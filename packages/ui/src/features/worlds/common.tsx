@@ -1,5 +1,6 @@
 // Shared bits of the worlds feature (also used by the publish modal).
 import type { ProjectInfo } from '@dcl-editor/contract'
+import { Notice } from '../../ds'
 import type { WorldEntry } from './inventory'
 import { newestScene } from './scene-label'
 
@@ -48,6 +49,15 @@ export function linkedScenes(projects: ProjectInfo[], world: string): ProjectInf
 
 export function publishFirstNote(lead: string, world: string): string {
   return `${lead} Publish a scene to ${world} first.`
+}
+
+export function OnDecentralandOnly(props: { title: string; what: string }): JSX.Element {
+  return (
+    <section className="eui-world-block">
+      <h2>{props.title}</h2>
+      <Notice>{props.what} is available when the editor runs on decentraland.org.</Notice>
+    </section>
+  )
 }
 
 export function PublishFirst(props: { lead: string; world: string }): JSX.Element {

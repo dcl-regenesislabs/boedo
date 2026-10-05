@@ -277,6 +277,7 @@ function PublishedScenes(props: { w: WorldEntry; wallet: string }): JSX.Element 
     setBusy(key)
     void undeployScene(w.name, sceneCoordinate(s)).then((r) => {
       setBusy(null)
+      if (!r.ok && r.reason === 'cancelled') return
       if (r.ok) {
         setNote(`Removed ${named(s)}.`)
         refreshWorlds()

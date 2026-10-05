@@ -6,6 +6,9 @@ import { LinkButton, Toast, useOutsideClose } from '../../ds'
 import { registerCss } from '../../ds/styles/registry'
 import { useStore } from '../../core/store'
 import { hostedRoute } from '../../engine/hosted'
+import { useAuth } from '../account/auth'
+import { ensureWorlds } from '../worlds/worlds-store'
+import { WorldsSection } from '../worlds/WorldsSection'
 import { relTime } from '../../lib/format'
 import { PublishModal } from '../publish/PublishModal'
 import { PublishOutcomeToast } from '../publish/PublishOutcomeToast'
@@ -45,7 +48,9 @@ export function captureHudTokens(el: HTMLElement): void {
 
 const CREATE_INTRO = 'Build scenes right here. Open one to walk into it and start building.'
 
-type Tab = 'scenes' | 'trash'
+type Tab = 'scenes' | 'worlds' | 'trash'
+
+const TAB_LABEL: Record<Tab, string> = { scenes: 'Your scenes', worlds: 'Worlds', trash: 'Trash' }
 
 export function CreateHome(): JSX.Element | null {
   const shell = window.editorShell
@@ -55,7 +60,8 @@ export function CreateHome(): JSX.Element | null {
   const [creating, setCreating] = useState(false)
   const [importMenu, setImportMenu] = useState(false)
   const [imported, setImported] = useState<ProjectImportResult | null>(null)
-  const [publish, setPublish] = useState<ProjectInfo | null>(null)
+  const [publish, setPublish] = useState<{ p: ProjectInfo; world: string | null } | null>(null)
+  const [worldsFocus, setWorldsFocus] = useState<string | null>(null)
   const [trashed, setTrashed] = useState<ProjectInfo | null>(null)
   useEffect(() => {
     if (trashed === null) return
@@ -71,6 +77,8 @@ export function CreateHome(): JSX.Element | null {
   const sync = useSyncStatus()
   const listRevision = sync?.revision
   useEffect(refresh, [listRevision])
+  const auth = useAuth()
+  useEffect(ensureWorlds, [auth.wallet])
   const notice = useStore(() => hostedRoute.notice)
   useEffect(() => {
     if (notice === null) return
@@ -96,20 +104,23 @@ export function CreateHome(): JSX.Element | null {
       <header className="eui-create-head">
         <h1>Create</h1>
         <div className="eui-create-tabs" role="tablist">
-          {(['scenes', 'trash'] as const).map((t) => (
+          {(['scenes', 'worlds', 'trash'] as const).map((t) => (
             <button
               key={t}
               role="tab"
               aria-selected={tab === t}
               className={`eui-create-pill ${tab === t ? 'on' : ''}`}
-              onClick={() => setTab(t)}
+              onClick={() => {
+                setTab(t)
+                setWorldsFocus(null)
+              }}
             >
-              {t === 'scenes' ? 'Your scenes' : 'Trash'}
+              {TAB_LABEL[t]}
             </button>
           ))}
         </div>
         <span className="eui-create-grow" />
-        {shell.importProject !== undefined && (
+        {tab !== 'worlds' && shell.importProject !== undefined && (
           <div className="eui-create-import" ref={importRef}>
             <button
               className="eui-create-action"
@@ -126,7 +137,9 @@ export function CreateHome(): JSX.Element | null {
             )}
           </div>
         )}
-        <button className="eui-create-action primary" onClick={() => setCreating(true)}>+ New scene</button>
+        {tab !== 'worlds' && (
+          <button className="eui-create-action primary" onClick={() => setCreating(true)}>+ New scene</button>
+        )}
       </header>
 
       {tab === 'scenes' ? (
@@ -143,7 +156,7 @@ export function CreateHome(): JSX.Element | null {
                 shell={shell}
                 onOpen={() => open(p.path)}
                 onChanged={refresh}
-                onPublish={() => setPublish(p)}
+                onPublish={() => setPublish({ p, world: p.world })}
                 onTrashed={() => setTrashed(p)}
               />
             ))}
@@ -153,6 +166,14 @@ export function CreateHome(): JSX.Element | null {
             </button>
           </div>
         </>
+      ) : tab === 'worlds' ? (
+        <WorldsSection
+          key={worldsFocus ?? 'all'}
+          projects={scenes}
+          initialWorld={worldsFocus}
+          onOpenScene={open}
+          onPublishScene={(p, world) => setPublish({ p, world })}
+        />
       ) : (
         <>
           <p className="eui-create-intro">Scenes in the trash are deleted for good 30 days after they were put there.</p>
@@ -202,12 +223,18 @@ export function CreateHome(): JSX.Element | null {
       )}
       {publish !== null && (
         <PublishModal
-          dir={publish.path}
-          sceneTitle={publish.title}
+          dir={publish.p.path}
+          sceneTitle={publish.p.title}
           currentWorld={publish.world}
           onClose={() => {
             setPublish(null)
             refresh()
+          }}
+          onManageWorld={(name) => {
+            setPublish(null)
+            refresh()
+            setWorldsFocus(name)
+            setTab('worlds')
           }}
         />
       )}

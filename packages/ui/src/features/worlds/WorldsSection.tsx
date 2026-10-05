@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import type { ProjectInfo } from '@dcl-editor/contract'
 import { Button, Chip } from '../../ds'
+import { getHost } from '../../engine/hosted'
 import { useAuth } from '../account/auth'
 import { type WorldEntry } from './inventory'
 import { sceneTotalOf, worldCardStatus } from './scene-label'
@@ -27,6 +28,7 @@ export function WorldsSection(props: {
   useEffect(ensureWorlds, [auth.wallet])
 
   if (auth.wallet === null) {
+    const host = getHost()
     return (
       <>
         <WorldsHead />
@@ -34,8 +36,22 @@ export function WorldsSection(props: {
           <div className="eui-signin">
             <div className="eui-account-empty-icon"><GlobeIcon size={22} /></div>
             <p className="t">Sign in to see your worlds</p>
-            <p className="s">Your Decentraland NAMEs are worlds you can publish scenes to.</p>
-            <Button variant="primary" size="md" onClick={auth.signIn}>Sign in with Decentraland</Button>
+            {auth.external ? (
+              <>
+                <p className="s">
+                  You are in Decentraland as a guest. Your NAMEs are worlds you can publish to, and seeing them needs a
+                  wallet: sign out from your profile in Decentraland, then sign in with a wallet.
+                </p>
+                {host !== null && (
+                  <Button variant="primary" size="md" onClick={() => host.exit()}>Back to Decentraland</Button>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="s">Your Decentraland NAMEs are worlds you can publish scenes to.</p>
+                <Button variant="primary" size="md" onClick={auth.signIn}>Sign in with Decentraland</Button>
+              </>
+            )}
           </div>
         </div>
       </>
@@ -82,7 +98,6 @@ export function WorldsSection(props: {
           </p>
           <div className="eui-home-cta">
             <Button variant="primary" size="md" onClick={() => openExternal(NAME_MARKETPLACE)}>Get a NAME</Button>
-            <Button variant="ghost" size="md" onClick={refreshWorlds}>Refresh</Button>
           </div>
         </div>
       )}

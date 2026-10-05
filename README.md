@@ -139,6 +139,9 @@ The **Worlds** tab in Home shows every world you can publish to — worlds on
 NAMEs you own, plus worlds where someone added you as a collaborator. It's
 always fetched live from the servers, so what you see is what's actually
 deployed, no matter which tool or machine deployed it.
+In the web editor the same tab sits on the **Create** page, and Decentraland's
+page signs for your wallet. Server storage and Analytics only work there when
+the page is served from decentraland.org.
 
 - **Publish** from a scene card, the in-editor topbar button, or a world's
   page: pick the world, the app builds and uploads, then offers to jump in.

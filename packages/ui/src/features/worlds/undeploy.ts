@@ -12,14 +12,16 @@
 // network", which want three different next moves.
 import { parseCoords } from '../../lib/parse-coords'
 import { worldsServer } from './endpoints'
-import { SIGN_IN_REQUIRED, signedFetch } from './signed-fetch'
+import { SIGN_CANCELLED, SIGN_IN_REQUIRED, SIGN_NOT_ALLOWED, SIGN_UNAVAILABLE, signedFetch } from './signed-fetch'
 
-export type UndeployReason = 'signed-out' | 'not-allowed' | 'gone' | 'unreachable' | 'bad-coordinate' | 'server'
+export type UndeployReason = 'cancelled' | 'signed-out' | 'not-allowed' | 'gone' | 'unreachable' | 'bad-coordinate' | 'server'
 
 export type UndeployResult = { ok: true } | { ok: false; reason: UndeployReason; message: string }
 
 function undeployError(reason: UndeployReason, status: number): string {
   switch (reason) {
+    case 'cancelled':
+      return SIGN_CANCELLED
     case 'signed-out':
       return SIGN_IN_REQUIRED
     case 'not-allowed':
@@ -51,6 +53,10 @@ export async function undeployScene(world: string, coordinate: string): Promise<
     res = await signedFetch(url, { method: 'DELETE' })
   } catch (e) {
     if (e instanceof Error && e.message === SIGN_IN_REQUIRED) return fail('signed-out')
+    if (e instanceof Error && e.message === SIGN_CANCELLED) return fail('cancelled')
+    if (e instanceof Error && (e.message === SIGN_NOT_ALLOWED || e.message === SIGN_UNAVAILABLE)) {
+      return { ok: false, reason: 'not-allowed', message: e.message }
+    }
     return fail('unreachable')
   }
   if (res.ok) return { ok: true }

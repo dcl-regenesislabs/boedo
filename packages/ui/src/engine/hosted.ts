@@ -25,6 +25,18 @@ export interface HostFetchInit {
   method?: string
   headers?: Record<string, string>
   body?: BodyInit | null
+  // contract v1.2, for services.signed urls: ADR-44 metadata, and aborting the request
+  metadata?: Record<string, unknown>
+  signal?: AbortSignal
+}
+
+// contract v1.2: Decentraland's services the host signs for, beside the project storage
+export interface SignedServices {
+  worldsContent: string
+  commsGatekeeper: string
+  storage: string
+  creatorsData: string
+  multiplayer: string
 }
 
 export interface DeploymentRequest {
@@ -45,8 +57,11 @@ export interface DclEditorHostV1 extends Omit<DclEditorHostV0, 'version'> {
     // no trailing slash; null: no project storage for this page
     projects: string | null
     worldsContent: string
+    // only when worldsContent is Decentraland's own (.org or .zone)
+    signed?: SignedServices
   }
-  // rejects 'not-signed-in' for a guest, 'not-allowed' for a url outside services.projects
+  // rejects 'not-signed-in' for a guest, 'not-allowed' for a url or method the host does not sign,
+  // 'cancelled' when the player declines a scene removal
   signedFetch(url: string, init?: HostFetchInit): Promise<Response>
   // the host asks the player first; rejects 'cancelled' or 'not-signed-in'
   signDeployment(request: DeploymentRequest): Promise<AuthChain>

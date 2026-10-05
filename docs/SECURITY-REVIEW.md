@@ -45,6 +45,10 @@ npx vitest run packages/service/src/security.test.ts packages/service/src/ai/ser
   the editor scene attached. Subsequent desktop checks did not run. The cause
   remains unresolved; this review does not establish that it predates these changes.
 
+## Worlds management signing (host contract v1.2)
+
+Host contract v1.2 ([HOST-CONTRACT.md](HOST-CONTRACT.md)) widens the signing boundary. Beside a .zone/.org Worlds server, the pinned editor can now get scene-shaped signatures (pathname only, metadata it chooses, e.g. `signer: decentraland-kernel-scene`) for the player's wallet on Worlds content, comms-gatekeeper, storage, multiplayer `/logs` and creators-data. Guards: exact per-environment host allow-list (no userinfo, ports, lookalikes or cross-environment), a method allow-list per service, multiplayer limited to GET `/logs`, the editor's own `dcl:editor` metadata refused there (so these signatures cannot be replayed at the project service), and a page dialog before a scene or whole-world undeploy. Other Worlds DELETEs (permissions, access lists) are not confirmed. A signature is replayable within each service's timestamp window, and since the query is unsigned, against any query on the same path and method. This still rests on L1: the editor is trusted like the HUD bundle.
+
 ## Deployment limits and remaining checks
 
 Use the [Node deployment guide](../packages/service/README.md#container-deployment)

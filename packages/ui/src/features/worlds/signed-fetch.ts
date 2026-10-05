@@ -5,17 +5,55 @@
 // each auth-chain link travels as an x-identity-auth-chain-<i> header. The
 // storage and creators-data APIs reject localhost origins in their CORS
 // allowlists, so requests to a RELAY_HOSTS host relay through main
-// (signedRelay) — signed here either way.
+// (signedRelay) — signed here either way. Hosted with services.signed, the page
+// holds the wallet and signs instead.
 import { Authenticator } from '@dcl/crypto'
 import { RELAY_HOSTS } from '@dcl-editor/contract'
+import { hostV1, isHosted, type DclEditorHostV1 } from '../../engine/hosted'
 import { getIdentity } from '../account/auth'
 import { signedFetchPayload } from '../../lib/adr44'
 
 // Thrown before the request leaves, so a caller mapping transport failures can
 // tell "signed out" apart from "unreachable" instead of blaming the network.
 export const SIGN_IN_REQUIRED = 'Sign in to do this'
+// the player declined the page's own confirmation: not a failure
+export const SIGN_CANCELLED = 'Cancelled'
+export const SIGN_NOT_ALLOWED = "Decentraland doesn't let the editor make this request"
+// hosted, the page holds the wallet and only signs for Decentraland's own servers
+export const SIGN_UNAVAILABLE = 'Available when the editor runs on decentraland.org'
+
+function lowerKeys(h: Record<string, string> | undefined): Record<string, string> | undefined {
+  return h === undefined ? undefined : Object.fromEntries(Object.entries(h).map(([k, v]) => [k.toLowerCase(), v]))
+}
+
+async function hostedSignedFetch(
+  host: DclEditorHostV1,
+  url: string,
+  init: RequestInit | undefined,
+  metadata: Record<string, unknown>
+): Promise<Response> {
+  try {
+    return await host.signedFetch(url, {
+      method: init?.method ?? 'GET',
+      // the page's header allow-list is lowercase
+      headers: lowerKeys(init?.headers as Record<string, string> | undefined),
+      body: init?.body,
+      metadata,
+      signal: init?.signal ?? undefined
+    })
+  } catch (e) {
+    const code = e instanceof Error ? e.message : ''
+    if (code === 'not-signed-in') throw new Error(SIGN_IN_REQUIRED)
+    if (code === 'cancelled') throw new Error(SIGN_CANCELLED)
+    if (code === 'not-allowed') throw new Error(SIGN_NOT_ALLOWED)
+    throw e
+  }
+}
 
 export async function signedFetch(url: string, init?: RequestInit, metadata: Record<string, unknown> = {}): Promise<Response> {
+  const host = hostV1()
+  if (host?.services.signed !== undefined) return hostedSignedFetch(host, url, init, metadata)
+  if (isHosted()) throw new Error(SIGN_UNAVAILABLE)
   const identity = getIdentity()
   if (identity === null) throw new Error(SIGN_IN_REQUIRED)
   const u = new URL(url)

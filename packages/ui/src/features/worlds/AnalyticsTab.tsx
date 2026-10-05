@@ -3,7 +3,8 @@ import { PanelState, Segmented, useLoad } from '../../ds'
 import { IconDesktop, IconMobile } from '../../icons'
 import { formatCount, formatMinutes, formatPercent1 } from '../../lib/format'
 import { rankByVisitors, sceneMetrics, visitorCounts, worldMetrics, type WorldSnapshot } from './analytics'
-import { publishFirstNote } from './common'
+import { OnDecentralandOnly, publishFirstNote } from './common'
+import { signedServicesOutOfReach } from './endpoints'
 import type { WorldEntry, WorldScene } from './inventory'
 import {
   hasNoData,
@@ -34,6 +35,7 @@ export function AnalyticsTab(props: { w: WorldEntry; picked: string[]; onPick: (
       />
     )
   }
+  if (signedServicesOutOfReach()) return <OnDecentralandOnly title="Visitors" what="Visitor numbers" />
   return <Visitors w={w} picked={props.picked} onPick={props.onPick} />
 }
 

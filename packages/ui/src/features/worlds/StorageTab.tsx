@@ -30,7 +30,8 @@ import {
   type WorldStorageScope
 } from './storage'
 import { sceneCoordinate, type WorldEntry, type WorldScene } from './inventory'
-import { publishFirstNote, PublishFirst } from './common'
+import { OnDecentralandOnly, publishFirstNote, PublishFirst } from './common'
+import { signedServicesOutOfReach } from './endpoints'
 import { sceneLabelSentence, sceneListShort, sceneTotalOf } from './scene-label'
 import { ScenePick } from './ScenePick'
 import { inlineJson, parseLoose, prettyJson, valueHint } from '../../lib/json-value'
@@ -59,6 +60,7 @@ export function StorageTab(props: { w: WorldEntry; picked: string[]; onPick: (ke
       </section>
     )
   }
+  if (signedServicesOutOfReach()) return <OnDecentralandOnly title="Server storage" what="Server storage" />
   return (
     <>
       <section className="eui-world-block">
