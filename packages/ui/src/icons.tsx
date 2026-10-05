@@ -19,7 +19,9 @@ import {
   PanelLeft,
   PanelRight,
   Video,
+  Focus,
   Pencil,
+  MessageSquarePlus,
   Undo2,
   Redo2,
   Code2,
@@ -81,11 +83,13 @@ export const IconMobile = wrap(Smartphone)
 export const IconSidebarLeft = wrap(PanelLeft)
 export const IconSidebarRight = wrap(PanelRight)
 export const IconCamera = wrap(Video)
+export const IconFrame = wrap(Focus)
 export const IconEdit = wrap(Pencil)
 export const IconUndo = wrap(Undo2)
 export const IconRedo = wrap(Redo2)
 export const IconCode = wrap(Code2)
 export const IconBot = wrap(Bot)
+export const IconNewChat = wrap(MessageSquarePlus)
 export const IconSceneUi = wrap(AppWindow)
 export const IconLock = wrap(Lock)
 export const IconUnlock = wrap(Unlock)

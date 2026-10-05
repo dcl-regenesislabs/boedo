@@ -29,14 +29,14 @@ import { authoredFromComposite, loadAuthoredIds, subscribeAuthored } from './aut
 import { entityName, NAME_COMPONENT } from '@scene/custom-components'
 import { outOfBoundsSet } from '@scene/out-of-bounds'
 import { uiSetComponentValue, uiSetEntityFlag } from '../actions/components'
-import { uiReparentEntities } from '../actions/entities'
+import { uiAddBox, uiReparentEntities } from '../actions/entities'
 import { uiClearSelection, uiFocusEntity, uiSelectEntity } from '../actions/selection'
 import { FOLDER_COMPONENT, uiNewFolder } from '../actions/folders'
 import { useStore } from '../core/store'
 import { IconPlus, IconImport, IconEye, IconEyeOff, IconFolder, IconFolderPlus, IconLock, IconUnlock, IconPrefab, IconWarn, IconGear, IconTable, KIND_ICONS } from '../icons'
 import { EntityContextMenu, type CtxMenu } from './EntityContextMenu'
 import { LeftTabs, type LeftView } from './left-view'
-import { sceneEmptiness } from './empty-scene'
+import { hasReadyMadePrefabs, sceneEmptiness } from './empty-scene'
 import { PrefabMark, PrefabUpdateBadge } from './prefab-widgets'
 import { prefabAssetId } from '../prefabs/provenance'
 import { isMod } from '../lib/keys'
@@ -53,10 +53,12 @@ import {
 } from './root-split'
 import { TreeFolder } from './TreeFolder'
 import { TreeCaret } from './TreeCaret'
+import { focusRow, onTreeRowKey, treeRows } from './hierarchy-keys'
 import { prefabStore } from './prefab-store'
 import { SceneSettingsModal } from '../features/scene-settings/SceneSettingsModal'
 import { GameConfigModal } from './GameConfigModal'
-import { Button, Chip, IconButton, Shelf } from '../ds'
+import { Button, Chip, IconButton, Shelf, labelTip } from '../ds'
+import { launchParam } from '../boot/launch-params'
 
 // The matched run of a label, marked so a hit reads at a glance in a tree that
 // still shows its ancestors as context.
@@ -107,7 +109,7 @@ function EntityFlags(props: { id: string }): JSX.Element {
     <span className="row-flags">
       <button
         className={`flag ${hiddenFlag ? 'on' : ''}`}
-        data-tip={hiddenFlag ? 'Show in the editor' : 'Hide in the editor'}
+        {...labelTip(hiddenFlag ? 'Show in the editor' : 'Hide in the editor')}
         onClick={(e) => {
           e.stopPropagation()
           void uiSetEntityFlag(props.id, 'inspector::Hide', !hiddenFlag)
@@ -117,7 +119,7 @@ function EntityFlags(props: { id: string }): JSX.Element {
       </button>
       <button
         className={`flag ${locked ? 'on' : ''}`}
-        data-tip={locked ? 'Unlock — allow selecting and moving' : 'Lock — stop it being selected or moved'}
+        {...labelTip(locked ? 'Unlock — allow selecting and moving' : 'Lock — stop it being selected or moved')}
         onClick={(e) => {
           e.stopPropagation()
           void uiSetEntityFlag(props.id, 'inspector::Lock', !locked)
@@ -177,7 +179,7 @@ export function HierarchyPanel(props: {
   const baseline = useStore(() => provenanceBaseline())
   const snapshot = snapshotState as Snapshot
   // Ground truth for "authored": the project's main.composite, read from disk.
-  const projectDirParam = new URLSearchParams(window.location.search).get('project')
+  const projectDirParam = launchParam('project')
   const fromComposite = useSyncExternalStore(subscribeAuthored, authoredFromComposite)
   useEffect(() => loadAuthoredIds(projectDirParam), [projectDirParam])
   const model = hierarchyModel(snapshot, baseline, true, fromComposite)
@@ -192,7 +194,7 @@ export function HierarchyPanel(props: {
   // The Game Config lives on the scene root, which this tree never shows — this
   // button is the only way to reach it.
   const [gameConfig, setGameConfig] = useState(false)
-  const projectDir = new URLSearchParams(window.location.search).get('project')
+  const projectDir = launchParam('project')
   const sceneSettingsAvailable = projectDir !== null && window.editorShell?.sceneSettings !== undefined
   // Reveal: expand first (the row may be collapsed or in a closed shelf, so it
   // is not in the DOM yet), then scroll one render later once it has mounted.
@@ -275,11 +277,9 @@ export function HierarchyPanel(props: {
         renaming={renaming}
         setRenaming={setRenaming}
         drag={drag}
-        onContext={(e, rowId) => {
-          e.preventDefault()
-          e.stopPropagation()
+        onContext={(at, rowId) => {
           if (!state.selected.has(rowId)) uiSelectEntity(rowId, false, false)
-          setCtx({ x: e.clientX, y: e.clientY, id: rowId })
+          setCtx({ x: at.x, y: at.y, id: rowId })
         }}
       />
     ))
@@ -355,7 +355,7 @@ export function HierarchyPanel(props: {
         )}
         <span className="eui-head-sep" />
         <div className="eui-head-actions">
-          <button className="eui-btn icon" data-tip="Browse assets" onClick={() => props.onView('assets')}>
+          <button className="eui-btn icon" {...labelTip('Browse assets')} onClick={() => props.onView('assets')}>
             <IconImport />
           </button>
           <IconButton
@@ -371,10 +371,10 @@ export function HierarchyPanel(props: {
           >
             <IconPrefab />
           </IconButton>
-          <button className="eui-btn icon" data-tip="New folder — organize the tree" onClick={() => void uiNewFolder(0)}>
+          <button className="eui-btn icon" {...labelTip('New folder — organize the tree')} onClick={() => void uiNewFolder(0)}>
             <IconFolderPlus />
           </button>
-          <button className="eui-btn icon" data-tip="New entity" onClick={props.onNewEntity}>
+          <button className="eui-btn icon" {...labelTip('New entity')} onClick={props.onNewEntity}>
             <IconPlus />
           </button>
         </div>
@@ -394,6 +394,15 @@ export function HierarchyPanel(props: {
         // padding band above it still scrolls its rows through — which read as a
         // strip of half-entities floating above "Made by your code".
         style={{ padding: '0 0 8px' }}
+        role="tree"
+        aria-label="Scene entities"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return
+          e.preventDefault()
+          const rows = treeRows(e.currentTarget)
+          focusRow(rows.find((row) => row.getAttribute('aria-selected') === 'true') ?? (e.key === 'End' ? rows.at(-1) : rows[0]))
+        }}
         onClick={() => uiClearSelection()}
         onContextMenu={(e) => e.preventDefault()}
         onDragOver={(e) => {
@@ -487,6 +496,17 @@ export function HierarchyPanel(props: {
 }
 
 function StartCta(props: { onView: (v: LeftView) => void }): JSX.Element {
+  if (!hasReadyMadePrefabs()) {
+    return (
+      <div className="eui-empty">
+        <p className="eui-empty-line">Nothing of yours in the scene yet.</p>
+        <Button variant="primary" onClick={() => void uiAddBox()}>
+          Add a box
+        </Button>
+        <p className="eui-empty-line">Or drop a model into Assets and place it in the scene.</p>
+      </div>
+    )
+  }
   return (
     <div className="eui-empty">
       <p className="eui-empty-line">Nothing of yours in the scene yet.</p>
@@ -570,12 +590,13 @@ function EntityRow(props: {
   renaming: RenameTarget | null
   setRenaming: (target: RenameTarget | null) => void
   drag: DragHandlers
-  onContext: (e: React.MouseEvent, id: string) => void
+  onContext: (at: { x: number; y: number }, id: string) => void
 }): JSX.Element | null {
   const { id, depth, model, search, renaming, setRenaming, drag, onContext } = props
   const forest = model.forest
   const expandedEntities = useStore(() => state.expandedEntities)
   const selected = useStore(() => state.selected)
+  const active = useStore(() => state.activeEntity)
   const snapshot = useStore(() => state.snapshot)
   const children = forest.children.get(id) ?? []
   const name = entityName(snapshot as Snapshot, id)
@@ -598,6 +619,7 @@ function EntityRow(props: {
       ? expandedEntities.has(id)
       : search.keptAny(children) || search.keptAny(codeKids)
 
+  const hasKids = children.length + codeKids.length > 0
   const commitRename = (value: string): void => {
     setRenaming(null)
     const v = value.trim()
@@ -615,6 +637,23 @@ function EntityRow(props: {
             drag.dropTarget === id ? ' drop-into' : ''
           }${isPrefab ? ' eui-prefab-row' : ''}${isCode ? ' code' : ''}`}
           draggable={!isRenaming && !isCode}
+          role="treeitem"
+          aria-level={depth + 1}
+          aria-selected={selected.has(id)}
+          aria-expanded={hasKids ? expanded : undefined}
+          data-entity={id}
+          title="Double-click to frame in the viewport"
+          tabIndex={active === id ? 0 : -1}
+          onKeyDown={(e) =>
+            onTreeRowKey(e, {
+              id,
+              depth,
+              hasKids,
+              expanded,
+              toggle: () => toggleEntity(id),
+              openMenu: (at) => onContext(at, id)
+            })
+          }
           onClick={(e) => {
             e.stopPropagation()
             uiSelectEntity(id, e.shiftKey, isMod(e))
@@ -626,7 +665,11 @@ function EntityRow(props: {
             // renamed things by accident. Rename lives in the context menu.
             uiFocusEntity(id)
           }}
-          onContextMenu={(e) => onContext(e, id)}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onContext({ x: e.clientX, y: e.clientY }, id)
+          }}
           onDragStart={(e) => {
             e.stopPropagation()
             // an unselected drag acts on just this row

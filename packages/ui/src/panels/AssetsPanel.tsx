@@ -195,6 +195,7 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   const [allFiles, setAllFiles] = useState(false)
   const catalog = useStore(() => state.assetCatalog)
   const busy = useStore(() => state.assetBusy)
+  const catalogFailed = useStore(() => state.assetCatalogFailed)
 
   const refresh = (): void => {
     setModels(null)
@@ -221,19 +222,21 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
       <LeftTabs view="assets" onView={props.onView} />
       <div className="eui-search" style={{ display: 'flex', gap: 6 }}>
         <SearchField size="sm" placeholder="Search assets…" value={filter} onChange={setFilter} />
-        <Select
-          density="row"
-          className="eui-asset-category"
-          value={category}
-          onChange={setCategory}
-          aria-label="category"
-          options={[{ value: '', label: 'All' }, ...categories.map((c) => ({ value: c, label: c }))]}
-        />
+        {!catalogFailed && (
+          <Select
+            density="row"
+            className="eui-asset-category"
+            value={category}
+            onChange={setCategory}
+            aria-label="category"
+            options={[{ value: '', label: 'All' }, ...categories.map((c) => ({ value: c, label: c }))]}
+          />
+        )}
         <IconButton tip="Reload your files" style={{ flex: 'none' }} onClick={refresh}>
           <IconRefresh />
         </IconButton>
       </div>
-      {(busy || models === null || catalog.length === 0) && (
+      {(busy || models === null || (catalog.length === 0 && !catalogFailed)) && (
         <div className="eui-asset-count">{busy ? 'Working…' : 'Loading…'}</div>
       )}
       <div className="eui-panel-body">
@@ -247,9 +250,13 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
             </div>
           )}
         </Shelf>
-        <Shelf title="Catalog" count={entries.length}>
-          <CatalogGrid entries={entries} resetKey={`${f}|${category}`} />
-        </Shelf>
+        {catalogFailed ? (
+          <p className="eui-asset-note">Catalog unavailable here. Use “Add model” to bring in a .glb from your computer.</p>
+        ) : (
+          <Shelf title="Catalog" count={entries.length}>
+            <CatalogGrid entries={entries} resetKey={`${f}|${category}`} />
+          </Shelf>
+        )}
         {nothing && (
           <SearchEmpty
             message="No assets match"

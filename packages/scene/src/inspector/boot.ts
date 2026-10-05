@@ -1,8 +1,10 @@
+import { BevyApi } from '../bevy-api'
 import { type LiveSceneInfo } from '../bevy-api/interface'
 import { trace, traced } from '../boot-trace'
 import { cmd } from '../cmd'
 import { resolveInspectableScene } from '../current-scene'
 import { forceLowGraphics } from '../graphics-preset'
+import { hostedAmong, isHosted, setHosted } from '../hosted'
 import { log } from '../log'
 import { autoLogin } from '../login'
 import { state } from '../state'
@@ -10,20 +12,43 @@ import { sleep } from '../utils'
 import { pinTimeOfDay, syncFrozenState } from './transport'
 import { CMD_ATTEMPT_TIMEOUT_MS, SCENE_BOOT_RETRY_MS, SCENE_BOOT_TIMEOUT_MS, loadComponentNames, pullSnapshot, traceSceneStats, withTimeout } from './writes'
 
-// Boot sequence: log in, then load the current scene's component state.
+// Whether a host's own privileged scene is running this engine. An engine that
+// never answers is treated as hosted: a session we can't account for isn't ours.
+async function detectHosted(): Promise<boolean> {
+  const deadline = Date.now() + SCENE_BOOT_TIMEOUT_MS
+  for (let attempt = 1; Date.now() < deadline; attempt++) {
+    try {
+      return await traced(
+        `host #${attempt}`,
+        async () => hostedAmong((await withTimeout(BevyApi.liveSceneInfo(), CMD_ATTEMPT_TIMEOUT_MS, 'live scenes')) ?? []),
+        (hosted) => (hosted ? 'hosted — another privileged scene owns the session' : 'standalone')
+      )
+    } catch {
+      await sleep(SCENE_BOOT_RETRY_MS) // traced() already recorded the failure
+    }
+  }
+  return true
+}
+
+// Boot sequence: log in (standalone only), then load the current scene's component state.
 export async function startInspector(): Promise<void> {
   trace('inspector start')
-  state.status = 'logging-in'
-  await traced('login', autoLogin)
+  setHosted(await detectHosted())
+  if (!isHosted()) {
+    state.status = 'logging-in'
+    await traced('login', autoLogin)
+  }
   await refresh()
   // Force graphics to Low to dodge the WebGPU shadow-pass crash on heavy scenes.
   // Done AFTER the scene is up (the render pipeline must exist for the Medium→Low
   // bounce to actually rebuild it). Best-effort, never blocks the editor.
-  void forceLowGraphics()
+  // Hosted, the graphics settings are the host's (and the player's) to choose.
+  if (!isHosted()) void forceLowGraphics()
   // Pin the sky to midday. The engine's day/night clock runs off real time at
   // speed 12 (a full cycle every ~2h) regardless of scene freeze, so a long
   // editing session silently turns to night. Same best-effort discipline.
-  pinTimeOfDay(false)
+  // Hosted, the clock is the host's: the page pins it when it pauses the scene.
+  if (!isHosted()) pinTimeOfDay(false)
   // Best-effort, independent of the scene — populates the add-component picker.
   loadComponentNames().catch(console.error)
 }

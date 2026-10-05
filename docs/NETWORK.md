@@ -86,6 +86,8 @@ Switching Admins↔Bans remounts each and refetches both directions every time.
 | List env keys | GET `{storage}/env?limit=50&offset=N` | signed+relay | every Env sub-tab mount / page | no |
 | Set/delete env key | PUT/DELETE `{storage}/env/:key` | signed+relay | per action + reload | n/a |
 
+Hosted (web), the logs drawer's Storage tab is the open preview's own data instead: the same `/values` and `/players/:addr/values` routes under the preview realm url, unsigned and not relayed, with no players list, env keys or bulk delete (the toolchain's preview serves none of those).
+
 **Logs (LogsTab)**
 
 | Request | Method + URL | Auth | Trigger | Cached today? |

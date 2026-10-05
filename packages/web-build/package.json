@@ -1,0 +1,27 @@
+{
+  "name": "@dcl-editor/web-build",
+  "version": "0.1.0",
+  "private": true,
+  "description": "In-browser scene build: bundles an SDK7 scene with esbuild-wasm in a Web Worker over an in-memory file system, and writes the result into the preview realm store the service worker serves.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "snapshot": "node scripts/make-sdk-snapshot.mjs",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json",
+    "validate": "npm run build && node validate/browser-build.mjs"
+  },
+  "dependencies": {
+    "esbuild-wasm": "0.18.20",
+    "ignore": "^5.2.4"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "playwright-core": "1.62.1",
+    "typescript": "^5.6.0"
+  }
+}

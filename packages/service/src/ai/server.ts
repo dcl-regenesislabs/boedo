@@ -1,0 +1,168 @@
+import type { IHttpServerComponent } from '@dcl/core-commons'
+import { upgradeWebSocketResponse } from '@dcl/http-server/dist/ws.js'
+import { STOP_COMPONENT } from '@well-known-components/interfaces'
+import type { IBaseComponent } from '@well-known-components/interfaces'
+import { WebSocketServer, WebSocket } from 'ws'
+import { ASSISTANT_MAX_MESSAGE_BYTES, ASSISTANT_PROTOCOL, ASSISTANT_TICKET_PREFIX } from '../../../contract/src/assistant.ts'
+import { createRateLimiter } from '../config.ts'
+import { createConnection } from './connection.ts'
+import type { AgentFactory, AssistantService } from './types.ts'
+import type { BaseComponents } from '../types.ts'
+
+function json(status: number, value: unknown): Response {
+  return new Response(JSON.stringify(value), {
+    status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
+  })
+}
+
+export interface AssistantComponent extends AssistantService, IBaseComponent {
+  ws: WebSocketServer
+  upgrade(request: Request): IHttpServerComponent.IResponse
+}
+
+export interface AssistantLimits {
+  /** Lowercase wallets that may use the assistant; null lets any signed-in wallet in. */
+  wallets: ReadonlySet<string> | null
+  /** Turns across all wallets per minute. */
+  turnsPerMinute: number
+  /** Turns one wallet may start per day. */
+  turnsPerDay: number
+}
+
+export const DEFAULT_ASSISTANT_LIMITS: AssistantLimits = { wallets: null, turnsPerMinute: 30, turnsPerDay: 200 }
+
+const MAX_SOCKETS = 32
+const SOCKETS_PER_WALLET = 3
+
+export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>, options: {
+  factory?: AgentFactory
+  allowedOrigins: readonly string[]
+  basePath?: string
+  limits?: AssistantLimits
+}): AssistantComponent {
+  const limits = options.limits ?? DEFAULT_ASSISTANT_LIMITS
+  const days = new Map<string, { day: number; count: number }>()
+  const factory = options.factory
+  const logger = logs.getLogger('assistant')
+  const tickets = new Map<string, { wallet: string; origin: string; expires: number }>()
+  const sockets = new Map<WebSocket, string>()
+  const pending = new Map<string, { wallet: string; timer: ReturnType<typeof setTimeout> }>()
+  const limiter = createRateLimiter()
+  const closing = new Set<Promise<void>>()
+  let stopped = false
+  const socketOptions = {
+    noServer: true, maxPayload: ASSISTANT_MAX_MESSAGE_BYTES, perMessageDeflate: false,
+    maxFragments: 4096, maxBufferedChunks: 16384, closeTimeout: 5000,
+    handleProtocols: () => ASSISTANT_PROTOCOL
+  }
+  const ws = new WebSocketServer(socketOptions)
+  const path = `${options.basePath ?? ''}/assistant/socket`
+  function liveTickets(): { all: number; held: (wallet: string) => number } {
+    for (const [token, ticket] of tickets) if (ticket.expires < Date.now()) tickets.delete(token)
+    return { all: tickets.size, held: (wallet) => [...tickets.values()].filter((ticket) => ticket.wallet === wallet).length }
+  }
+  function allowTurn(wallet: string): boolean {
+    const now = Date.now()
+    const day = Math.floor(now / 86_400_000)
+    const used = days.get(wallet)
+    const count = used?.day === day ? used.count : 0
+    if (count >= limits.turnsPerDay) return false
+    if (limiter.take(wallet, now, 10) > 0 || limiter.take('turns', now, limits.turnsPerMinute) > 0) return false
+    if (days.size > 10_000) for (const [other, entry] of days) if (entry.day !== day) days.delete(other)
+    days.set(wallet, { day, count: count + 1 })
+    return true
+  }
+  function connect(socket: WebSocket, token: string) {
+    const reservation = pending.get(token)
+    if (reservation !== undefined) clearTimeout(reservation.timer)
+    pending.delete(token)
+    if (stopped || factory === undefined || reservation === undefined) { socket.terminate(); return }
+    const { wallet } = reservation
+    sockets.set(socket, wallet)
+    let connection: ReturnType<typeof createConnection> | null = null
+    const deadline = setTimeout(() => socket.terminate(), 5000)
+    const idle = setTimeout(() => socket.close(1000, 'Session expired'), 15 * 60_000)
+    const send = (value: unknown) => {
+      if (socket.readyState !== WebSocket.OPEN) return
+      if (socket.bufferedAmount > 1024 * 1024) { socket.close(1008, 'Client too slow'); return }
+      socket.send(JSON.stringify(value))
+    }
+    socket.on('message', (raw, binary) => {
+      idle.refresh()
+      if (binary) { socket.close(1003, 'Text messages required'); return }
+      let message: unknown
+      try { message = JSON.parse(raw.toString()) } catch { socket.close(1008, 'Invalid message'); return }
+      if (connection !== null) connection.receive(message)
+      else socket.close(1008, 'Wait for session readiness')
+    })
+    void factory.providers().then((providers) => {
+      if (socket.readyState !== WebSocket.OPEN) return
+      clearTimeout(deadline)
+      connection = createConnection({ factory, send, allowTurn: () => allowTurn(wallet) })
+      send({ kind: 'ready', providers })
+    }).catch(() => socket.close(1011, 'Assistant unavailable'))
+    socket.on('error', () => socket.close())
+    socket.on('close', () => {
+      clearTimeout(deadline)
+      clearTimeout(idle)
+      sockets.delete(socket)
+      if (connection !== null) {
+        const pending = connection.close().catch(() => { logger.error('Assistant cleanup failed') })
+        closing.add(pending)
+        void pending.then(() => closing.delete(pending))
+      }
+    })
+  }
+  return {
+    ws,
+    upgrade(request) {
+      if (stopped || factory === undefined) return { status: 503 }
+      const url = new URL(request.url)
+      const origin = request.headers.get('origin') ?? ''
+      if (url.pathname + url.search !== path || !options.allowedOrigins.includes(origin)) return { status: 403 }
+      if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') return { status: 426 }
+      const protocols = (request.headers.get('sec-websocket-protocol') ?? '').split(',').map((value) => value.trim())
+      if (protocols.length !== 2 || protocols[0] !== ASSISTANT_PROTOCOL || !protocols[1].startsWith(ASSISTANT_TICKET_PREFIX)) return { status: 403 }
+      const token = protocols[1].slice(ASSISTANT_TICKET_PREFIX.length)
+      const ticket = tickets.get(token)
+      if (ticket === undefined || ticket.expires <= Date.now() || ticket.origin !== origin) return { status: 403 }
+      const walletConnections = [...sockets.values(), ...[...pending.values()].map((entry) => entry.wallet)]
+      if (walletConnections.length >= MAX_SOCKETS || walletConnections.filter((wallet) => wallet === ticket.wallet).length >= SOCKETS_PER_WALLET) return { status: 429 }
+      tickets.delete(token)
+      const timer = setTimeout(() => pending.delete(token), 5000)
+      timer.unref()
+      pending.set(token, { wallet: ticket.wallet, timer })
+      return upgradeWebSocketResponse((socket: WebSocket) => connect(socket, token))
+    },
+    async handle(request, route, wallet) {
+      if (stopped || factory === undefined) return json(503, { error: 'assistant-unavailable' })
+      const allowed = limits.wallets === null || limits.wallets.has(wallet)
+      if (route === '/assistant/providers' && request.method === 'GET') {
+        const providers = await factory.providers()
+        return json(200, allowed ? providers : providers.map((provider) => ({
+          ...provider, available: false, reason: 'This account does not have access to the assistant.'
+        })))
+      }
+      if (route !== '/assistant/connect' || request.method !== 'POST') return json(404, { error: 'not-found' })
+      const origin = request.headers.get('origin') ?? JSON.parse(request.headers.get('x-identity-metadata') ?? '{}').origin
+      if (typeof origin !== 'string' || !options.allowedOrigins.includes(origin)) return json(403, { error: 'origin-not-allowed' })
+      if (!allowed) return json(403, { error: 'assistant-not-allowed' })
+      const live = liveTickets()
+      if (live.all >= 100 || live.held(wallet) >= SOCKETS_PER_WALLET || limiter.take(`connect:${wallet}`, Date.now(), 10) > 0) {
+        return json(429, { error: 'rate-limited' })
+      }
+      const token = crypto.randomUUID()
+      tickets.set(token, { wallet, origin, expires: Date.now() + 30_000 })
+      return json(200, { token, path })
+    },
+    async [STOP_COMPONENT]() {
+      stopped = true
+      tickets.clear()
+      for (const reservation of pending.values()) clearTimeout(reservation.timer)
+      pending.clear()
+      for (const socket of ws.clients) socket.terminate()
+      await new Promise<void>((resolve) => ws.close(() => resolve()))
+      await Promise.all(closing)
+    }
+  }
+}

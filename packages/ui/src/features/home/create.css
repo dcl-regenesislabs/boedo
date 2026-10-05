@@ -1,0 +1,115 @@
+/* the HUD's Create page body: HUD tokens (captured as --hud-*) and the HUD pages' sizes */
+.eui-root.eui-create-root { position: absolute; inset: 0; z-index: auto; }
+.eui-create {
+  --brand: var(--hud-brand, #ff2d55);
+  --brand-hover: var(--hud-brand-hover, #ff4d70);
+  --primary: var(--brand);
+  --brand-active: color-mix(in srgb, var(--brand) 50%, transparent);
+  --primary-dark: color-mix(in srgb, var(--brand), black 20%);
+  --primary-selected: color-mix(in srgb, var(--brand) 16%, transparent);
+  --primary-border: color-mix(in srgb, var(--brand) 60%, transparent);
+  --primary-glow: color-mix(in srgb, var(--brand) 35%, transparent);
+  --accent: var(--hud-accent, #ff743a);
+  --text: var(--hud-text, #fcfcfc);
+  --font-family: var(--hud-font-family, 'Inter Variable', 'Inter', system-ui, sans-serif);
+  --r-sm: var(--hud-r-sm, 8px);
+  --r-lg: var(--hud-r-lg, 16px);
+  --r-pill: var(--hud-r-pill, 999px);
+  --fill-3: var(--hud-fill-3, rgba(255, 255, 255, 0.08));
+  --fill-4: var(--hud-fill-4, rgba(255, 255, 255, 0.1));
+  --fill-5: var(--hud-fill-5, rgba(255, 255, 255, 0.12));
+  --ink-95: var(--hud-ink-95, rgba(255, 255, 255, 0.95));
+  --ink-7: var(--hud-ink-7, rgba(255, 255, 255, 0.7));
+  --ink-6: var(--hud-ink-6, rgba(255, 255, 255, 0.6));
+  --ink-45: var(--hud-ink-45, rgba(255, 255, 255, 0.45));
+  --dur-fast: var(--hud-dur-fast, 140ms);
+  --ease-spring: var(--hud-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+  --create-card-body: rgba(0, 0, 0, 0.4);
+  --create-card-glow: 0 2px 12px 12px rgba(255, 255, 255, 0.3);
+  --create-badge: rgba(22, 21, 24, 0.92);
+  --create-sky: linear-gradient(#8fb6e6 0%, #cfe0f2 55%, #6f9a3a 55%, #4c7524 100%);
+
+  /* pulled out 14px so a hovered card's glow isn't clipped, padded back to the shell's edge */
+  pointer-events: auto; position: absolute; inset: -14px -14px 0; overflow-y: auto; overflow-x: hidden;
+  display: flex; flex-direction: column; gap: 18px; padding: 14px 14px 24px;
+  font-family: var(--font-family); color: var(--text); font-size: 14px;
+}
+.eui-create-head { display: flex; align-items: center; gap: 16px; }
+.eui-create-head h1 { margin: 0; font-size: 30px; font-weight: 800; }
+.eui-create-tabs { display: flex; gap: 8px; }
+.eui-create-grow { flex: 1; }
+.eui-create-pill {
+  display: inline-flex; align-items: center; height: 34px; padding: 0 18px;
+  font: 700 14px/1 var(--font-family); color: var(--text);
+  background: var(--fill-3); border: 0; border-radius: var(--r-pill); cursor: pointer;
+  transition: transform 0.16s var(--ease-spring), background-color var(--dur-fast) ease;
+}
+.eui-create-pill:hover { transform: scale(1.06); }
+.eui-create-pill:hover:not(.on) { background: var(--fill-4); }
+.eui-create-pill.on { background: var(--accent); animation: eui-create-pop 0.24s var(--ease-spring); }
+.eui-create-pill.small { align-self: flex-start; height: 30px; padding: 0 14px; font-size: 13px; }
+@keyframes eui-create-pop { 0% { transform: scale(0.92); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.eui-create-pill:focus-visible, .eui-create-action:focus-visible, .eui-create-tile:focus-visible,
+.eui-create-card:focus-visible, .eui-create-more:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.eui-create-action {
+  display: inline-flex; align-items: center; justify-content: center; padding: 10px 22px;
+  font: 800 0.82rem/normal var(--font-family); white-space: nowrap;
+  color: var(--text); background: var(--fill-4); border: 0; border-radius: var(--r-pill); cursor: pointer;
+  transition: background-color var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+/* outranks the editor's `.eui-root button` reset */
+.eui-create .eui-create-action { letter-spacing: 0.04em; text-transform: uppercase; }
+.eui-create-action:hover { background: var(--fill-5); }
+.eui-create-action:active { transform: translateY(1px); }
+.eui-create-action.primary { background: var(--brand); }
+.eui-create-action.primary:hover { background: var(--brand-hover); }
+.eui-create-import { position: relative; }
+.eui-create-menu { position: absolute; top: calc(100% + 6px); right: 0; min-width: 180px; }
+.eui-create-intro { margin: 0; font-size: 16px; color: var(--ink-7); }
+.eui-create-sync { margin: -12px 0 0; font-size: 13px; color: var(--ink-6); }
+.eui-create-sync.attention { color: var(--accent); }
+.eui-create-empty { margin: 0; color: var(--ink-7); }
+.eui-create-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+.eui-create-card {
+  position: relative; display: flex; flex-direction: column;
+  border-radius: var(--r-lg); cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.eui-create-card:hover { transform: translateY(-4px); box-shadow: var(--create-card-glow); }
+.eui-create-card.trashed { cursor: default; }
+.eui-create-card.trashed:hover { transform: none; box-shadow: none; }
+.eui-create-card.trashed .eui-create-thumb { filter: grayscale(1); opacity: 0.6; }
+.eui-create-thumb {
+  aspect-ratio: 500 / 329; background: var(--create-sky); border-radius: var(--r-lg) var(--r-lg) 0 0; overflow: hidden;
+}
+.eui-create-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.eui-create-more {
+  position: absolute; top: 16px; right: 16px; width: 32px; height: 26px; border: 0; border-radius: var(--r-sm);
+  background: var(--create-badge); color: var(--text); font-size: 16px; line-height: 1; cursor: pointer;
+  opacity: 0; transition: opacity var(--dur-fast) ease;
+}
+.eui-create-card:hover .eui-create-more, .eui-create-card.menu-open .eui-create-more,
+.eui-create-more:focus-visible { opacity: 1; }
+.eui-create-card .eui-scene-menu { top: 48px; right: 16px; }
+.eui-create-meta {
+  flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0;
+  background: var(--create-card-body); border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+.eui-create-name {
+  font-weight: 600; font-size: 18px; line-height: 1.4; color: var(--ink-95);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.eui-create-where { font-size: 14px; color: var(--ink-6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eui-create-world { font-size: 14px; font-weight: 600; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eui-create-rename {
+  font: 600 18px var(--font-family); color: var(--text); background: var(--create-card-body);
+  border: 1px solid var(--ink-45); border-radius: var(--r-sm); padding: 2px 6px;
+}
+.eui-create-tile {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 260px;
+  border: 2px dashed var(--ink-45); border-radius: var(--r-lg); background: none; cursor: pointer;
+  font: 600 16px var(--font-family); color: var(--ink-7);
+  transition: border-color var(--dur-fast) ease, color var(--dur-fast) ease, background-color var(--dur-fast) ease;
+}
+.eui-create-tile .plus { font-size: 40px; font-weight: 400; line-height: 1; }
+.eui-create-tile:hover { border-color: var(--text); color: var(--text); background: var(--fill-3); }

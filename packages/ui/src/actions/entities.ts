@@ -15,16 +15,41 @@ import {
   type DeleteMode,
   type EntityClip
 } from '@scene/inspector'
-import { dropPosition } from '../assets'
+import { NAME_COMPONENT } from '@scene/custom-components'
+import { dropPosition, uniqueEntityName } from '../assets'
 import { revealInTree } from '../panels/reveal'
 import {
   setDuplicateAction,
   setClipboardActions,
   pushEntityDelete,
+  pushHistory,
+  creationEntries,
+  treeCreationEntries,
   withHistorySuppressed
 } from '../core/history'
 import { run } from './run'
 import { syncSelectionToScene, ensureTransformTool } from './selection'
+
+// Creation is ONE undo step: the engine instantiates the Name outside the write
+// path (no history), so recording the individual writes left a Name-only husk.
+const addEntityAsOneStep = async (
+  name: string,
+  parent: number,
+  position?: { x: number; y: number; z: number },
+  components: Record<string, unknown> = {}
+): Promise<void> => {
+  let id: string | null = null
+  await withHistorySuppressed(() =>
+    run(
+      addEntity(name, parent, position, components).then((eid) => {
+        id = eid
+      })
+    )
+  )
+  if (id !== null) pushHistory(creationEntries(id, [NAME_COMPONENT, 'Transform', ...Object.keys(components)]))
+  syncSelectionToScene()
+  ensureTransformTool()
+}
 
 // A scene-root entity lands at the camera drop point, like an imported model or a
 // prefab does — at the origin it was easy to create one and never find it. A CHILD
@@ -32,9 +57,16 @@ import { syncSelectionToScene, ensureTransformTool } from './selection'
 // parent, which is where the hierarchy's "New child entity" should place it.
 export const uiAddEntity = async (name: string, parent: number): Promise<void> => {
   const position = parent === 0 ? await dropPosition() : undefined
-  await run(addEntity(name, parent, position))
-  syncSelectionToScene()
-  ensureTransformTool()
+  await addEntityAsOneStep(name, parent, position)
+}
+
+// The first thing a creator adds should be something they can see and walk into.
+const BOX = { MeshRenderer: { mesh: { box: { uvs: [] } } }, MeshCollider: { mesh: { box: {} } } }
+
+export const uiAddBox = async (): Promise<void> => {
+  const at = await dropPosition()
+  // the drop point is on the floor; a unit box is centred on its pivot
+  await addEntityAsOneStep(uniqueEntityName('Box'), 0, { ...at, y: at.y + 0.5 }, BOX)
 }
 
 // history.ts can't import these (it is imported here, so the edge would cycle).
@@ -42,21 +74,31 @@ export const uiAddEntity = async (name: string, parent: number): Promise<void> =
 setDuplicateAction((id) => uiDuplicateEntity(id))
 setClipboardActions((id) => uiCopyEntity(id), () => uiPasteEntity())
 
+// A copied subtree is ONE undo step, like a creation (see addEntityAsOneStep).
+const placeTreeAsOneStep = async (create: () => Promise<string | null>): Promise<void> => {
+  let root: string | null = null
+  await withHistorySuppressed(() =>
+    run(
+      create().then((eid) => {
+        root = eid
+      })
+    )
+  )
+  if (root !== null) {
+    pushHistory(treeCreationEntries(root))
+    setSelected([root])
+    state.activeEntity = root
+    revealInTree(root)
+  }
+  syncSelectionToScene()
+  ensureTransformTool()
+}
+
 // Duplicate an entity and its whole subtree: clone every authored component
 // (editor tooling state excluded), remap internal parent refs, nudge the copy
 // +1m on X, and select the new root.
 export const uiDuplicateEntity = async (id: string): Promise<void> => {
-  await run(
-    duplicateEntityTree(id).then((eid) => {
-      if (eid !== null) {
-        setSelected([eid])
-        state.activeEntity = eid
-        revealInTree(eid)
-      }
-    })
-  )
-  syncSelectionToScene()
-  ensureTransformTool()
+  await placeTreeAsOneStep(() => duplicateEntityTree(id))
 }
 
 // One entity subtree on the editor's own clipboard. Deep-cloned at copy time, so
@@ -71,18 +113,9 @@ export const uiCopyEntity = (id: string): void => {
 }
 
 export const uiPasteEntity = async (): Promise<void> => {
-  if (clipboard === null) return
-  await run(
-    instantiateEntityTree(clipboard).then((eid) => {
-      if (eid !== null) {
-        setSelected([eid])
-        state.activeEntity = eid
-        revealInTree(eid)
-      }
-    })
-  )
-  syncSelectionToScene()
-  ensureTransformTool()
+  const clip = clipboard
+  if (clip === null) return
+  await placeTreeAsOneStep(() => instantiateEntityTree(clip))
 }
 
 // Deleting an entity is ONE undo step. The subtree is captured first (the delete

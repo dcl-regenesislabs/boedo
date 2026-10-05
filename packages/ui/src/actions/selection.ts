@@ -1,8 +1,10 @@
 // Selection, tool and camera. Each change mirrors to the scene over the bus so
 // the gizmos stay in sync with what the panels show.
-import { state, selectionClick, setActiveAction, clearSelection } from '@scene/state'
+import { state, selectionClick, setActiveAction, clearSelection, provenanceBaseline } from '@scene/state'
 import { type EditorTool, type CameraMode } from '@scene/bridge-protocol'
 import { sendToScene } from '../engine/bus'
+import { sceneFrameIds } from '../panels/hierarchy-model'
+import { authoredFromComposite } from '../panels/authored-ids'
 
 export function syncSelectionToScene(): void {
   void sendToScene({
@@ -35,6 +37,20 @@ export function uiSetCamera(mode: CameraMode, axis?: string): void {
 export function uiFocusEntity(id: string): void {
   state.camMode = 'free' // focus flies the free camera to it; it never orbits
   void sendToScene({ type: 'focus', entity: id })
+}
+
+// The frame button and shortcut: the selection, or the whole scene when nothing is selected.
+export function uiFrameSelectionOrScene(): void {
+  const selected = [...state.selected]
+  const single = selected.length > 1 ? null : (state.activeEntity ?? selected[0] ?? null)
+  if (single !== null) {
+    uiFocusEntity(single)
+    return
+  }
+  const ids = selected.length > 1 ? selected : sceneFrameIds(state.snapshot, provenanceBaseline(), authoredFromComposite())
+  if (ids.length === 0) return
+  state.camMode = 'free'
+  void sendToScene({ type: 'frame', entities: ids })
 }
 
 // A fresh entity wants its gizmo: hop from the select tool to move so the

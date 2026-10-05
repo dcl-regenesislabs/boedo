@@ -27,6 +27,9 @@ base-app-size.json
 # editor / OS
 .DS_Store
 *.log
+.auth.json
+.auth.json.*
+.env*
 
 # raw session transcripts (verbatim archive, large)
 docs/transcripts/
@@ -41,3 +44,4 @@ agent/
 skills-lock.json
 .claude/skills/*
 !.claude/skills/add-builtin-prefab
+.data/

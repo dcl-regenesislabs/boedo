@@ -8,7 +8,20 @@ const storageKey = (name: string): string => `eui:${name}`
 
 /** Whether this choice has ever been made — a first run has no stored value. */
 export function storedValue(name: string): string | null {
-  return localStorage.getItem(storageKey(name))
+  try {
+    return localStorage.getItem(storageKey(name))
+  } catch {
+    return null
+  }
+}
+
+// Storage can throw (private window, blocked site data); the choice then lasts the session.
+function store(name: string, value: string): void {
+  try {
+    localStorage.setItem(storageKey(name), value)
+  } catch {
+    // ignore
+  }
 }
 
 /** Read/write a flag outside React — for the module stores (chrome, ai-store),
@@ -19,7 +32,7 @@ export function storedFlag(name: string, initial: boolean): boolean {
 }
 
 export function setStoredFlag(name: string, value: boolean): void {
-  localStorage.setItem(storageKey(name), value ? '1' : '0')
+  store(name, value ? '1' : '0')
 }
 
 export function usePersistentFlag(name: string, initial: boolean): [boolean, (v: boolean) => void] {
@@ -41,7 +54,7 @@ export function usePersistentNum(name: string, initial: number): [number, (v: nu
   return [
     v,
     (next: number) => {
-      localStorage.setItem(storageKey(name), String(next))
+      store(name, String(next))
       setV(next)
     }
   ]
@@ -59,7 +72,7 @@ export function usePersistentEnum<T extends string>(
   return [
     v,
     (next: T) => {
-      localStorage.setItem(storageKey(name), next)
+      store(name, next)
       setV(next)
     }
   ]

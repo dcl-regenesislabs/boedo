@@ -19,7 +19,6 @@ import {
   inputSystem,
   InputAction,
   PointerEventType,
-  PrimaryPointerInfo,
   ColliderLayer,
   TextureCamera,
   CameraLayer,
@@ -30,7 +29,9 @@ import {
 import { Vector3, Quaternion, Color3, Color4 } from '@dcl/sdk/math'
 import { state, topLevelSelected, parentOf } from '../state'
 import { hiddenInTree } from './hidden'
-import { cameraFovY } from '../camera/camera-projection'
+import { cameraFovY, pointerWorldRay } from '../camera/camera-projection'
+import { syncTextureCamera } from './texture-camera'
+import { gizmoDebugSnapshot, recordGizmoSample } from './gizmo-debug'
 import {
   worldTransformOf,
   worldToLocalPosition,
@@ -139,16 +140,13 @@ let builtSig = ''
 // (Same technique relations.ts uses for link lines; layer 4, drawn above lines.)
 export const GIZMO_LAYER = 4
 let gizmoCamera: Entity | null = null
-// Canvas size the render target is currently sized for. The target is created once
-// at boot when UiCanvasInformation may be unready (→ a stale low-res 1280×720 target
-// that upscales over the real viewport, which reads as blurry handles); we re-sync it
-// to the live canvas whenever it changes.
-let lastCanvasW = 0
-let lastCanvasH = 0
-let lastDpr = 0
 
 export function gizmoCameraEntity(): Entity | null {
   return gizmoCamera
+}
+
+export function gizmoDebugReport(): unknown {
+  return gizmoDebugSnapshot(gizmoCamera, gizmoRoot)
 }
 
 // Size the render target in DEVICE pixels. UiCanvasInformation width/height are
@@ -171,26 +169,14 @@ function mirrorGizmoCamera(camT: { position: Vector3; rotation: Quaternion }): v
   const g = Transform.getMutable(gizmoCamera)
   g.position = { ...camT.position }
   g.rotation = { ...camT.rotation }
-  const tc = TextureCamera.getMutableOrNull(gizmoCamera)
-  if (tc === null) return
-  const fov = cameraFovY()
-  if (fov !== null && tc.mode?.$case === 'perspective') tc.mode.perspective.fieldOfView = fov
-  // re-sync the render target to the live canvas (see lastCanvasW/H) so the gizmo
-  // is rendered at viewport resolution, not the boot-time fallback.
+  // The target is created at boot when UiCanvasInformation may be unready (a stale
+  // low-res target that upscales into blurry handles), so it follows the live canvas.
   const canvas = UiCanvasInformation.getOrNull(engine.RootEntity)
-  if (
-    canvas !== null &&
-    canvas.width > 0 &&
-    canvas.height > 0 &&
-    (canvas.width !== lastCanvasW || canvas.height !== lastCanvasH || canvas.devicePixelRatio !== lastDpr)
-  ) {
-    lastCanvasW = canvas.width
-    lastCanvasH = canvas.height
-    lastDpr = canvas.devicePixelRatio
-    const size = gizmoTextureSize(canvas.width, canvas.height, canvas.devicePixelRatio || 1)
-    tc.width = size.width
-    tc.height = size.height
-  }
+  const size =
+    canvas !== null && canvas.width > 0 && canvas.height > 0
+      ? gizmoTextureSize(canvas.width, canvas.height, canvas.devicePixelRatio || 1)
+      : null
+  syncTextureCamera(gizmoCamera, cameraFovY(), size)
 }
 
 function hoverId(kind: HandleKind): string {
@@ -515,16 +501,9 @@ function captureGroup(): GroupEntry[] {
   return out
 }
 
-function pointerRay(): { origin: Vector3; dir: Vector3 } | null {
-  const p = PrimaryPointerInfo.getOrNull(engine.RootEntity)
-  const camT = Transform.getOrNull(engine.CameraEntity)
-  if (p?.worldRayDirection === undefined || camT === null) return null
-  return { origin: camT.position, dir: p.worldRayDirection as Vector3 }
-}
-
 function beginDrag(entry: HandleEntry): void {
   if (state.activeEntity === null || gizmoRoot === null) return
-  const ray = pointerRay()
+  const ray = pointerWorldRay()
   if (ray === null) return
   const rootT = Transform.get(gizmoRoot)
   const center = { ...rootT.position }
@@ -606,7 +585,7 @@ function writeEntry(g: GroupEntry, t: { position: Local; rotation: LocalRot; sca
 function updateDrag(): void {
   const d = drag
   if (d === null) return
-  const ray = pointerRay()
+  const ray = pointerWorldRay()
   if (ray === null) return
   const hit = rayPlaneIntersect(ray.origin, ray.dir, d.center, d.planeNormal)
   if (hit === null) return
@@ -702,7 +681,7 @@ function gizmoActive(): boolean {
   )
 }
 
-function gizmoSystem(_dt: number): void {
+function gizmoSystem(dt: number): void {
   // drag lifecycle first: ends on the engine's release, or page bus pointer-up
   if (drag !== null) {
     if (
@@ -780,12 +759,13 @@ function gizmoSystem(_dt: number): void {
   t.position = { ...pos }
   t.rotation = Quaternion.Identity() // world-aligned, opendcl style
   t.scale = Vector3.create(s, s, s)
+  recordGizmoSample(dt, { cam: camT, base, dist, s, pos })
 
   // Hover + grab, analytic (the engine's collider hover was unreliable for these
   // handles). Sets the highlight and state.gizmoHover — which click-select reads to
   // tell a handle-drag from a selection pick — and starts a drag on press.
   if (drag === null) {
-    const ray = pointerRay()
+    const ray = pointerWorldRay()
     const hovered = ray === null ? null : pickHandle(ray)
     const hid = hovered === null ? null : hovered.hoverId
     if (hid !== state.gizmoHover) {
@@ -814,9 +794,6 @@ export function setupGizmo(): void {
   if (gizmoCamera === null) {
     const canvas = UiCanvasInformation.getOrNull(engine.RootEntity)
     const size = gizmoTextureSize(canvas?.width ?? 1280, canvas?.height ?? 720, canvas?.devicePixelRatio || 1)
-    lastCanvasW = canvas?.width ?? 0
-    lastCanvasH = canvas?.height ?? 0
-    lastDpr = canvas?.devicePixelRatio ?? 0
     const cam = engine.addEntity()
     Transform.create(cam)
     TextureCamera.create(cam, {

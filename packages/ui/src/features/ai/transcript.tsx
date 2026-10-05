@@ -8,7 +8,8 @@ import { EXAMPLES, friendlyError, SETUP } from './chat-helpers'
 
 export type ChatMsg =
   | { role: 'user'; text: string; images?: string[] }
-  | { role: 'assistant'; turnId?: string; text: string; tools: ToolUse[]; done: boolean; error?: string }
+  | { role: 'assistant'; turnId?: string; text: string; tools: ToolUse[]; done: boolean; error?: string; paused?: string }
+  | { role: 'note'; text: string }
 
 export function AiSetup(props: {
   providers: AiProviderInfo[]
@@ -17,6 +18,7 @@ export function AiSetup(props: {
   onRecheck: () => void
   rechecking: boolean
 }): JSX.Element {
+  const hosted = props.providers.some((provider) => provider.transport === 'service')
   return (
     <div className="eui-ai-setup">
       <div className="eui-ai-empty-icon">
@@ -24,8 +26,10 @@ export function AiSetup(props: {
       </div>
       <p className="eui-ai-empty-title">{props.anyAvailable ? `${props.current?.label} isn’t ready` : 'Set up the assistant'}</p>
       <p className="eui-ai-empty-sub">
-        It runs a local AI CLI on your own subscription — no API key.{' '}
-        {props.anyAvailable ? 'Pick an available provider below, or set this one up:' : 'Install one, sign in, then recheck.'}
+        {hosted
+          ? props.current?.reason ?? 'The assistant connects through the editor service. Recheck when it is available.'
+          : <>It runs a local AI CLI on your own subscription — no API key.{' '}
+            {props.anyAvailable ? 'Pick an available provider below, or set this one up:' : 'Install one, sign in, then recheck.'}</>}
       </p>
       <div className="eui-ai-setup-list">
         {props.providers.map((p) => (
@@ -33,7 +37,7 @@ export function AiSetup(props: {
             <span className="pl">{p.label}</span>
             {p.available ? (
               <span className="ready">✓ ready</span>
-            ) : (
+            ) : hosted ? <span className="cmds">{p.reason ?? 'Unavailable'}</span> : (
               <span className="cmds">
                 <code>{SETUP[p.id].install}</code>
                 <code>
@@ -59,7 +63,7 @@ export function AiEmpty(props: { current?: AiProviderInfo; studio: boolean; onEx
       </div>
       <p className="eui-ai-empty-title">Edit your scripts by chatting</p>
       <p className="eui-ai-empty-sub">
-        Runs on your {props.current?.label} subscription — no API key.
+        {props.current?.transport === 'service' ? 'Works with the project open in your browser.' : `Runs on your ${props.current?.label} subscription — no API key.`}
         {props.studio ? ' Select code in the editor and it rides along with your next message.' : ' Select an entity and I’ll scope the code to it.'}
       </p>
       {!props.studio && (
@@ -77,13 +81,17 @@ export function AiEmpty(props: { current?: AiProviderInfo; studio: boolean; onEx
 
 export function MessageList(props: {
   messages: ChatMsg[]
-  onRetry: () => void
+  hosted?: boolean
+  onRetry?: () => void
+  onContinue?: () => void
   onShowDetail: (detail: string) => void
 }): JSX.Element {
   return (
     <>
       {props.messages.map((m, i) =>
-        m.role === 'user' ? (
+        m.role === 'note' ? (
+          <div key={i} className="eui-ai-note">{m.text}</div>
+        ) : m.role === 'user' ? (
           <div key={i} className="eui-ai-msg user">
             {m.images !== undefined && (
               <span className="eui-ai-msg-imgs">
@@ -122,16 +130,29 @@ export function MessageList(props: {
                 <Spinner size="sm" /> Thinking…
               </span>
             )}
+            {m.paused !== undefined && (
+              <div className="eui-ai-paused">
+                <span className="msg">Paused — {m.paused}</span>
+                <span style={{ flex: 1 }} />
+                {i === props.messages.length - 1 && props.onContinue !== undefined && (
+                  <button className="eui-ai-retry ghost" onClick={props.onContinue}>
+                    Continue
+                  </button>
+                )}
+              </div>
+            )}
             {m.error !== undefined && (
               <div className="eui-ai-err">
-                <span className="msg">{friendlyError(m.error)}</span>
+                <span className="msg">{friendlyError(m.error, props.hosted)}</span>
                 <span style={{ flex: 1 }} />
                 <button className="eui-ai-retry ghost" onClick={() => props.onShowDetail(m.error ?? '')}>
                   See details
                 </button>
-                <button className="eui-ai-retry" onClick={props.onRetry}>
-                  Retry
-                </button>
+                {props.onRetry !== undefined && (
+                  <button className="eui-ai-retry" onClick={props.onRetry}>
+                    Retry
+                  </button>
+                )}
               </div>
             )}
           </div>

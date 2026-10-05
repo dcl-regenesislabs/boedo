@@ -8,7 +8,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 
 // The scene package's sources: scene-runtime imports coming FROM these files get
 // redirected to the browser replacements below; `~system/*` is stubbed.
-const sceneSrc = path.resolve(here, '../scene/src')
+export const sceneSrc = path.resolve(here, '../scene/src')
 const systemStub = path.resolve(here, 'src/engine/system-stub.ts')
 const redirects: Record<string, string> = {
   'bevy-api': path.resolve(here, 'src/engine/bevy-api-web.ts'),
@@ -30,7 +30,7 @@ for (const [name, target] of Object.entries(redirects)) {
 // Port of the esbuild `scene-shims` plugin: swap scene-runtime modules for their
 // browser implementations, but only for imports coming from the scene's own
 // sources; stub `~system/*` everywhere.
-function sceneShims(): Plugin {
+export function sceneShims(): Plugin {
   return {
     name: 'scene-shims',
     enforce: 'pre',

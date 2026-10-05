@@ -16,10 +16,12 @@ import { aiStore, canAskAssistant } from './panels/ai-store'
 import { chrome, toggleRightPanel } from './core/chrome'
 import { dragCapture } from './core/drag'
 import { isLeftView, type LeftView } from './panels/left-view'
-import { sceneEmptiness } from './panels/empty-scene'
+import { hasReadyMadePrefabs, sceneEmptiness } from './panels/empty-scene'
 import { prefabStore } from './panels/prefab-store'
 import { renameRequested } from './panels/reveal'
 import { storedValue, usePersistentEnum, usePersistentFlag, usePersistentNum } from './core/persist'
+import { autoSaveStatus } from './core/autosave'
+import { Splitter, Toast as DsToast } from './ds'
 
 // Draggable right edge of the left dock.
 function LeftResize(props: { width: number; onResize: (w: number) => void }): JSX.Element {
@@ -55,20 +57,24 @@ function RightResize(props: { width: number; onResize: (w: number) => void }): J
 }
 
 const DOCK_MIN_H = 200
-function maxDockHeight(): number {
-  return Math.max(DOCK_MIN_H, Math.round(window.innerHeight * 0.7))
+// The inspector keeps its header plus a few rows however tall the assistant gets.
+const INSPECTOR_MIN_H = 180
+const COL_GAPS = 20
+function maxDockHeight(colHeight: number): number {
+  return Math.max(DOCK_MIN_H, colHeight - INSPECTOR_MIN_H - COL_GAPS)
 }
 
-// Vertical splitter between the inspector and the docked assistant.
-function AiSplit(props: { height: number; onResize: (h: number) => void }): JSX.Element {
-  const onDown = (e: ReactPointerEvent<HTMLDivElement>): void => {
-    const startY = e.clientY
-    const base = props.height
-    dragCapture(e, (ev) =>
-      props.onResize(Math.max(DOCK_MIN_H, Math.min(maxDockHeight(), base + (startY - ev.clientY))))
-    )
-  }
-  return <div className="eui-col-split" onPointerDown={onDown} />
+function useElementHeight(el: HTMLElement | null): number {
+  const [h, setH] = useState(() => window.innerHeight - 24)
+  useEffect(() => {
+    if (el === null || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      if (el.clientHeight > 0) setH(el.clientHeight)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [el])
+  return h
 }
 
 export function App(): JSX.Element {
@@ -87,24 +93,30 @@ export function App(): JSX.Element {
   const rightOpen = useStore(() => chrome.rightOpen)
   const aiMin = useStore(() => aiStore.collapsed)
   const aiMode = useStore(() => aiStore.mode)
-  const aiHere = canAskAssistant()
+  const aiHere = useStore(canAskAssistant)
+  // the Studio is the code editor too, with or without an assistant beside it
+  const studioHere = aiHere || aiMode === 'studio'
   // Who gets the column's leftover height: the inspector unless it is minimized,
   // in which case the docked chat takes it. Two minimized panels are two title
   // bars stacked at the top, with the viewport showing through below.
   const splitShown = !inspectorMin && aiHere && aiMode === 'dock' && !aiMin
   // A stored height from a taller window (or a since-shrunk column) would push
   // the composer off the bottom — clamp on the way out, not just while dragging.
-  const dockHeight = Math.min(aiHeight, maxDockHeight())
+  const [colEl, setColEl] = useState<HTMLDivElement | null>(null)
+  const dockMax = maxDockHeight(useElementHeight(colEl))
+  const dockHeight = Math.max(DOCK_MIN_H, Math.min(aiHeight, dockMax))
   // The dock is one unit: the inspector and the assistant show and hide together
   // (chrome.rightOpen), and neither can be dismissed on its own — only minimized
   // to its title bar. The Studio is the assistant's other mode, so it paints
   // full-screen from inside this same column and survives the dock being hidden.
   const rightCol = (
     <>
-      <div className="eui-right-col" style={{ width: rightWidth }} hidden={!rightOpen && aiMode !== 'studio'}>
+      <div ref={setColEl} className="eui-right-col" style={{ width: rightWidth }} hidden={!rightOpen && aiMode !== 'studio'}>
         {rightOpen && <InspectorPanel min={inspectorMin} onToggleMin={() => setInspectorMin(!inspectorMin)} />}
-        {rightOpen && splitShown && <AiSplit height={dockHeight} onResize={setAiHeight} />}
-        {aiHere && <AiPanel shown={rightOpen} fill={inspectorMin} height={dockHeight} />}
+        {rightOpen && splitShown && (
+          <Splitter label="Resize inspector and assistant" value={dockHeight} min={DOCK_MIN_H} max={dockMax} onChange={setAiHeight} />
+        )}
+        {studioHere && <AiPanel shown={rightOpen} fill={inspectorMin} height={dockHeight} />}
       </div>
       {rightOpen && <RightResize width={rightWidth} onResize={setRightWidth} />}
     </>
@@ -119,7 +131,7 @@ export function App(): JSX.Element {
   useEffect(() => {
     if (!firstRun.current || emptyScene === null) return
     firstRun.current = false
-    if (emptyScene) setLeftView('prefabs')
+    if (emptyScene && hasReadyMadePrefabs()) setLeftView('prefabs')
   }, [emptyScene])
   const prefabReveal = useStore(() => prefabStore.reveal)
   const libraryReveal = useStore(() => prefabStore.revealLibrary)
@@ -149,7 +161,7 @@ export function App(): JSX.Element {
               ? 'Attaching editor tools…'
               : 'Editor — waiting for scene…'}
         </div>
-        {aiHere && (
+        {studioHere && (
           <>
             <div className="eui-right-col" style={{ width: rightWidth }} hidden={!rightOpen && aiMode !== 'studio'}>
               <AiPanel shown={rightOpen} fill height={dockHeight} />
@@ -207,8 +219,11 @@ export function App(): JSX.Element {
   )
 }
 
+const FAILURE = /fail|could not|not saved|blocked|⚠/i
+
 function Toast(): JSX.Element | null {
   const msg = useStore(() => state.saveStatus)
+  const saveFailed = useStore(() => state.frozen && autoSaveStatus() === 'error')
   useEffect(() => {
     if (msg === '' || msg === 'saving…') return
     const t = setTimeout(() => {
@@ -216,6 +231,8 @@ function Toast(): JSX.Element | null {
     }, 5000)
     return () => clearTimeout(t)
   }, [msg])
+  // outlives the 5s toast: the edits stay unsaved until a later save succeeds
+  if (saveFailed) return <DsToast alert>Save failed — your latest changes are not saved. Your next edit tries again.</DsToast>
   if (msg === '' || msg === 'saving…') return null
-  return <div className="eui-toast">{msg}</div>
+  return <DsToast alert={FAILURE.test(msg)}>{msg}</DsToast>
 }

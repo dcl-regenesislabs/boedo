@@ -1,5 +1,5 @@
 // Keyboard shortcuts for the in-world editor — the same set the Creators Hub Pro
-// desktop editor uses, mapped onto our actions. One source of truth: SHORTCUT_GROUPS
+// desktop editor uses, mapped onto our actions. One source of truth: shortcutGroups()
 // carries each shortcut's display combo + label (for the `?` cheatsheet overlay)
 // and, when this module owns the key, a matcher + action.
 //
@@ -16,13 +16,14 @@
 // directly — those events belong to the iframe's window and never reach this one.
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import { state, topLevelSelected } from '@scene/state'
-import { uiSetTool, uiFocusEntity, uiSetCamera, uiClearSelection } from './actions/selection'
+import { uiSetTool, uiFrameSelectionOrScene, uiSetCamera, uiClearSelection } from './actions/selection'
 import { uiDeleteSelected } from './actions/entities'
 import { uiGroupIntoFolder, uiUngroupSelection } from './actions/folders'
 import { uiPlay, uiPause } from './actions/playback'
 import { toggleSceneAudio } from './engine/audio'
 import { deleteConfirmSkipped } from './panels/delete-confirm'
-import { aiStore } from './panels/ai-store'
+import { aiStore, runStudioChord } from './panels/ai-store'
+import { fromEditorUi, isHosted } from './engine/hosted'
 import { revealAndRename } from './panels/reveal'
 import { ALT, MOD, SHIFT, isMac, isMod, keyCombo } from './lib/keys'
 
@@ -49,18 +50,28 @@ export type ShortcutGroup = { title: string; items: Shortcut[] }
 // first" bug. Listed here so the `?` cheatsheet still documents them.
 const mainOwned = () => (_e: KeyboardEvent) => false
 
+// Hosted in a browser tab there is no main process, and ⌘/Ctrl+W, +Q and +R
+// belong to the browser (close tab, quit, reload). The tool keys move to Alt +
+// the physical key, which the engine binds to nothing.
+const altCode = (code: string) => (e: KeyboardEvent) => e.altKey && !isMod(e) && e.code === code
+function chord(letter: string): Pick<Shortcut, 'combo' | 'match'> {
+  return isHosted()
+    ? { combo: keyCombo(ALT, letter), match: altCode(`Key${letter}`) }
+    : { combo: keyCombo(MOD, letter), match: mainOwned() }
+}
+
 // The left dock is App's own state, so a key can only ask for it: App hands its
 // opener to useEditorShortcuts and the shortcut dispatches through here.
 let openPrefabsTab: (() => void) | null = null
 
-export const SHORTCUT_GROUPS: ShortcutGroup[] = [
+const buildGroups = (): ShortcutGroup[] => [
   {
     title: 'Tools',
     items: [
-      { combo: keyCombo(MOD, 'Q'), label: 'Select tool', match: mainOwned(), run: () => uiSetTool('select') },
-      { combo: keyCombo(MOD, 'W'), label: 'Move (translate)', match: mainOwned(), run: () => uiSetTool('translate') },
-      { combo: keyCombo(MOD, 'E'), label: 'Rotate', match: mainOwned(), run: () => uiSetTool('rotate') },
-      { combo: keyCombo(MOD, 'R'), label: 'Scale', match: mainOwned(), run: () => uiSetTool('scale') }
+      { ...chord('Q'), label: 'Select tool', run: () => uiSetTool('select') },
+      { ...chord('W'), label: 'Move (translate)', run: () => uiSetTool('translate') },
+      { ...chord('E'), label: 'Rotate', run: () => uiSetTool('rotate') },
+      { ...chord('R'), label: 'Scale', run: () => uiSetTool('scale') }
     ]
   },
   {
@@ -99,7 +110,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
           // the dispatcher preventDefaults on match, so claiming it on a focused
           // button/menu item would break keyboard activation. F2 has no such
           // second job and stays global.
-          (e.key === 'F2' || (isMac && e.key === 'Enter' && !onActivatable(e))) &&
+          (e.key === 'F2' || (isMac && e.key === 'Enter' && !onActivatable(e) && panelFocused(e))) &&
           // Return is load-bearing in a confirm dialog and in the Studio; neither
           // should be answered with a rename.
           state.deleteConfirm === null &&
@@ -132,12 +143,9 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     title: 'Camera',
     items: [
       {
-        combo: keyCombo(MOD, 'F'),
-        label: 'Focus selection',
-        match: mainOwned(),
-        run: () => {
-          if (state.activeEntity !== null) uiFocusEntity(state.activeEntity)
-        }
+        ...chord('F'),
+        label: 'Frame selection (or whole scene)',
+        run: uiFrameSelectionOrScene
       },
       {
         combo: '`',
@@ -170,12 +178,17 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
           else void uiPause()
         }
       },
-      {
-        combo: keyCombo(MOD, 'M'),
-        label: 'Mute / unmute the scene',
-        match: (e) => isMod(e) && !e.shiftKey && !e.altKey && e.code === 'KeyM',
-        run: () => toggleSceneAudio()
-      }
+      // hosted: the engine's volume is the host page's own setting, there is no mute
+      ...(isHosted()
+        ? []
+        : [
+            {
+              combo: keyCombo(MOD, 'M'),
+              label: 'Mute / unmute the scene',
+              match: (e: KeyboardEvent) => isMod(e) && !e.shiftKey && !e.altKey && e.code === 'KeyM',
+              run: () => toggleSceneAudio()
+            }
+          ])
     ]
   },
   {
@@ -187,7 +200,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { combo: keyCombo(MOD, 'P'), label: 'Go to file' },
       { combo: keyCombo(MOD, 'S'), label: 'Save file' },
       { combo: keyCombo(MOD, 'F'), label: 'Find in file' },
-      { combo: keyCombo(MOD, 'W'), label: 'Close tab' },
+      { combo: keyCombo(isHosted() ? ALT : MOD, 'W'), label: 'Close tab' },
       { combo: `${keyCombo(MOD, SHIFT, '[')} / ${keyCombo(MOD, SHIFT, ']')}`, label: 'Previous / next tab' },
       { combo: keyCombo(MOD, 'K'), label: 'Ask AI about selected code' },
       { combo: 'Esc', label: 'Close the Studio' }
@@ -220,7 +233,52 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   }
 ]
 
-const DISPATCH: Shortcut[] = SHORTCUT_GROUPS.flatMap((g) => g.items).filter((s) => s.match && s.run)
+// The tool chord as the toolbar's tooltips print it.
+export function toolCombo(letter: string): string {
+  return chord(letter).combo
+}
+
+// Built on first use, not at import: whether the editor is hosted is only known
+// once the entry has run.
+let groups: ShortcutGroup[] | null = null
+export function shortcutGroups(): ShortcutGroup[] {
+  groups ??= buildGroups()
+  return groups
+}
+
+let dispatch: Shortcut[] | null = null
+function dispatchable(): Shortcut[] {
+  dispatch ??= shortcutGroups()
+    .flatMap((g) => g.items)
+    .filter((s) => s.match && s.run)
+  return dispatch
+}
+
+// Hosted, the viewport shares this document, so a key pressed in it reaches this
+// listener directly. Return pressed there belongs to the in-world chat.
+function panelFocused(e: KeyboardEvent): boolean {
+  return !isHosted() || fromEditorUi(e)
+}
+
+// ⌘Z/⌘D/⌘C/⌘V are history.ts's and ⌘U is Editor.tsx's.
+const MOD_LETTERS = new Set(['z', 'd', 'c', 'v', 'u'])
+
+// A modifier chord the editor answers. Hosted, these are kept from the engine's
+// canvas: Ctrl is a bound key there, so Ctrl+G would also open the host's gallery
+// and Ctrl+V would toggle the microphone.
+export function isEditorChord(e: KeyboardEvent): boolean {
+  if (!isMod(e) && !e.altKey) return false
+  return (isMod(e) && MOD_LETTERS.has(e.key.toLowerCase())) || dispatchable().some((s) => s.match!(e))
+}
+
+// Desktop routes these through the main process. Hosted they are answered here,
+// before the typing check: the code editor has focus when they are pressed.
+function runHostedStudioChord(e: KeyboardEvent): boolean {
+  if (!isHosted() || aiStore.mode !== 'studio') return false
+  if (altCode('KeyW')(e)) return runStudioChord('close-tab')
+  if (isMod(e) && !e.shiftKey && !e.altKey && e.code === 'KeyF') return runStudioChord('find')
+  return false
+}
 
 // Run the shortcut this event matches, if any; true when one fired.
 //
@@ -232,7 +290,7 @@ const DISPATCH: Shortcut[] = SHORTCUT_GROUPS.flatMap((g) => g.items).filter((s) 
 // directly instead, which doesn't depend on focus at all.
 export function runShortcutFor(e: KeyboardEvent): boolean {
   if (isTyping(e)) return false
-  for (const s of DISPATCH) {
+  for (const s of dispatchable()) {
     if (s.match!(e)) {
       s.run!()
       return true
@@ -258,7 +316,7 @@ function onActivatable(e: KeyboardEvent): boolean {
   )
 }
 
-function isTyping(e: KeyboardEvent): boolean {
+export function isTyping(e: KeyboardEvent): boolean {
   const el = e.composedPath()[0] as HTMLElement | undefined
   const tag = el?.tagName
   return tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable === true
@@ -283,6 +341,11 @@ export function useEditorShortcuts(
   }, [])
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      if (runHostedStudioChord(e)) {
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      }
       if (isTyping(e)) return
       // overlay toggle / dismiss — control keys, always available (even in fly)
       if (e.key === '?') {
@@ -315,7 +378,7 @@ export function useEditorShortcuts(
       // No mode gating on the tool keys any more: they carry Alt, which the engine
       // binds to nothing, so they can't collide with walking or interacting and
       // fire the same way whether the scene is paused or running.
-      for (const s of DISPATCH) {
+      for (const s of dispatchable()) {
         if (s.match!(e)) {
           e.preventDefault()
           s.run!()

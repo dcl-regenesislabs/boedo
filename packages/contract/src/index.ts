@@ -1,2 +1,5 @@
 export * from './bus-protocol'
 export * from './shell'
+export * from './projects'
+export * from './publish'
+export * from './assistant'

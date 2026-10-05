@@ -39,6 +39,8 @@
   position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center;
   background: var(--paper); color: var(--text); font-family: var(--font-family);
 }
+/* the code from a failed first build: no topbar above the Studio yet */
+.eui-loading-studio { --topbar-h: 0px; }
 .eui-loading-card {
   /* 86vw is the small-window escape hatch, not a size */
   width: min(720px, 86vw);

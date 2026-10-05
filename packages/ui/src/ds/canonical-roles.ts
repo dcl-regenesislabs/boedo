@@ -43,7 +43,7 @@ export const UNROLED = [
   'Button', 'IconButton', 'LinkButton', 'ControlButton', 'ConfirmButton',
   'SelectTrigger', 'TextInput', 'NumberField', 'TextArea', 'SearchField', 'CopyField',
   'ColorSwatch', 'FieldLabel', 'IdBadge', 'Panel', 'GroupLabel', 'PropRow', 'MenuItem',
-  'Tooltip', 'Spinner', 'Toast', 'AutoSaveChip', 'Pager', 'PanelState', 'TABLE_KINDS',
-  'useOutsideClose', 'useLoad', 'usePageClamp', 'copyText', 'parcelTone',
+  'Tooltip', 'Splitter', 'Spinner', 'Toast', 'AutoSaveChip', 'Pager', 'PanelState', 'TABLE_KINDS',
+  'useOutsideClose', 'useLoad', 'usePageClamp', 'copyText', 'parcelTone', 'labelTip',
   'TOGGLE_SIZES', 'SPINNER_SIZES', 'DENSITIES', 'MODAL_SIZES', 'NOTICE_TONES', 'STATE_TONES'
 ]

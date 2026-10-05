@@ -7,7 +7,10 @@
     "packages/contract",
     "packages/scene",
     "packages/ui",
-    "packages/desktop"
+    "packages/desktop",
+    "packages/web-build",
+    "packages/web",
+    "packages/service"
   ],
   "engines": {
     "node": "^24 || ^26",
@@ -23,6 +26,7 @@
     "start": "npm run build && npm run app -w @dcl-editor/desktop",
     "dist": "npm run build && npm run dist -w @dcl-editor/desktop",
     "dev": "node scripts/dev.mjs",
+    "dev:web": "node scripts/dev-web.mjs",
     "validate": "node scripts/validate.mjs",
     "size": "node scripts/measure-size.mjs",
     "size:check": "node scripts/measure-size.mjs --out size-reports/local.json && node scripts/size-check.mjs --measured size-reports",
@@ -33,8 +37,13 @@
   "devDependencies": {
     "eslint": "^9.9.0",
     "happy-dom": "^20.11.1",
+    "typescript": "5.9.3",
     "typescript-eslint": "^8.0.0",
+    "undici": "8.11.2",
     "vitest": "^2.1.9"
+  },
+  "overrides": {
+    "protobufjs@<7.6.3": "7.6.6"
   },
   "dependencies": {
     "@dcl-regenesislabs/bevy-explorer-web": "0.1.0-32423376134.commit-d18de13"

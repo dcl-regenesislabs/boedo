@@ -125,6 +125,17 @@ export function isCodeEntity(
   return isRuntimeEntity(id, baseline)
 }
 
+// What "the whole scene" frames: placed, authored content; all placed content
+// when nothing reads as authored (an all-code scene).
+export function sceneFrameIds(snapshot: Snapshot, baseline: Snapshot | null, fromComposite: Set<string> | null): string[] {
+  const authored = fromComposite ?? authoredIds(snapshot)
+  const placed = Object.keys(snapshot).filter(
+    (id) => !isEngineEntity(snapshot, id) && snapshot[id]?.Transform !== undefined && !isEditorInternal(snapshot, id)
+  )
+  const own = placed.filter((id) => !isCodeEntity(snapshot, id, baseline, authored))
+  return own.length > 0 ? own : placed
+}
+
 export function buildHierarchyModel(
   snapshot: Snapshot,
   baseline: Snapshot | null,

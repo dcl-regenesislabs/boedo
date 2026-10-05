@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react'
-import type { EditorShell, ProjectInfo } from '@dcl-editor/contract'
-import { Chip, useOutsideClose } from '../../ds'
+import type { EditorShell, ProjectInfo, ProjectSync } from '@dcl-editor/contract'
+import { Chip, labelTip, useOutsideClose } from '../../ds'
 import { relTime } from '../../lib/format'
+import { canPublish } from '../publish/publish-preflight'
 import { SceneSettingsModal } from '../scene-settings/SceneSettingsModal'
+import { syncLabel } from '../sync/sync'
 
 export const FolderIcon = (): JSX.Element => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -12,11 +14,14 @@ export const FolderIcon = (): JSX.Element => (
 
 function sceneSub(p: ProjectInfo): string {
   if (p.missing === true) return 'Folder not found'
+  if (p.remoteOnly === true) return 'On your account'
   return p.world !== null ? p.world : `${p.parcels} parcel${p.parcels === 1 ? '' : 's'}`
 }
 
 export function SceneCard(props: {
   p: ProjectInfo
+  // where the account's copy stands, when the shell keeps one
+  sync?: ProjectSync
   shell: EditorShell
   onOpen: () => void
   onChanged: () => void
@@ -27,6 +32,9 @@ export function SceneCard(props: {
   const [menu, setMenu] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [settings, setSettings] = useState(false)
+  const synced = syncLabel(props.sync)
+  // a scene that is only on the account has nothing here to rename, copy or delete yet
+  const here = p.missing !== true && p.remoteOnly !== true
   const ref = useRef<HTMLDivElement>(null)
   useOutsideClose(menu, ref, () => setMenu(false))
 
@@ -45,6 +53,7 @@ export function SceneCard(props: {
       role="button"
       tabIndex={0}
       data-tip={p.path}
+      data-sync={p.remoteOnly === true ? 'remote' : props.sync?.state}
       onClick={open}
       onKeyDown={(e) => {
         if ((e.key === 'Enter' || e.key === ' ') && !renaming) {
@@ -88,13 +97,16 @@ export function SceneCard(props: {
         ) : (
           <span className="eui-scene-sub">{sceneSub(p)}</span>
         )}
-        {p.lastOpened !== undefined && p.missing !== true && (
-          <span className="eui-scene-ago">opened {relTime(p.lastOpened)}</span>
+        {p.remoteOnly === true && <span className="eui-scene-ago">Not on this device yet. Opening it downloads it.</span>}
+        {here && (p.lastOpened !== undefined || synced !== null) && (
+          <span className="eui-scene-ago" data-tip={props.sync?.message}>
+            {[p.lastOpened !== undefined ? `opened ${relTime(p.lastOpened)}` : null, synced].filter(Boolean).join(' · ')}
+          </span>
         )}
       </div>
 
       <div className="eui-scene-actions">
-        {p.missing !== true && (
+        {here && (
           <button
             className={`eui-scene-iact ${p.favourite === true ? 'on' : ''}`}
             data-tip={p.favourite === true ? 'Unfavourite' : 'Favourite'}
@@ -108,7 +120,7 @@ export function SceneCard(props: {
         )}
         <button
           className="eui-scene-iact"
-          data-tip="More"
+          {...labelTip('More')}
           onClick={(e) => {
             e.stopPropagation()
             setMenu((v) => !v)
@@ -119,73 +131,29 @@ export function SceneCard(props: {
       </div>
 
       {menu && (
-        <div className="eui-ctx eui-scene-menu" onClick={(e) => e.stopPropagation()}>
-          {p.missing !== true && (
-            <>
-              <button className="eui-menu-item" onClick={props.onOpen}>Open<span className="hint">↵</span></button>
-              <button className="eui-menu-item" onClick={() => after(shell.toggleFavourite?.(p.path))}>
-                {p.favourite === true ? 'Unfavourite' : 'Favourite'}
-              </button>
-              <button className="eui-menu-item" onClick={() => after(shell.revealInFinder?.(p.path))}>Reveal in Finder</button>
-              <button
-                className="eui-menu-item"
-                onClick={() => {
-                  setMenu(false)
-                  setRenaming(true)
-                }}
-              >
-                Rename
-              </button>
-              <button className="eui-menu-item" onClick={() => after(shell.duplicateProject?.(p.path))}>Duplicate</button>
-              {shell.sceneSettings !== undefined && (
-                <button
-                  className="eui-menu-item"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setMenu(false)
-                    setSettings(true)
-                  }}
-                >
-                  Scene settings…
-                </button>
-              )}
-              <div className="eui-menu-sep" />
-              <button
-                className="eui-menu-item"
-                onClick={() => {
-                  setMenu(false)
-                  props.onPublish()
-                }}
-              >
-                {p.world !== null ? `Publish to ${p.world}…` : 'Publish to a world…'}
-              </button>
-              <div className="eui-menu-sep" />
-            </>
-          )}
-          <button
-            className="eui-menu-item"
-            onClick={() => {
-              setMenu(false)
-              props.onRemove(p)
-            }}
-          >
-            Remove from list
-          </button>
-          {p.missing !== true && (
-            <button
-              className="eui-menu-item danger"
-              onClick={() =>
-                after(
-                  shell.deleteProject?.(p.path).then((ok) => {
-                    if (ok !== true) return
-                  })
-                )
-              }
-            >
-              Delete from disk…
-            </button>
-          )}
-        </div>
+        <SceneMenu
+          p={p}
+          shell={shell}
+          sync={props.sync}
+          onOpen={props.onOpen}
+          onRename={() => {
+            setMenu(false)
+            setRenaming(true)
+          }}
+          onSettings={() => {
+            setMenu(false)
+            setSettings(true)
+          }}
+          onPublish={() => {
+            setMenu(false)
+            props.onPublish()
+          }}
+          onRemove={() => {
+            setMenu(false)
+            props.onRemove(p)
+          }}
+          after={after}
+        />
       )}
       {settings && (
         <SceneSettingsModal
@@ -193,6 +161,84 @@ export function SceneCard(props: {
           onClose={() => setSettings(false)}
           onSaved={props.onChanged} // title/thumbnail feed the card — refresh it
         />
+      )}
+    </div>
+  )
+}
+
+// A scene's menu, from its ⋯ button or a right-click.
+export function SceneMenu(props: {
+  p: ProjectInfo
+  shell: EditorShell
+  onOpen: () => void
+  onRename: () => void
+  onSettings: () => void
+  onPublish: () => void
+  onRemove: () => void
+  after: (op?: Promise<unknown>) => void
+  // a scene put in the shell's own trash, which can be undone
+  onTrashed?: () => void
+  // false where the list has no favourites shelf
+  favourites?: boolean
+  sync?: ProjectSync
+}): JSX.Element {
+  const { p, shell, after } = props
+  const here = p.missing !== true && p.remoteOnly !== true
+  return (
+    <div className="eui-ctx eui-scene-menu" onClick={(e) => e.stopPropagation()}>
+      {p.remoteOnly === true && (
+        <button className="eui-menu-item" onClick={props.onOpen}>Download and open<span className="hint">↵</span></button>
+      )}
+      {here && (
+        <>
+          <button className="eui-menu-item" onClick={props.onOpen}>Open<span className="hint">↵</span></button>
+          {props.favourites !== false && (
+            <button className="eui-menu-item" onClick={() => after(shell.toggleFavourite?.(p.path))}>
+              {p.favourite === true ? 'Unfavourite' : 'Favourite'}
+            </button>
+          )}
+          {shell.revealInFinder !== undefined && (
+            <button className="eui-menu-item" onClick={() => after(shell.revealInFinder?.(p.path))}>Reveal in Finder</button>
+          )}
+          <button className="eui-menu-item" onClick={props.onRename}>Rename</button>
+          <button className="eui-menu-item" onClick={() => after(shell.duplicateProject?.(p.path))}>Duplicate</button>
+          {shell.exportProject !== undefined && (
+            <button className="eui-menu-item" onClick={() => after(shell.exportProject?.(p.path))}>Export as .zip</button>
+          )}
+          {shell.sceneSettings !== undefined && (
+            <button className="eui-menu-item" onClick={props.onSettings}>Scene settings…</button>
+          )}
+          <div className="eui-menu-sep" />
+          {canPublish(shell) && (
+            <>
+              <button className="eui-menu-item" onClick={props.onPublish}>
+                {p.world !== null ? `Publish to ${p.world}…` : 'Publish to a world…'}
+              </button>
+              <div className="eui-menu-sep" />
+            </>
+          )}
+        </>
+      )}
+      {shell.removeFromRecents !== undefined && (
+        <button className="eui-menu-item" onClick={props.onRemove}>Remove from list</button>
+      )}
+      {here && (
+        <button
+          className="eui-menu-item danger"
+          onClick={() =>
+            after(
+              shell.deleteProject?.(p.path).then((done) => {
+                if (done && shell.restoreProject !== undefined) props.onTrashed?.()
+              })
+            )
+          }
+        >
+          {shell.restoreProject === undefined
+            ? 'Delete from disk…'
+            : props.sync?.otherAccount === true
+              ? 'Remove from this device'
+              : 'Move to trash'}
+        </button>
       )}
     </div>
   )

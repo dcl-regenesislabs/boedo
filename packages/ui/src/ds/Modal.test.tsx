@@ -53,3 +53,28 @@ describe('Modal scrim close', () => {
     view.unmount()
   })
 })
+
+describe('Modal focus', () => {
+  it('is a labelled dialog that keeps Tab inside and gives focus back when it closes', () => {
+    const opener = document.createElement('button')
+    document.body.appendChild(opener)
+    opener.focus()
+    const view = mount(
+      <Modal title="Rename" onClose={() => {}} closeX>
+        <input />
+      </Modal>
+    )
+    const dialog = view.find('[role="dialog"]')
+    expect(dialog?.getAttribute('aria-modal')).toBe('true')
+    expect(document.getElementById(dialog?.getAttribute('aria-labelledby') ?? '')?.textContent).toBe('Rename')
+    const input = view.find('input')
+    input?.focus()
+    act(() => {
+      input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
+    })
+    expect(document.activeElement).toBe(view.find('.eui-modal-x'))
+    view.unmount()
+    expect(document.activeElement).toBe(opener)
+    opener.remove()
+  })
+})

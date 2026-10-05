@@ -16,11 +16,13 @@ import {
   CONFLICT_HEADING,
   conflictConsequence,
   conflictRows,
+  GUEST_NOTE,
   KEEPS_PUBLISHING,
   moveLine,
   NO_NAME_HEADING,
   NO_NAME_NOTE,
   pickTimeLine,
+  PUBLISHED_AT,
   publishingHeadline,
   recoveryLine,
   sceneHeadline,
@@ -29,6 +31,8 @@ import {
   SDK_TOO_OLD_HEADING,
   SIGN_IN_NOTE,
   SIGN_IN_TO_PUBLISH,
+  SIGNING_NOTE,
+  SIGNING_STEP,
   STOP_PUBLISHING,
   successFallbackLine,
   successLine,
@@ -99,6 +103,11 @@ export interface PublishViewInput {
   job: PublishState
   wallet: string | null
   signIn: () => void
+  /** the account belongs to the page hosting the editor: no sign-in here, and a
+   *  published world opens in that same page */
+  external?: boolean
+  // hosted: leave the editor for the page's own sign-in
+  exit?: () => void
   worlds: WorldEntry[]
   worldsStatus: WorldsState['status']
   worldsError: string | null
@@ -218,11 +227,11 @@ function stepState(step: WaitStep, at: WaitStep): StepState {
   return WAIT_STEPS.indexOf(step) < WAIT_STEPS.indexOf(at) ? 'done' : 'todo'
 }
 
-function waitEvidence(at: WaitStep, world: string, caption: boolean): ReactNode {
+function waitEvidence(at: WaitStep, world: string, caption: boolean, signing: boolean): ReactNode {
   const label: Record<WaitStep, string> = {
     checking: checkingHeadline(world),
     building: 'Building your scene',
-    uploading: `Uploading to ${world}`
+    uploading: signing ? SIGNING_STEP : `Uploading to ${world}`
   }
   return (
     <>
@@ -322,8 +331,13 @@ export function publishView(input: PublishViewInput): PublishView {
       family: 'blocked',
       mark: 'world',
       headline: SIGN_IN_TO_PUBLISH,
-      note: SIGN_IN_NOTE,
-      actions: { primary: { label: 'Sign in with Decentraland', onClick: input.signIn } },
+      note: input.external === true ? GUEST_NOTE : SIGN_IN_NOTE,
+      actions:
+        input.external !== true
+          ? { primary: { label: 'Sign in with Decentraland', onClick: input.signIn } }
+          : input.exit !== undefined
+            ? { primary: { label: 'Back to Decentraland', onClick: input.exit } }
+            : {},
       scrimClose: true
     })
   }
@@ -350,9 +364,18 @@ export function publishView(input: PublishViewInput): PublishView {
       mark: 'done',
       headline: `${live ?? ''} is live!`,
       note,
+      evidence:
+        input.external === true && job.jumpIn !== null ? (
+          <p className="eui-publish-url">
+            {PUBLISHED_AT} <span className="where">{job.jumpIn}</span>
+          </p>
+        ) : undefined,
       actions: {
         ...(manageWorld === undefined ? {} : { secondary: manageWorld }),
-        primary: { label: 'Jump in', onClick: () => openExternal(job.jumpIn ?? jumpInUrl(live ?? '')) }
+        primary: {
+          label: input.external === true ? 'Open it' : 'Jump in',
+          onClick: () => openExternal(job.jumpIn ?? jumpInUrl(live ?? ''))
+        }
       },
       scrimClose: true
     })
@@ -374,7 +397,7 @@ export function publishView(input: PublishViewInput): PublishView {
       note: <span className="eui-publish-errmsg">{failure.headline}</span>,
       evidence: failure.retryable ? detailLog : problemList(failure),
       disclosure: logShelf(job, input.attachLog),
-      actions: failure.retryable ? { primary: { label: 'Try again', onClick: retry } } : {},
+      actions: failure.retryable && job.retry ? { primary: { label: 'Try again', onClick: retry } } : {},
       scrimClose: true
     })
   }
@@ -457,8 +480,8 @@ export function publishView(input: PublishViewInput): PublishView {
       family: 'wait',
       mark: 'none',
       headline: publishingHeadline(world),
-      note: WAIT_NOTE[job.phase],
-      evidence: waitEvidence(job.phase, world, spawned),
+      note: job.signing ? SIGNING_NOTE : WAIT_NOTE[job.phase],
+      evidence: waitEvidence(job.phase, world, spawned, job.signing),
       disclosure: logShelf(job, input.attachLog),
       actions: {
         destructive: { label: 'Cancel publish', onClick: cancelPublish, confirm: STOP_PUBLISHING }
@@ -490,7 +513,10 @@ export function publishView(input: PublishViewInput): PublishView {
       mark: 'world',
       headline: NO_NAME_HEADING,
       note: NO_NAME_NOTE,
-      actions: { primary: { label: 'Get a NAME', onClick: () => openExternal(NAME_MARKETPLACE) } },
+      actions: {
+        secondary: { label: 'Check again', onClick: refreshWorlds },
+        primary: { label: 'Get a NAME', onClick: () => openExternal(NAME_MARKETPLACE) }
+      },
       scrimClose: true
     })
   }

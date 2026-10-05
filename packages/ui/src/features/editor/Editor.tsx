@@ -2,18 +2,24 @@
 // logs). All engine communication goes through the console-command RPC seam.
 import { useEffect, useRef, useState } from 'react'
 import { App } from '../../App'
-import { boot, reattachScene, isViewportReady } from '../../boot/boot'
-import { setLaunchParams } from '../../boot/launch-params'
+import { boot, reattachScene, stopBoot, isSettling, isViewportReady } from '../../boot/boot'
+import { clearLaunchParams, setLaunchParams } from '../../boot/launch-params'
 import { useStore } from '../../core/store'
 import { state } from '@scene/state'
+import { pinTimeOfDay } from '@scene/inspector'
 import { setEngineWindow, engineReady } from '../../engine/console'
+import { getHost, startEditorScene } from '../../engine/hosted'
+import { installHostedInput } from '../../engine/hosted-input'
 import { cmd } from '../../engine/cmd'
 import { log } from '../../log'
 import { ENGINE_BOOT_WATCHDOG_MS, INSPECTOR_STALL_MS, SLOW_BOOT_HINT_MS } from '../../config'
 import { forwardEngineKeys } from '../../embed'
-import { Button, LinkButton, Spinner } from '../../ds'
-import { backToProjects } from './nav'
+import { Button, LinkButton, Spinner, labelTip } from '../../ds'
+import { isTyping } from '../../shortcuts'
+import { backLabel, backToProjects, reloadEditor } from './nav'
 import { SceneTopbar } from './SceneTopbar'
+import { PublishOutcomeToast } from '../publish/PublishOutcomeToast'
+import { SyncConflictGate } from '../sync/SyncChip'
 import { PlayPointer } from '../play/PlayPointer'
 import { PlayZones } from '../play/PlayZones'
 import { PlayGame } from '../play/PlayGame'
@@ -31,6 +37,13 @@ export function engineUrl(params: URLSearchParams): string {
   q.set('systemScene', params.get('systemScene') ?? 'http://localhost:8005')
   q.set('realm', params.get('realm') ?? 'http://localhost:8004')
   return `/engine.html?${q}`
+}
+
+// the shell's realm is <pageDir>preview/<id>: a random id, not the project's
+function previewRealmId(params: URLSearchParams): string {
+  const realm = params.get('realm')
+  const id = realm === null ? null : new URL(realm, location.href).pathname.split('/').filter(Boolean).pop()
+  return id ?? params.get('project') ?? ''
 }
 
 export function Editor(props: { params: URLSearchParams }): JSX.Element {
@@ -66,6 +79,36 @@ export function Editor(props: { params: URLSearchParams }): JSX.Element {
       forwardEngineKeys(iframe.contentWindow)
     })
   }
+
+  // Hosted: the engine is the host page's and already running. Ask the host to
+  // put it on the project's preview realm and to spawn the editor scene.
+  const host = getHost()
+  useEffect(() => {
+    if (host === null) return
+    let live = true
+    setLaunchParams(props.params)
+    const removeInput = installHostedInput()
+    void (async () => {
+      try {
+        await host.openPreview(previewRealmId(props.params), props.params.get('position') ?? '0,0')
+        await startEditorScene(cmd.reload)
+      } catch (e) {
+        log.error('the host could not open the project', e)
+        state.error = e instanceof Error ? e.message : String(e)
+        state.status = 'error'
+        return
+      }
+      if (live) void boot()
+    })()
+    return () => {
+      live = false
+      // pausing stopped the clock; the world the creator goes back to gets it running
+      pinTimeOfDay(true)
+      removeInput()
+      stopBoot()
+      clearLaunchParams()
+    }
+  }, [])
 
   // Engine boot watchdog. A corrupt IndexedDB makes the engine's indexedDB.open
   // fail, so it never registers its console command and boot() spins forever at
@@ -158,7 +201,7 @@ export function Editor(props: { params: URLSearchParams }): JSX.Element {
     // let the rebuilt scene spin up first
     const t = setTimeout(() => {
       if (revealed) void reattachScene()
-      else window.location.reload()
+      else reloadEditor()
     }, 2000)
     return () => clearTimeout(t)
   }, [health, ready, revealed])
@@ -169,33 +212,41 @@ export function Editor(props: { params: URLSearchParams }): JSX.Element {
   // Engine-focused keystrokes arrive re-dispatched on this window (embed.ts).
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (!isPrimaryMod(e) || e.altKey || e.key.toLowerCase() !== 'u') return
+      if (!isPrimaryMod(e) || e.altKey || e.key.toLowerCase() !== 'u' || isTyping(e)) return
       e.preventDefault()
       toggleUiHidden()
     }
     window.addEventListener('keydown', onKey, { capture: true })
     return () => window.removeEventListener('keydown', onKey, { capture: true })
   }, [])
+  // while the editor is pausing the scene itself the mode stays what it was: the
+  // scene running for a moment on attach or Stop is not the creator playing
+  const settling = useStore(isSettling)
+  useEffect(() => {
+    if (!settling) host?.setMode(ready && !frozen ? 'play' : 'edit')
+  }, [host, ready, frozen, settling])
   const booting = !ready && !revealed
   return (
     <>
-      <iframe
-        ref={attach}
-        src={engineUrl(props.params)}
-        title="bevy engine"
-        style={{
-          position: 'fixed',
-          inset: 0,
-          width: '100vw',
-          height: '100vh',
-          border: 0,
-          zIndex: 0,
-          // .eui-root is pointer-events:none (panels opt back in); the engine
-          // viewport must receive real input — clicks focus the iframe so
-          // WASD/mouse reach winit directly
-          pointerEvents: 'auto'
-        }}
-      />
+      {host === null && (
+        <iframe
+          ref={attach}
+          src={engineUrl(props.params)}
+          title="bevy engine"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            width: '100vw',
+            height: '100vh',
+            border: 0,
+            zIndex: 0,
+            // .eui-root is pointer-events:none (panels opt back in); the engine
+            // viewport must receive real input — clicks focus the iframe so
+            // WASD/mouse reach winit directly
+            pointerEvents: 'auto'
+          }}
+        />
+      )}
       {booting && (health !== null ? (
         <SceneCodeErrorOverlay health={health} project={props.params.get('project')} />
       ) : (
@@ -204,9 +255,11 @@ export function Editor(props: { params: URLSearchParams }): JSX.Element {
       {!ready && !everReady && stalled && <InspectorStallNotice onLogs={() => openLogs()} />}
       {revealed && health !== null && <SceneHealthBanner health={health} onLogs={() => openLogs()} />}
       {revealed && !uiHidden && <SceneChecksCard />}
+      {props.params.get('project') !== null && <SyncConflictGate project={props.params.get('project') as string} />}
       {!uiHidden && (
         <>
           <SceneTopbar logsOpen={logsOpen} onToggleLogs={toggleLogs} project={props.params.get('project')} />
+          <PublishOutcomeToast />
           <App />
           <LogsDrawer open={logsOpen} initialTab={logsAsk.tab} openKey={logsAsk.n} onClose={closeLogs} />
         </>
@@ -214,7 +267,8 @@ export function Editor(props: { params: URLSearchParams }): JSX.Element {
       {/* Player-facing, not editor chrome: the crosshair and "press E" prompts are
           drawn by the page (the engine runs hud:false), so hiding the editor with
           ⌘U must not take them away — that is exactly the view you hide it to get. */}
-      {!frozen && <PlayPointer />}
+      {/* hosted: the host's own HUD draws the reticle and the prompts */}
+      {!frozen && host === null && <PlayPointer />}
       {!frozen && !uiHidden && <PlayZones />}
       {!frozen && !uiHidden && <PlayGame onLogs={() => openLogs('scene')} />}
       {uiHidden && (
@@ -270,6 +324,9 @@ function EngineInitOverlay(): JSX.Element {
       <div className="eui-loading-card">
         <Spinner size="xl" />
         <div className="eui-loading-title">{statusLabel()}</div>
+        {getHost() !== null && status === 'error' && state.error !== '' && (
+          <div className="eui-loading-sub">{state.error}</div>
+        )}
         {showLogs && (
           <pre ref={pre} className="eui-loading-log">
             {logs.length > 0 ? logs.map(stripAnsi).join('\n') : '…'}
@@ -278,7 +335,7 @@ function EngineInitOverlay(): JSX.Element {
         {/* This overlay covers the topbar, so without its own exit a scene that
             never finishes loading can only be escaped by quitting the app. */}
         <Button variant="ghost" size="lg" onClick={backToProjects}>
-          Back to projects
+          {backLabel()}
         </Button>
       </div>
     </div>
@@ -310,7 +367,7 @@ function SceneCodeErrorOverlay(props: { health: SceneHealth; project: string | n
           </Button>
         )}
         <Button variant="ghost" size="lg" onClick={backToProjects}>
-          Back to projects
+          {backLabel()}
         </Button>
       </div>
     </div>
@@ -346,7 +403,7 @@ function SceneHealthBanner(props: { health: SceneHealth; onLogs: () => void }): 
         </LinkButton>
       )}
       <LinkButton className="act" onClick={props.onLogs}>View logs</LinkButton>
-      <button className="eui-stall-x" onClick={() => setDismissed(props.health)} data-tip="Dismiss">✕</button>
+      <button className="eui-stall-x" onClick={() => setDismissed(props.health)} {...labelTip('Dismiss')}>✕</button>
     </div>
   )
 }
@@ -363,9 +420,9 @@ function InspectorStallNotice(props: { onLogs: () => void }): JSX.Element {
         <b>Editor tools couldn’t load for this scene.</b>
         <span>The live view is shown, but the hierarchy and inspector didn’t attach. Reloading the editor usually fixes this.</span>
       </div>
-      <LinkButton className="act" onClick={() => window.location.reload()}>Reload editor</LinkButton>
+      <LinkButton className="act" onClick={reloadEditor}>Reload editor</LinkButton>
       <LinkButton className="act" onClick={props.onLogs}>View logs</LinkButton>
-      <button className="eui-stall-x" onClick={() => setDismissed(true)} data-tip="Dismiss">✕</button>
+      <button className="eui-stall-x" onClick={() => setDismissed(true)} {...labelTip('Dismiss')}>✕</button>
     </div>
   )
 }

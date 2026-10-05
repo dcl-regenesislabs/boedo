@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable", "DOM.AsyncIterable"],
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@scene/*": ["../scene/src/*"],
+      "@ui/*": ["../ui/src/*"]
+    }
+  },
+  "include": ["src", "../ui/src/vite-env.d.ts", "../ui/src/ds/styles/css.d.ts"]
+}

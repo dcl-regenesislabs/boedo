@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { cx } from './cx'
 import { Popover } from './Popover'
+export { labelTip } from './label-tip'
 import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, KeyboardEvent, ReactNode, TextareaHTMLAttributes } from 'react'
 
 // ---------- buttons ----------
@@ -31,7 +32,7 @@ export function Button(
       ? cx('eui-btn', variant === 'primary' && 'primary', icon && 'icon', active && 'active', className)
       : cx('eui-ds-btn', variant, size, className)
   return (
-    <button type={type} className={cls} data-tip={tip} {...rest}>
+    <button type={type} className={cls} data-tip={tip} aria-label={icon === true ? tip : undefined} {...rest}>
       {children}
     </button>
   )
@@ -81,6 +82,7 @@ export function ControlButton(
       className={cx('eui-ds-ctl', variant, shape, size, active && 'active', className)}
       aria-pressed={active}
       data-tip={tip}
+      aria-label={shape === 'pill' ? undefined : tip}
       {...rest}
     />
   )
@@ -522,6 +524,8 @@ export function SearchField(props: {
   /** sm = 28px panel row; md = 36px pill (default); lg = 40px toolbar row. */
   size?: 'sm' | 'md' | 'lg'
   className?: string
+  autoFocus?: boolean
+  onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void
 }): JSX.Element {
   const { value, defaultValue = '', placeholder = 'Search', onChange } = props
   const [internal, setInternal] = useState(defaultValue)
@@ -538,6 +542,8 @@ export function SearchField(props: {
         aria-label={placeholder}
         placeholder={placeholder}
         value={v}
+        autoFocus={props.autoFocus}
+        onKeyDown={props.onKeyDown}
         onChange={(e) => {
           if (!isControlled) setInternal(e.target.value)
           onChange?.(e.target.value)
@@ -710,12 +716,16 @@ export function Spinner(props: { size?: SpinnerSize; color?: string }): JSX.Elem
   )
 }
 
-export function Toast(props: { children: ReactNode }): JSX.Element {
-  return <div className="eui-toast">{props.children}</div>
-}
-export function AutoSaveChip(props: { state?: 'ok' | 'dim' | 'err'; tip?: string; children: ReactNode }): JSX.Element {
+export function Toast(props: { alert?: boolean; children: ReactNode }): JSX.Element {
   return (
-    <span className={cx('eui-autosave', props.state)} data-tip={props.tip}>
+    <div className={cx('eui-toast', props.alert === true && 'err')} role={props.alert === true ? 'alert' : 'status'}>
+      {props.children}
+    </div>
+  )
+}
+export function AutoSaveChip(props: { state?: 'ok' | 'dim' | 'err'; tip?: string; role?: 'alert' | 'status'; children: ReactNode }): JSX.Element {
+  return (
+    <span className={cx('eui-autosave', props.state)} data-tip={props.tip} role={props.role}>
       <span className="dot" />
       {props.children}
     </span>
@@ -736,5 +746,6 @@ export { CardPicker, type PickerItem } from './CardPicker'
 export { Notice, NOTICE_TONES, type NoticeTone } from './Notice'
 export { ContextMenu } from './ContextMenu'
 export { Popover, type PopoverDensity } from './Popover'
+export { Splitter } from './Splitter'
 export { TableEditor, TABLE_KINDS } from './TableEditor'
 export type { TableKind, TableColumn, TableRow, TableEditorProps } from './TableEditor'

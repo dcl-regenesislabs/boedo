@@ -1,12 +1,10 @@
 // Renderer half of the cross-scene prefab library. The folders themselves live
-// outside the project (app resources for builtins, the Electron userData dir for
-// the user's own), so every filesystem operation is an IPC call into main — see
-// packages/desktop/src/prefab-library.ts. This module only names entries by
-// `ref`, parses their data.json with the shared prefab parser, and copies a
-// library prefab into the open project before anything is instantiated.
-//
-// Web build: `window.editorShell` is absent, so `libraryAvailable()` is false and
-// the Prefabs tab shows this project's prefabs only.
+// outside the project, so every operation is a shell call: desktop main owns
+// app resources and the userData dir (packages/desktop/src/prefab-library.ts),
+// the web shell the built-ins next to editor.js and the wallet's library on the
+// project service (packages/web/src/shell/prefab-library.ts). This module only
+// names entries by `ref`, parses their data.json with the shared prefab parser,
+// and copies a library prefab into the open project before it is instantiated.
 import type {
   PrefabCopyResult,
   PrefabImportInspect,
@@ -19,6 +17,7 @@ import { log } from '../log'
 import { hashPrefabFolder, writeOriginHashes } from './hashes'
 import { readPrefabData } from './storage'
 import { compareVersions, type PrefabData } from './format'
+import { launchParam } from '../boot/launch-params'
 
 export interface LibraryEntry {
   ref: string
@@ -31,10 +30,20 @@ export function libraryAvailable(): boolean {
   return window.editorShell?.prefabLibraryList !== undefined
 }
 
+// Whether a prefab can be saved to the user's own library right now.
+export function userLibraryState(): 'on' | 'guest' | 'unavailable' {
+  const shell = window.editorShell
+  return shell?.prefabUserLibrary?.() ?? (shell?.prefabLibraryCopyOut !== undefined ? 'on' : 'unavailable')
+}
+
+export function importAvailable(): boolean {
+  return window.editorShell?.prefabImportPick !== undefined
+}
+
 // The scene folder the shell opened us with — main needs it to copy folders in
 // and out (the data-layer only ever speaks project-relative paths).
 export function projectDir(): string | null {
-  return new URLSearchParams(window.location.search).get('project')
+  return launchParam('project')
 }
 
 function requireProject(): string {

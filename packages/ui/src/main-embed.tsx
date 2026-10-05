@@ -6,12 +6,9 @@
 // Inter Variable is registered at document level (@font-face penetrates the
 // shadow DOM even though regular selectors don't).
 import '@fontsource-variable/inter/index.css'
-import { createRoot } from 'react-dom/client'
-import './ds/styles'
-import { collectCss } from './ds/styles/registry'
+import { mountEditorUi } from './mount'
 import { state } from '@scene/state'
 import { consoleCommand } from './engine/console'
-import { TooltipLayer } from './panels/TooltipLayer'
 import { enterAsGuest } from './features/home/Welcome'
 import { Editor } from './features/editor/Editor'
 import { SceneLoader } from './features/editor/SceneLoader'
@@ -37,25 +34,11 @@ function start(): void {
   // console, and how the e2e harness gets to the picker (validate/validate.mjs).
   ;(window as unknown as Record<string, unknown>).__euiGuest = enterAsGuest
 
-  const host = document.createElement('div')
-  host.id = 'editor-ui-host'
-  document.body.appendChild(host)
-  const shadow = host.attachShadow({ mode: 'open' })
-
-  const style = document.createElement('style')
-  style.textContent = collectCss()
-  shadow.appendChild(style)
-
-  const rootEl = document.createElement('div')
-  rootEl.className = 'eui-root'
-  shadow.appendChild(rootEl)
-
   const params = new URLSearchParams(window.location.search)
   // routing:
   //  ?realm=…      → attach straight to a running stack (browser tab / harness)
   //  ?project=…    → scene-loading lifecycle (electron started the servers)
   //  (none)        → home / project picker
-  const root = createRoot(rootEl)
   const view =
     params.has('ops') ? (
       // hidden operator dashboard: no nav entry, admin signed-fetch only
@@ -67,13 +50,7 @@ function start(): void {
     ) : (
       <Picker />
     )
-  // TooltipLayer is app-wide: one delegated listener styles every [data-tip] hover.
-  root.render(
-    <>
-      {view}
-      <TooltipLayer />
-    </>
-  )
+  mountEditorUi(document.body, view)
 }
 
 start()

@@ -34,6 +34,7 @@ import { NAME_COMPONENT } from '../custom-components'
 import { PICK_LAYER, DEFAULT_COLLIDER_MASK, GLTF, MESH_RENDERER, MESH_COLLIDER, TEXT_SHAPE, pickApplied, synthesized } from './pick-layer'
 import { syncAnimationHold } from './animation-hold'
 import { pickZone, type ZoneHit } from './zone-pick'
+import { pointerWorldRay } from '../camera/camera-projection'
 
 // Creator Hub marks entities locked / hidden with these; nothing in this editor
 // authors them, but a project made there arrives carrying them and the editor
@@ -160,10 +161,10 @@ let pending: { shift: boolean; ctrl: boolean; zone: ZoneHit | null } | null = nu
 // the engine to the active inspection scene, so it returns that scene's entity ids.
 export function pickAtPointer(add: boolean, toggle: boolean): void {
   if (picker === null) return
-  const dir = PrimaryPointerInfo.getOrNull(engine.RootEntity)?.worldRayDirection
-  const camT = Transform.getOrNull(engine.CameraEntity)
-  if (dir === undefined || camT === null) return
-  Transform.createOrReplace(picker, { position: { ...camT.position } })
+  const ray = pointerWorldRay()
+  if (ray === null) return
+  const dir = ray.dir
+  Transform.createOrReplace(picker, { position: { ...ray.origin } })
   rayTs += 1
   Raycast.createOrReplace(picker, {
     timestamp: rayTs,
@@ -175,7 +176,7 @@ export function pickAtPointer(add: boolean, toggle: boolean): void {
   })
   // Zones have no collider by design (see zone-pick.ts), so they can only be hit
   // analytically — done here, while the ray is the one the user aimed with.
-  const zone = pickZone(camT.position, dir, state.snapshot, (id) => !lockedInTree(id) && !hiddenInTree(id))
+  const zone = pickZone(ray.origin, dir, state.snapshot, (id) => !lockedInTree(id) && !hiddenInTree(id))
   pending = { shift: add, ctrl: toggle, zone }
 }
 

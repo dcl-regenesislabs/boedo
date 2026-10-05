@@ -191,6 +191,10 @@ export async function clearEditorRequests(): Promise<void> {
 export async function runEditorRequests(fallbackTarget: string | null): Promise<RequestRun> {
   const text = await takeRequestFile()
   if (text === null) return { outcomes: [], problems: [], attached: [] }
+  return runRequestText(text, fallbackTarget)
+}
+
+export async function runRequestText(text: string, fallbackTarget: string | null): Promise<RequestRun> {
   const parsed = parseRequests(text)
   const out: RequestRun = { outcomes: [], problems: [...parsed.problems], attached: [] }
   if (parsed.requests.length === 0) return out

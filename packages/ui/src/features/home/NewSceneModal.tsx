@@ -18,6 +18,8 @@ export function NewSceneModal(props: {
   onOpenExisting?: () => void
 }): JSX.Element {
   const { shell } = props
+  // a shell with no folder dialog keeps the scenes itself: there is no location to choose
+  const placed = shell.pickFolder !== undefined
   const [step, setStep] = useState<'choose' | 'create'>(props.onOpenExisting !== undefined ? 'choose' : 'create')
   const [templates, setTemplates] = useState<SceneTemplate[]>([])
   const [template, setTemplate] = useState('blank')
@@ -32,11 +34,11 @@ export function NewSceneModal(props: {
     })
   }, [])
   const create = async (): Promise<void> => {
-    if (parent === null || name.trim() === '') return
+    if ((placed && parent === null) || name.trim() === '') return
     setBusy(true)
     setErr(null)
     try {
-      const dir = await shell.createScene?.(parent, name, template)
+      const dir = await shell.createScene?.(parent ?? '', name, template)
       if (dir === null || dir === undefined) throw new Error('could not create the scene')
       props.onCreated(dir)
     } catch (e) {
@@ -79,7 +81,7 @@ export function NewSceneModal(props: {
           <Button
             variant="primary"
             size="md"
-            disabled={busy || parent === null || name.trim() === '' || templates.length === 0}
+            disabled={busy || (placed && parent === null) || name.trim() === '' || templates.length === 0}
             onClick={() => void create()}
           >
             {busy ? 'Creating…' : 'Create scene'}
@@ -104,18 +106,20 @@ export function NewSceneModal(props: {
           <label className="eui-home-flabel">Name</label>
           <TextInput size="lg" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
-        <div className="eui-home-field">
-          <label className="eui-home-flabel">Location</label>
-          {/* the whole row is the picker — no floating side button */}
-          <button
-            className={`eui-loc-btn ${parent === null ? 'ph' : ''}`}
-            onClick={() => void shell.pickFolder?.().then((d) => d !== null && d !== undefined && setParent(d))}
-          >
-            <FolderIcon />
-            <span className="path">{parent ?? 'Choose where to create it…'}</span>
-            <span className="act">{parent === null ? 'Browse' : 'Change'}</span>
-          </button>
-        </div>
+        {placed && (
+          <div className="eui-home-field">
+            <label className="eui-home-flabel">Location</label>
+            {/* the whole row is the picker — no floating side button */}
+            <button
+              className={`eui-loc-btn ${parent === null ? 'ph' : ''}`}
+              onClick={() => void shell.pickFolder?.().then((d) => d !== null && d !== undefined && setParent(d))}
+            >
+              <FolderIcon />
+              <span className="path">{parent ?? 'Choose where to create it…'}</span>
+              <span className="act">{parent === null ? 'Browse' : 'Change'}</span>
+            </button>
+          </div>
+        )}
         {err !== null && <div className="eui-script-err">{err}</div>}
       </>
     </Modal>

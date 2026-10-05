@@ -36,6 +36,10 @@
 .eui-publish-legend span { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--text-3); }
 .eui-publish-legend i { width: 10px; height: 10px; border-radius: 3px; background: var(--map-tone); border: 1px solid var(--map-tone-line); }
 
+/* where a publish made in the page landed: the link the creator can share */
+.eui-publish-url { margin: 0; font-size: var(--fs-sm); color: var(--text-2); word-break: break-all; }
+.eui-publish-url .where { font-family: var(--font-mono); color: var(--text); user-select: text; }
+
 /* one parsed problem: the compiler's own sentence, ending in the place it
    happened. The location is a link inside the line rather than a control under
    it — the sentence already reads "…in spawner.ts:10", so a button repeating it

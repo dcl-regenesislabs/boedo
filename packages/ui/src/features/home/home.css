@@ -42,6 +42,10 @@
 .eui-home-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-5); margin-bottom: var(--space-5); padding-right: var(--space-5); }
 .eui-home-head h1 { font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; margin: 0 0 var(--space-2); }
 .eui-home-head p { color: var(--text-2); margin: 0; font-size: var(--fs-md); }
+/* where the scenes are kept: one line, never a dialog */
+.eui-home-head p.eui-home-sync { margin-top: var(--space-2); font-size: var(--fs-sm); color: var(--text-3); }
+.eui-home-head p.eui-home-sync.busy { color: var(--text-2); }
+.eui-home-head p.eui-home-sync.attention { color: var(--warning); }
 .eui-scene-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--space-4); }
 .eui-scene-card {
   display: flex; flex-direction: column; text-align: left; padding: 0; gap: 0;
@@ -118,6 +122,10 @@
 .eui-scene-card.missing .eui-scene-thumb { filter: grayscale(1); }
 .eui-scene-card.missing .eui-scene-sub { color: var(--error); }
 .eui-scene-card.missing:hover { transform: none; box-shadow: none; border-color: var(--divider-soft); }
+/* in the trash: shown, not openable; Restore is its one action */
+.eui-scene-card.trashed { cursor: default; }
+.eui-scene-card.trashed .eui-scene-thumb { filter: grayscale(1); opacity: .6; }
+.eui-scene-card.trashed:hover { transform: none; box-shadow: none; border-color: var(--divider-soft); }
 
 /* New-scene FAB: fixed to the window (.eui-home is inset:0), so it stays put
    while the scene column scrolls under it. Circular and brand-filled — the one

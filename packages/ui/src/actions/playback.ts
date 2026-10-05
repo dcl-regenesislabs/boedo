@@ -9,6 +9,7 @@ import { awaitFreshBundle, noteSceneUpToDate, sceneNeedsReload, wireSceneHealth 
 import { consumePlayOverride, playBlockingFindings, revealSceneChecks } from '../features/editor/scene-checks'
 import { refreshAuthoredIds } from '../panels/authored-ids'
 import { autoHideSceneUi, releaseAutoHiddenSceneUi } from '../engine/scene-ui'
+import { log } from '../log'
 import { run } from './run'
 import { uiSetCamera } from './selection'
 
@@ -49,7 +50,9 @@ async function waitForFreshBuild(): Promise<void> {
   if (!sceneNeedsReload()) return
   state.saveStatus = 'rebuilding the scene before play…'
   await awaitFreshBundle()
-  await cmd.reload().then(noteSceneUpToDate).catch(() => {})
+  // by id: a bare /reload respawns every scene, the editor's and a host page's included
+  const hash = state.scene?.hash
+  if (hash !== undefined) await cmd.reload(hash).then(noteSceneUpToDate).catch((e) => log.warn('reload before play failed', e))
   // give the fresh instance a beat to spawn; playScene re-pins if the old one died
   await sleep(RELOAD_SETTLE_MS)
   state.saveStatus = ''

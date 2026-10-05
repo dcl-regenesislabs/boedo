@@ -13,8 +13,8 @@ import {
 } from '@scene/state'
 import { notify } from '@scene/reactive'
 import { isFrozenStatus } from '@scene/commands'
-import { launchParam } from './launch-params'
-import { uiSetTool, uiFocusEntity } from '../actions/selection'
+import { baseParcelCorner, launchParam } from './launch-params'
+import { uiSetTool, uiFrameSelectionOrScene } from '../actions/selection'
 import { uiDuplicateEntity } from '../actions/entities'
 import {
   refresh,
@@ -41,10 +41,13 @@ import {
   AUTOPAUSE_ATTEMPTS,
   AUTOPAUSE_INTERVAL_MS
 } from '../config'
-import { startBusPolling, onSceneMessage, sendToScene } from '../engine/bus'
+import { startBusPolling, stopBus, onSceneMessage, sendToScene, sceneRpc } from '../engine/bus'
+import { isHosted } from '../engine/hosted'
+import { log } from '../log'
 import { pageTrace, pageTraced, recordSceneTrace, printBootTimeline } from '../engine/boot-trace'
 import {
   pushHistory,
+  clearHistory,
   isHistorySuppressed,
   installHistoryKeys,
   undo,
@@ -64,7 +67,9 @@ import { sendSpawnPoints } from '../spawn-points'
 import { entityName } from '@scene/custom-components'
 import { SCRIPT_COMPONENT } from '@scene/allowed-components'
 import type { Snapshot } from '@scene/state'
+import { setSceneBaseCorner } from '@scene/world-origin'
 import { startDevSceneReload, notifyDevSceneReady } from './dev-hmr'
+import '../engine/gizmo-debug'
 
 export type BootPhase = 'waiting-engine' | 'waiting-scene' | 'ready'
 
@@ -118,7 +123,56 @@ function updateCodeMove(entity: string, name: string): void {
   refreshCodeMove(entity, name, snapshot[entity]?.[name], entityName(snapshot, entity) ?? null)
 }
 
+// boot() runs once per page on desktop. Hosted mode opens project after project
+// in the same page, so the listeners are installed once and each later run starts
+// from a clean session.
+let wired = false
+let bootRun = 0
+
+function resetSession(): void {
+  bootPhase = 'waiting-engine'
+  viewportReady = false
+  autoPausedHash = null
+  state.scene = undefined
+  state.status = 'logging-in'
+  state.snapshot = {}
+  setSelectionAndActive([], null)
+  resetSaveChangelog()
+  clearDirty()
+  clearAllEdits()
+  clearPendingCodeMove()
+  resetCodeOrigins()
+  resetSceneUi()
+  clearHistory()
+  notify()
+}
+
+// Leave the project without leaving the page: stop announcing, stop listening.
+export function stopBoot(): void {
+  bootRun++
+  stopBus()
+}
+
+// announce until the scene answers with scene-ready
+async function announce(run: number): Promise<void> {
+  for (let announced = 0; bootPhase === 'waiting-scene' && run === bootRun; announced++) {
+    try {
+      await sendToScene({ type: 'init', baseCorner: baseParcelCorner() })
+      // every 15s of silence, so a wedged attach leaves a trail in the console
+      if (announced === 0 || announced % 15 === 14) {
+        pageTrace('init announced', `${announced + 1}× — no scene-ready yet`)
+      }
+    } catch {
+      /* engine may still be wiring the console — retry */
+    }
+    await new Promise((r) => setTimeout(r, 1000))
+  }
+}
+
 export async function boot(): Promise<void> {
+  const run = ++bootRun
+  if (wired) resetSession()
+  setSceneBaseCorner(baseParcelCorner())
   pageTrace('page boot')
   while (!engineReady()) {
     await new Promise((r) => setTimeout(r, 250))
@@ -129,6 +183,13 @@ export async function boot(): Promise<void> {
   startBusPolling()
   startDevSceneReload() // dev-only: in-place editor-scene reload on rebuild (no-op in prod)
   onSceneMessage(handleSceneMessage)
+
+  if (wired) {
+    void initAutoSave()
+    await announce(run)
+    return
+  }
+  wired = true
 
   // The scene's UI misses pointer releases that land on the page's DOM panels,
   // leaving a gizmo ghost-drag. The DOM always sees the release — forward it.
@@ -231,7 +292,7 @@ export async function boot(): Promise<void> {
         break
       case 'focus':
         if (runStudioChord('find')) break
-        if (state.activeEntity !== null) uiFocusEntity(state.activeEntity)
+        uiFrameSelectionOrScene()
         break
       case 'undo':
         // ⌘Z in the Studio's code editor undoes TYPING; in any other text field
@@ -260,19 +321,7 @@ export async function boot(): Promise<void> {
   installHistoryKeys()
   void initAutoSave()
 
-  // announce until the scene answers with scene-ready
-  for (let announced = 0; bootPhase === 'waiting-scene'; announced++) {
-    try {
-      await sendToScene({ type: 'init' })
-      // every 15s of silence, so a wedged attach leaves a trail in the console
-      if (announced === 0 || announced % 15 === 14) {
-        pageTrace('init announced', `${announced + 1}× — no scene-ready yet`)
-      }
-    } catch {
-      /* engine may still be wiring the console — retry */
-    }
-    await new Promise((r) => setTimeout(r, 1000))
-  }
+  await announce(run)
 }
 
 // The page's frozen flag, from the authoritative scene status (mirrors the
@@ -303,6 +352,7 @@ async function autoPause(): Promise<void> {
   const hash = state.scene?.hash
   if (hash === undefined || autoPausedHash === hash || autoPausing) return
   autoPausing = true
+  notify()
   try {
     let frozen = false
     for (let i = 0; i < AUTOPAUSE_ATTEMPTS && !frozen; i++) {
@@ -325,7 +375,14 @@ async function autoPause(): Promise<void> {
     }
   } finally {
     autoPausing = false
+    notify()
   }
+}
+
+// The editor itself is pausing the scene (on attach, on Stop): it may run for a
+// moment first, and that is not the creator pressing Play.
+export function isSettling(): boolean {
+  return autoPausing || restart !== null
 }
 
 // Attach to the scene again without reloading the page: re-resolve and re-pin it,
@@ -360,13 +417,39 @@ async function moveToSpawn(): Promise<void> {
   const spawn = (launchParam('spawn') ?? '').split(',').map(Number)
   if (spawn.length !== 3 || !spawn.every(Number.isFinite)) return
   try {
-    await cmd.movePlayerTo(spawn[0], spawn[1], spawn[2])
+    // hosted, the console command is not registered (the host's realm is not a
+    // preview launch): the editor scene moves the player with the SDK instead
+    if (isHosted()) await sceneRpc('movePlayerTo', spawn)
+    else await cmd.movePlayerTo(spawn[0], spawn[1], spawn[2])
   } catch (e) {
-    console.warn('[editor-ui] could not return the player to spawn:', e)
+    log.debug('could not return the player to spawn', e)
   }
 }
 
-let restarting = false
+let restart: Promise<void> | null = null
+let restartAfter: Promise<void> | null = null
+
+export function isRestarting(): boolean {
+  return restart !== null
+}
+
+// A call that lands while a restart is under way may be for a newer save than the
+// reload already sent: one more restart follows it, however many callers ask.
+export function restartScene(): Promise<void> {
+  if (restart === null) {
+    restart = restartOnce().finally(() => {
+      restart = null
+      notify()
+    })
+    notify()
+    return restart
+  }
+  restartAfter ??= restart.then(() => {
+    restartAfter = null
+    return restartScene()
+  })
+  return restartAfter
+}
 
 // Stop = restart: reload the scene (fresh instance, tick 0), re-pin it, freeze
 // it again, and resync both editors' snapshots. Unsaved runtime edits die with
@@ -376,11 +459,9 @@ let restarting = false
 // before Stop is still sitting in autosave's debounce window, and the reload
 // below would drop it. Flush first — Stop restarts the scene, it doesn't undo
 // your work. If that write fails, abort rather than reload over it.
-export async function restartScene(): Promise<void> {
+async function restartOnce(): Promise<void> {
   const hash = state.scene?.hash
   if (hash === undefined) return
-  if (restarting) return
-  restarting = true
   try {
     if (hasPendingSave()) state.saveStatus = 'saving…'
     const flushed = await flushPendingSave()
@@ -433,8 +514,6 @@ export async function restartScene(): Promise<void> {
     state.saveStatus = paused ? 'restarted' : 'restarted, but the scene would not pause — press Pause'
   } catch (e) {
     state.saveStatus = `restart failed: ${String(e)}`
-  } finally {
-    restarting = false
   }
 }
 

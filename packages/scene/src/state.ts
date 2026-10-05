@@ -88,6 +88,8 @@ export const state = reactive({
     thumbnail?: string | null
   }>,
   assetBusy: false,
+  // the catalog could not be fetched from this page (no proxy, CDN blocked)
+  assetCatalogFailed: false,
   // catalog of editable component names (from /component_names), for the picker
   componentNames: [] as string[],
   // per-component typed schema (from /component_schema), keyed by component name

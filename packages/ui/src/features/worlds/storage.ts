@@ -6,15 +6,25 @@
 // leaves the service to pick a default, which silently reads and writes whatever
 // scene happens to stand on that ground. `parcel` is required in the type so no
 // call can be built without one. ADR-44 signed like everything else.
+import { getHost } from '../../engine/hosted'
 import { storageUrl } from './endpoints'
 import { signedFetch } from './signed-fetch'
 
-export interface StorageScope {
+export interface WorldStorageScope {
   realm: string // world name, lowercased
   parcel: string // a parcel of THIS scene's footprint
 }
+// A preview realm serving the toolchain's own storage routes (sdk-commands
+// `start`): the scene's test data, unsigned, with no list of players or env
+// keys; it bulk-deletes shared or one player's data.
+export interface PreviewStorageScope {
+  preview: string // the realm's url, no trailing slash
+}
+export type StorageScope = WorldStorageScope | PreviewStorageScope
 
-function storageMetadata(s: StorageScope): Record<string, unknown> {
+export const isPreviewScope = (s: StorageScope): s is PreviewStorageScope => 'preview' in s
+
+function storageMetadata(s: WorldStorageScope): Record<string, unknown> {
   return { realm: { serverName: s.realm }, realmName: s.realm, parcel: s.parcel }
 }
 
@@ -27,16 +37,31 @@ export interface StoragePage<T> {
 }
 
 // friendlier error mapping for the storage service specifically
-function storageError(status: number): Error {
+function storageError(status: number, preview: boolean): Error {
+  if (preview && status === 404) return new Error('This preview is not serving its storage — is the scene running?')
   if (status === 401 || status === 403) return new Error('Only the world owner can manage storage')
   if (status === 413) return new Error('That value is too large for the storage service')
   if (status === 429) return new Error('Slowing down — the storage service is rate-limiting, try again in a moment')
   return new Error(`The request failed (${status}) — try again`)
 }
 
-async function storageReq(scope: StorageScope, path: string, init?: RequestInit): Promise<Response> {
-  const res = await signedFetch(`${storageUrl()}${path}`, init, storageMetadata(scope))
-  if (!res.ok) throw storageError(res.status)
+interface StorageInit {
+  method: string
+  headers?: Record<string, string>
+  body?: string
+}
+
+// the preview's storage answers its server copy alone; the host fetches as that copy
+function previewReq(scope: PreviewStorageScope, path: string, init: StorageInit): Promise<Response> {
+  const host = getHost()
+  return host?.previewStorageFetch !== undefined ? host.previewStorageFetch(path, init) : fetch(`${scope.preview}${path}`, init)
+}
+
+async function storageReq(scope: StorageScope, path: string, init: StorageInit): Promise<Response> {
+  const res = isPreviewScope(scope)
+    ? await previewReq(scope, path, init)
+    : await signedFetch(`${storageUrl()}${path}`, init, storageMetadata(scope))
+  if (!res.ok) throw storageError(res.status, isPreviewScope(scope))
   return res
 }
 
@@ -61,14 +86,14 @@ const asKV = (d: unknown): Array<{ key: string; value: unknown }> =>
 const valuesBase = (player?: string): string =>
   player !== undefined ? `/players/${encodeURIComponent(player)}/values` : '/values'
 
-export const listEnvKeys = (scope: StorageScope, offset = 0): Promise<StoragePage<string>> =>
+export const listEnvKeys = (scope: WorldStorageScope, offset = 0): Promise<StoragePage<string>> =>
   storageList(scope, '/env', offset, asStrings)
 export const listStorageValues = (
   scope: StorageScope,
   offset = 0,
   player?: string
 ): Promise<StoragePage<{ key: string; value: unknown }>> => storageList(scope, valuesBase(player), offset, asKV)
-export const listStoragePlayers = (scope: StorageScope, offset = 0): Promise<StoragePage<string>> =>
+export const listStoragePlayers = (scope: WorldStorageScope, offset = 0): Promise<StoragePage<string>> =>
   storageList(scope, '/players', offset, asStrings)
 
 // fetch ONE value in full (the list may carry it, but this is the authoritative read)
@@ -91,7 +116,7 @@ export async function deleteStorageValue(scope: StorageScope, key: string, playe
   await storageReq(scope, `${valuesBase(player)}/${encodeURIComponent(key)}`, { method: 'DELETE' })
 }
 
-export async function putEnvKey(scope: StorageScope, key: string, value: string): Promise<void> {
+export async function putEnvKey(scope: WorldStorageScope, key: string, value: string): Promise<void> {
   await storageReq(scope, `/env/${encodeURIComponent(key)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -99,12 +124,12 @@ export async function putEnvKey(scope: StorageScope, key: string, value: string)
   })
 }
 
-export async function deleteEnvKey(scope: StorageScope, key: string): Promise<void> {
+export async function deleteEnvKey(scope: WorldStorageScope, key: string): Promise<void> {
   await storageReq(scope, `/env/${encodeURIComponent(key)}`, { method: 'DELETE' })
 }
 
 // wipe a whole collection: all env keys, all shared data, every player's data,
-// or one player's data
+// or one player's data (a preview clears only shared or one player's data)
 export async function clearStorage(scope: StorageScope, target: 'env' | 'values' | 'players' | { player: string }): Promise<void> {
   const path = typeof target === 'string' ? `/${target}` : valuesBase(target.player)
   await storageReq(scope, path, { method: 'DELETE', headers: { 'X-Confirm-Delete-All': 'true' } })

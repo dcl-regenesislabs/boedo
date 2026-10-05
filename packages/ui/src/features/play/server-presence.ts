@@ -9,9 +9,10 @@
 // both come back `unknown`, and unknown leaves the strip's wording alone.
 import { log } from '../../log'
 import { serverPresence, type ServerPresence } from './game-life'
+import { launchParam } from '../../boot/launch-params'
 
 function projectDir(): string | null {
-  return new URLSearchParams(window.location.search).get('project')
+  return launchParam('project')
 }
 
 export async function readServerPresence(): Promise<ServerPresence> {

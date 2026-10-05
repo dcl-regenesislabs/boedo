@@ -5,11 +5,22 @@
 //   - places API (world thumbnails / live user counts)
 //   - creators-data (the once-a-day analytics export behind the Analytics tab)
 
+import { hostV1 } from '../../engine/hosted'
+
+// Hosted, the page says which Worlds server deployments go to, and everything
+// read about a world has to come from that same server.
+function hostedWorlds(): string | null {
+  return hostV1()?.services.worldsContent.replace(/\/+$/, '') ?? null
+}
 // same env switch as the account feature's auth.ts ('dcl-auth-env' = 'zone' → Sepolia stack)
 function zone(): boolean {
+  const hosted = hostedWorlds()
+  if (hosted !== null) return new URL(hosted).hostname.endsWith('.decentraland.zone')
   return localStorage.getItem('dcl-auth-env') === 'zone'
 }
 export function worldsServer(): string {
+  const hosted = hostedWorlds()
+  if (hosted !== null) return hosted
   return zone() ? 'https://worlds-content-server.decentraland.zone' : 'https://worlds-content-server.decentraland.org'
 }
 export function placesApi(): string {

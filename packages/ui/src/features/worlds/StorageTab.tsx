@@ -25,7 +25,9 @@ import {
   listStorageValues,
   putEnvKey,
   putStorageValue,
-  type StorageScope
+  isPreviewScope,
+  type StorageScope,
+  type WorldStorageScope
 } from './storage'
 import { sceneCoordinate, type WorldEntry, type WorldScene } from './inventory'
 import { publishFirstNote, PublishFirst } from './common'
@@ -103,7 +105,7 @@ function SceneStorage(props: {
   const { scene, sub, player } = props
   const realm = props.w.name.toLowerCase()
   const parcel = sceneCoordinate(scene)
-  const scope = useMemo<StorageScope>(() => ({ realm, parcel }), [realm, parcel])
+  const scope = useMemo<WorldStorageScope>(() => ({ realm, parcel }), [realm, parcel])
   if (!scene.authoritativeMultiplayer) {
     return (
       <div className="eui-world-scenebody">
@@ -305,7 +307,7 @@ function ValueRow(props: {
 }
 
 // the paginated key-value manager (world data, or one player's data)
-function ValueManager(props: { scope: StorageScope; player?: string }): JSX.Element {
+export function ValueManager(props: { scope: StorageScope; player?: string }): JSX.Element {
   const [offset, setOffset] = useState(0)
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -386,7 +388,7 @@ function ValueManager(props: { scope: StorageScope; player?: string }): JSX.Elem
 }
 
 // paginated players list; picking one drills into their ValueManager
-function PlayersManager(props: { scope: StorageScope; onPick: (address: string) => void }): JSX.Element {
+function PlayersManager(props: { scope: WorldStorageScope; onPick: (address: string) => void }): JSX.Element {
   const [offset, setOffset] = useState(0)
   const [actErr, setActErr] = useState<string | null>(null)
   const { data, err, reload } = useLoad(() => listStoragePlayers(props.scope, offset), [props.scope, offset])
@@ -423,7 +425,7 @@ function PlayersManager(props: { scope: StorageScope; onPick: (address: string) 
 }
 
 // env keys: write-only secrets — list, set (create/overwrite), delete, wipe
-function EnvManager(props: { scope: StorageScope }): JSX.Element {
+function EnvManager(props: { scope: WorldStorageScope }): JSX.Element {
   const [offset, setOffset] = useState(0)
   const [busy, setBusy] = useState(false)
   const [actErr, setActErr] = useState<string | null>(null)

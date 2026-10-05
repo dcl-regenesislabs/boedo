@@ -140,8 +140,8 @@ async function main() {
     if (!add) return 'no add button'
     add.click()
     await new Promise((r) => setTimeout(r, 400))
-    const item = [...sh.querySelectorAll('.eui-pop-item')].find((el) => el.textContent.includes('asset-packs::Script'))
-    if (!item) return 'Script not in picker: ' + [...sh.querySelectorAll('.eui-pop-item')].map((e) => e.textContent).join(',').slice(0, 200)
+    const item = sh.querySelector('.eui-pop .eui-menu-item[data-tip="asset-packs::Script"]')
+    if (!item) return 'Script not in picker: ' + [...sh.querySelectorAll('.eui-pop .eui-menu-item')].map((e) => e.textContent).join(',').slice(0, 200)
     item.click()
     return 'ok'
   })()`)

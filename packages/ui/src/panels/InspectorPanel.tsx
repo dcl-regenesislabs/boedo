@@ -33,6 +33,8 @@ import { prettyLabel } from './fields'
 import { SchemaEditor } from './schema-editor'
 import { ShapeEditor } from './shape-editor'
 import { TransformEditor } from './transform-editor'
+import { GroupLabel, MenuItem, SearchField, labelTip } from '../ds'
+import { catalogEntry, groupComponents, matchesComponent } from './component-catalog'
 
 export function InspectorPanel(props: { min: boolean; onToggleMin: () => void }): JSX.Element {
   const activeEntity = useStore(() => state.activeEntity)
@@ -110,7 +112,7 @@ export function InspectorPanel(props: { min: boolean; onToggleMin: () => void })
             {!readOnly && (
               <button
                 className={`eui-btn icon ${pickerOpen ? 'active' : ''}`}
-                data-tip="Add component"
+                {...labelTip('Add component')}
                 onClick={() => setPickerOpen(!pickerOpen)}
               >
                 <IconPlus />
@@ -294,7 +296,7 @@ function ComponentCard(props: {
           <button
             className="eui-btn icon"
             style={{ width: 20, height: 20 }}
-            data-tip="Remove component"
+            {...labelTip('Remove component')}
             onClick={(e) => {
               e.stopPropagation()
               uiDeleteComponent(entityId, name)
@@ -429,38 +431,45 @@ function AddComponentPicker(props: { entityId: string; onDone: () => void }): JS
   const all = [...new Set([...componentNames, ...customComponentNames()])]
     .filter((n) => isAllowedComponent(n))
     .filter((n) => !existing.has(n))
-    .filter((n) => componentDisplayName(n).toLowerCase().includes(filter.toLowerCase()))
-    .sort((a, b) => componentDisplayName(a).localeCompare(componentDisplayName(b)))
+    .filter((n) => matchesComponent(n, filter))
+  const groups = groupComponents(all)
 
   return (
     <div className="eui-pop">
-      <input
-        className="eui-input"
+      <SearchField
+        size="sm"
         autoFocus
         placeholder="Add component…"
         value={filter}
-        onChange={(e) => setFilter(e.target.value)}
+        onChange={setFilter}
         onKeyDown={(e) => {
           if (e.key === 'Escape') props.onDone()
         }}
       />
       <div className="eui-pop-list">
-        {all.map((n) => {
-          const hint = restrictionUnmet(n, props.entityId)
-          return (
-            <div
-              key={n}
-              className="eui-pop-item"
-              onClick={() => {
-                void uiAddComponent(props.entityId, n)
-                props.onDone()
-              }}
-            >
-              {componentDisplayName(n)}
-              {hint !== null && <span className="hint">{hint}</span>}
-            </div>
-          )
-        })}
+        {groups.map(({ group, names }) => (
+          <div key={group} role="group" aria-label={group}>
+            <GroupLabel>{group}</GroupLabel>
+            {names.map((n) => {
+              const entry = catalogEntry(n)
+              const hint = restrictionUnmet(n, props.entityId)
+              return (
+                <MenuItem
+                  key={n}
+                  sub={entry.description}
+                  hint={hint ?? undefined}
+                  tip={n}
+                  onClick={() => {
+                    void uiAddComponent(props.entityId, n)
+                    props.onDone()
+                  }}
+                >
+                  {entry.label}
+                </MenuItem>
+              )
+            })}
+          </div>
+        ))}
         {all.length === 0 && <div className="eui-empty">no matches</div>}
       </div>
     </div>

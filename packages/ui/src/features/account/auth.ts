@@ -92,7 +92,29 @@ async function applyDeepLinkIdentity(identityId: string): Promise<string> {
   return signer
 }
 
+// Hosted mode: the host page's session is the only identity. The editor shows it;
+// it never signs in or out and never reads the stored key.
+type HostIdentity = () => { address: string | null; isGuest: boolean }
+let hostIdentity: HostIdentity | null = null
+
+function hostWallet(): string | null {
+  const id = hostIdentity?.()
+  return id === undefined || id.isGuest || id.address === null ? null : id.address.toLowerCase()
+}
+
+export function setHostIdentity(read: HostIdentity | null): void {
+  hostIdentity = read
+  syncHostIdentity()
+}
+
+function syncHostIdentity(): void {
+  if (hostIdentity === null) return
+  const wallet = hostWallet()
+  if (wallet !== store.wallet) setStore({ wallet, profile: null, phase: 'idle', error: null, errorReason: null })
+}
+
 export function getAccount(): string | null {
+  if (hostIdentity !== null) return hostWallet()
   return localStorage.getItem(STORAGE_KEY_ADDRESS)
 }
 
@@ -100,6 +122,7 @@ export function getAccount(): string | null {
 // sso calls throw on a non-address key — degrade to signed-out instead of
 // crashing every render if bad data ever lands in localStorage.
 export function hasValidIdentity(): boolean {
+  if (hostIdentity !== null) return false
   const account = getAccount()
   if (account === null) return false
   try {
@@ -110,7 +133,14 @@ export function hasValidIdentity(): boolean {
   }
 }
 
+// Can a publish be signed as the account: with the stored identity here, by the
+// hosting page when it has a wallet.
+export function canSign(): boolean {
+  return hostIdentity !== null ? hostWallet() !== null : hasValidIdentity()
+}
+
 export function getIdentity(): AuthIdentity | null {
+  if (hostIdentity !== null) return null
   const account = getAccount()
   if (account === null) return null
   try {
@@ -121,6 +151,7 @@ export function getIdentity(): AuthIdentity | null {
 }
 
 export function signOut(): void {
+  if (hostIdentity !== null) return
   const account = getAccount()
   if (account !== null) {
     try {
@@ -177,7 +208,7 @@ async function loadProfile(address: string): Promise<void> {
 // yet — it can still only arrive inside this window (the shipping Creator Hub's
 // own posture), and tightens to strict once prod ships the echo.
 export function signIn(): void {
-  if (inflight) return
+  if (inflight || hostIdentity !== null) return
   const shell = window.editorShell
   if (shell?.openExternal === undefined || shell.onSignIn === undefined) {
     setStore({ phase: 'error', error: 'Sign-in needs the desktop app', errorReason: 'unknown' })
@@ -254,6 +285,7 @@ export function submitSignInLink(url: string): Promise<boolean> {
   return window.editorShell?.submitSignInLink?.(url.trim()) ?? Promise.resolve(false)
 }
 function doSignOut(): void {
+  if (hostIdentity !== null) return
   signOut()
   setStore({ wallet: null, profile: null, phase: 'idle', error: null, errorReason: null })
 }
@@ -299,6 +331,8 @@ export interface AuthState {
   cancel: () => void
   reopen: () => void
   dismissError: () => void
+  // the identity belongs to the page hosting the editor: no sign-in or sign-out here
+  external: boolean
   // dev-only paste-the-link fallback (see submitSignInLink)
   isDev: boolean
   submitLink: (url: string) => Promise<boolean>
@@ -316,6 +350,13 @@ export function useAuth(): AuthState {
   useEffect(() => {
     if (snap.wallet !== null && snap.profile === null) void loadProfile(snap.wallet)
   }, [snap.wallet, snap.profile])
+  const external = hostIdentity !== null
+  // the host can sign in or out while the editor is open
+  useEffect(() => {
+    if (!external) return
+    const poll = setInterval(syncHostIdentity, 3000)
+    return () => clearInterval(poll)
+  }, [external])
 
   return {
     wallet: snap.wallet,
@@ -329,6 +370,7 @@ export function useAuth(): AuthState {
     cancel: cancelSignIn,
     reopen: reopenSignInBrowser,
     dismissError,
+    external,
     isDev: window.editorShell?.isDev === true,
     submitLink: submitSignInLink
   }

@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { cmd } from '../../engine/cmd'
 import { BUILD_TAB_EMPTY, GAME_TAB_EMPTY, GAME_TAB_TIP, gameTabLines, lastSeconds, type RelayedLine } from './log-roles'
 import { stripAnsi } from './scene-health'
+import { labelTip } from '../../ds'
+import { launchParam } from '../../boot/launch-params'
+import { getHost } from '../../engine/hosted'
+import { PreviewStorage } from './PreviewStorage'
 
 // Bottom-docked log drawer: the inspected scene's own console output (what the
 // scene prints while running) and the shared copy's lines lifted out of the
@@ -15,7 +19,7 @@ import { stripAnsi } from './scene-health'
 // opening that asks for nothing keeps the tab the creator last chose. `openKey`
 // counts the openings, so asking for the same tab twice still lands there: the
 // creator who clicks Logs, browses Build, then clicks Logs again means it.
-export type LogsTab = 'scene' | 'server'
+export type LogsTab = 'scene' | 'server' | 'storage'
 
 // One line per relayed entry, so this is a line count — it used to be a chunk
 // count, which made the visible backlog a fraction of what it reads as. Matches
@@ -77,6 +81,9 @@ export function LogsDrawer(props: {
     if (pre.current !== null) pre.current.scrollTop = pre.current.scrollHeight
   }, [serverLogs, sceneLogs, open, tab])
   if (!open) return null
+  // hosted, the preview realm serves the scene's storage itself
+  const host = getHost()
+  const realm = host === null ? null : launchParam('realm')
   const epoch = sceneEpochMs.current
   const relayed: RelayedLine[] = serverLogs.map((line) => ({
     text: line.text,
@@ -84,6 +91,20 @@ export function LogsDrawer(props: {
   }))
   const rows = tab === 'scene' ? gameTabLines(sceneLogs, relayed) : []
   const quiet = !rows.some((row) => row.role !== null || row.text.trim() !== '')
+  function logText(): ReactNode {
+    if (tab === 'scene') {
+      if (quiet) return GAME_TAB_EMPTY
+      return rows.map((line, i) => (
+        <span key={i} className={line.error ? 'eui-logs-line error' : 'eui-logs-line'}>
+          {line.role !== null && <span className={`eui-logs-role ${line.role}`}>[{line.role}]</span>}
+          {line.text}
+          {'\n'}
+        </span>
+      ))
+    }
+    if (serverLogs.length > 0) return serverLogs.map((line) => stripAnsi(line.text)).join('\n')
+    return BUILD_TAB_EMPTY
+  }
   return (
     <div className="eui-logs-drawer">
       <div className="eui-logs-tabs">
@@ -95,32 +116,25 @@ export function LogsDrawer(props: {
         <button className={tab === 'scene' ? 'on' : ''} onClick={() => setTab('scene')} data-tip={GAME_TAB_TIP}>
           Game
         </button>
+        {realm !== null && (
+          <button className={tab === 'storage' ? 'on' : ''} onClick={() => setTab('storage')}>
+            Storage
+          </button>
+        )}
         <span className="eui-logs-spacer" />
-        <button onClick={onClose} data-tip="Hide logs">
+        <button onClick={onClose} {...labelTip('Hide logs')}>
           ✕
         </button>
       </div>
-      <pre ref={pre} className="eui-logs-body">
-        {tab === 'scene' ? (
-          quiet ? (
-            GAME_TAB_EMPTY
-          ) : (
-            <>
-              {rows.map((line, i) => (
-                <span key={i} className={line.error ? 'eui-logs-line error' : 'eui-logs-line'}>
-                  {line.role !== null && <span className={`eui-logs-role ${line.role}`}>[{line.role}]</span>}
-                  {line.text}
-                  {'\n'}
-                </span>
-              ))}
-            </>
-          )
-        ) : serverLogs.length > 0 ? (
-          serverLogs.map((line) => stripAnsi(line.text)).join('\n')
-        ) : (
-          BUILD_TAB_EMPTY
-        )}
-      </pre>
+      {tab === 'storage' && realm !== null ? (
+        <div className="eui-logs-body">
+          <PreviewStorage realm={realm} player={host?.identity().address?.toLowerCase() ?? null} />
+        </div>
+      ) : (
+        <pre ref={pre} className="eui-logs-body">
+          {logText()}
+        </pre>
+      )}
     </div>
   )
 }

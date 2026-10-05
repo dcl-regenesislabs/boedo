@@ -12,6 +12,9 @@ import type { Footprint, OccupyingScene } from './publish-conflict'
 export const NEEDS_DESKTOP = 'Publishing needs the desktop app'
 export const SIGN_IN_TO_PUBLISH = 'Sign in to publish'
 export const SIGN_IN_NOTE = 'Publishing proves the world is yours — sign in with Decentraland first.'
+// hosted: the wallet belongs to the page the editor runs in, so there is no sign-in to offer here
+export const GUEST_NOTE =
+  'You are in Decentraland as a guest. Publishing proves the world is yours, so it needs a wallet. Go back to Decentraland, open your profile at the top left, choose Sign out, and sign in with a wallet. Then open Create again: your scenes stay on this device.'
 export const CONFLICT_HEADING = 'A scene is already on these parcels'
 export const MOVE_UNAVAILABLE = "Couldn't find free parcels for this scene."
 // `npm i @dcl/sdk@latest` — the documented way to update a scene's SDK.
@@ -31,7 +34,8 @@ export const SDK_DOCS_URL = 'https://docs.decentraland.org/creator/scenes-sdk7/g
 // sizes, a line apart. Each note below carries only what its headline does not.
 export const SDK_TOO_OLD_HEADING = "This scene's Decentraland SDK can't publish next to other scenes"
 export const NO_NAME_HEADING = "You don't own a Decentraland NAME yet"
-export const NO_NAME_NOTE = 'A NAME is the world you publish to.'
+export const NO_NAME_NOTE =
+  'A NAME is a Decentraland name you own, like yourname.dcl.eth. Every NAME has a world of its own, and that world is where a scene is published. The owner of a world can also let your wallet publish to theirs.'
 export const WORLDS_FAILED_HEADING = "Couldn't load your worlds"
 
 export function sceneHeadline(title: string): string {
@@ -52,6 +56,10 @@ export function checkingHeadline(world: string): string {
 export const CHECKING_NOTE = "Reading what's already on your parcels."
 export const BUILDING_NOTE = 'Bundling code and assets — this can take a minute the first time.'
 export const UPLOADING_NOTE = 'Sending your scene to Decentraland. Almost there…'
+export const SIGNING_NOTE = 'Decentraland is asking you to confirm. Check the world and the wallet, then sign.'
+export const SIGNING_STEP = 'Confirm in Decentraland'
+export const PUBLISHED_AT = 'It is live at'
+
 
 export function publishingHeadline(world: string): string {
   return `Publishing to ${world}`

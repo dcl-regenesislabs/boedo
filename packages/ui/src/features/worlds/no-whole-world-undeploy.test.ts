@@ -86,6 +86,15 @@ export function buildsWholeWorldUndeploy(line: string): boolean {
   return UNDEPLOY_URL.some((r) => r.test(line))
 }
 
+// The two files that may spell the path, and what keeps each from being the
+// forbidden request. Publishing from the page is `POST <server>/entities` with
+// nothing after it: the upload module may write exactly that, and never a
+// DELETE. The stand-in Worlds server answers the route and sends no request.
+const SPELLS_THE_PATH: Record<string, (line: string, text: string) => boolean> = {
+  'packages/web/src/publish/upload.ts': (line, text) => /\}\/entities`/.test(line) && !text.includes('DELETE'),
+  'packages/web/validate/fake-worlds-server.mjs': (_line, text) => !/\bfetch\(/.test(text)
+}
+
 // The second spelling: a DELETE addressed at a world rather than at something
 // inside one. Reads the URL literal out of the statement above the call, so it
 // only judges call sites whose URL it can actually see — R1 is the wide net,
@@ -112,8 +121,10 @@ describe('no whole-world undeploy', () => {
   it('U1 no source file builds the DELETE /entities/{world} path', () => {
     const hits: string[] = []
     for (const f of ALL) {
-      executable(read(f)).forEach((line, i) => {
-        if (buildsWholeWorldUndeploy(line)) hits.push(`${rel(f)}:${i + 1} — ${line.trim().slice(0, 100)}`)
+      const text = read(f)
+      const allowed = SPELLS_THE_PATH[rel(f)]
+      executable(text).forEach((line, i) => {
+        if (buildsWholeWorldUndeploy(line) && allowed?.(line, text) !== true) hits.push(`${rel(f)}:${i + 1} — ${line.trim().slice(0, 100)}`)
       })
     }
     expect(

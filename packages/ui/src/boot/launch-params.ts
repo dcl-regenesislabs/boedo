@@ -12,6 +12,10 @@ export function setLaunchParams(params: URLSearchParams): void {
   launchParams = params
 }
 
+export function clearLaunchParams(): void {
+  launchParams = null
+}
+
 export function launchParam(name: string): string | null {
   return (launchParams ?? new URLSearchParams(window.location.search)).get(name)
 }

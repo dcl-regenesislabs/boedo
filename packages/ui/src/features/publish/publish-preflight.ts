@@ -2,11 +2,17 @@
 // sit, what can this build of the CLI do, and may this wallet write there.
 // Every one of them fails open except the capability probe — a check that
 // blocks on its own failure would be a worse bug than the one it guards.
-import type { DeployCapability } from '@dcl-editor/contract'
+import type { DeployCapability, EditorShell } from '@dcl-editor/contract'
 import { worldsServer } from '../worlds/endpoints'
 import { fetchWorldPermissions, fetchWorldScenes } from '../worlds/inventory'
 import { footprintOf, type Footprint } from './publish-conflict'
 import { parcelPermissionMessage, worldPermissionMessage } from './publish-copy'
+
+// A shell publishes through the scene's CLI (desktop) or by itself (the web
+// target); one with neither gets no Publish entry point.
+export function canPublish(shell: EditorShell | undefined): boolean {
+  return shell?.publishStart !== undefined || shell?.publishScene !== undefined
+}
 
 // The scene's own parcels, as scene.json holds them. Null when we can't read
 // them: the collision question then can't be asked at all, and the pick-time

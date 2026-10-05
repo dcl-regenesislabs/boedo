@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Modal, Shelf, StateBlock, useLoad } from '../../ds'
+import { getHost } from '../../engine/hosted'
 import { hasValidIdentity, useAuth } from '../account/auth'
-import { ensureWorlds, useWorlds } from '../worlds/worlds-store'
-import { resetPublish, usePublish } from './publish-flow'
+import { ensureWorlds, refreshWorlds, useWorlds } from '../worlds/worlds-store'
+import { resetPublish, usePublish, watchPublish } from './publish-flow'
 import { readLocalFootprint } from './publish-preflight'
 import { GlobeIcon } from '../worlds/common'
 import { PublishFooter } from './PublishFooter'
@@ -22,6 +23,14 @@ export function PublishModal(props: {
   const logRef = useRef<HTMLPreElement | null>(null)
   const { data: local } = useLoad(() => readLocalFootprint(props.dir), [props.dir])
   useEffect(ensureWorlds, [auth.wallet])
+  useEffect(watchPublish, [])
+  // a NAME bought in another tab shows up when the creator comes back
+  const noName = status === 'ready' && worlds.length === 0
+  useEffect(() => {
+    if (!noName) return
+    window.addEventListener('focus', refreshWorlds)
+    return () => window.removeEventListener('focus', refreshWorlds)
+  }, [noName])
   useEffect(() => {
     if (logRef.current !== null) logRef.current.scrollTop = logRef.current.scrollHeight
   }, [job.logs])
@@ -42,8 +51,11 @@ export function PublishModal(props: {
 
   const view = publishView({
     job,
-    wallet: hasValidIdentity() ? auth.wallet : null,
+    // hosted, the page's wallet signs; here, only an identity that has not expired
+    wallet: auth.external || hasValidIdentity() ? auth.wallet : null,
     signIn: auth.signIn,
+    external: auth.external,
+    exit: getHost() === null ? undefined : () => getHost()?.exit(),
     worlds,
     worldsStatus: status,
     worldsError,

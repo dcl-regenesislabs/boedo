@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2020", "WebWorker"]
+  },
+  "files": ["src/worker.ts", "src/pinned-sdk.d.ts"]
+}

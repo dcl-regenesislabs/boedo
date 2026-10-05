@@ -1,17 +1,22 @@
 import { useEffect, useState } from 'react'
 import type { OpenPreview } from '@dcl-editor/contract'
-import { Button, MenuItem } from '../../ds'
+import { Button, MenuItem, Spinner, labelTip } from '../../ds'
+import { useAuth } from '../account/auth'
+import { usePublish } from '../publish/publish-flow'
 import { useStore } from '../../core/store'
 import { GlobeIcon, openExternal } from '../worlds/common'
 import { state } from '@scene/state'
 import { AccountBadge } from '../account/account'
 import { PublishModal } from '../publish/PublishModal'
+import { canPublish } from '../publish/publish-preflight'
 import { restartToUpdate, useUpdateStatus } from '../update/update'
 import { SceneSettingsModal } from '../scene-settings/SceneSettingsModal'
 import { MobilePreviewModal } from '../preview/MobilePreviewModal'
-import { backToProjects } from './nav'
+import { backLabel, backToProjects, reloadEditor } from './nav'
 import { openCodeEditor } from '../../panels/ai-store'
 import { IconCode } from '../../icons'
+import { SyncChip } from '../sync/SyncChip'
+import { getHost } from '../../engine/hosted'
 
 const TerminalIcon = (): JSX.Element => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -77,7 +82,12 @@ export function SceneTopbar(props: { logsOpen: boolean; onToggleLogs: () => void
   }
   const title = scene?.title ?? scene?.hash ?? 'Loading scene…'
   const home = backToProjects
+  const host = getHost()
   const project = props.project ?? null
+  const auth = useAuth()
+  const guest = auth.external && auth.wallet === null
+  const job = usePublish()
+  const publishingNow = job.phase === 'building' || job.phase === 'uploading'
   // the scene's current target world (for pre-selecting in the publish modal)
   useEffect(() => {
     if (project === null || window.editorShell === undefined) return
@@ -87,20 +97,27 @@ export function SceneTopbar(props: { logsOpen: boolean; onToggleLogs: () => void
   }, [project, publishing])
   return (
     <div className="eui-topbar">
-      <button className="eui-topbar-home" data-tip="Back to projects" onClick={home}>
+      <button className="eui-topbar-home" {...labelTip(backLabel())} onClick={home}>
         <ArrowLeftIcon />
       </button>
       <div className="eui-topbar-title">
         <span className="eui-title">{title}</span>
       </div>
       <span style={{ flex: 1 }} />
+      {project !== null && <SyncChip project={project} />}
       {window.editorShell !== undefined && project !== null && (
         <button className="eui-topbar-btn wide" data-tip="Browse and edit your scene's code" onClick={openCodeEditor}>
           <IconCode /> Code
         </button>
       )}
-      {window.editorShell !== undefined && project !== null && (
-        <Button variant="primary" className="eui-topbar-publish" onClick={() => setPublishing(true)}>
+      {canPublish(window.editorShell) && project !== null && (
+        <Button
+          variant={guest ? 'secondary' : 'primary'}
+          className="eui-topbar-publish"
+          tip={guest ? 'Sign in to publish' : publishingNow ? `Publishing to ${job.world ?? 'your world'}…` : undefined}
+          onClick={() => setPublishing(true)}
+        >
+          {publishingNow && <Spinner size="xs" />}
           Publish
         </Button>
       )}
@@ -157,7 +174,7 @@ export function SceneTopbar(props: { logsOpen: boolean; onToggleLogs: () => void
       )}
       <button
         className={`eui-topbar-btn ${props.logsOpen ? 'on' : ''}`}
-        data-tip={props.logsOpen ? 'Hide logs' : 'Show build / server logs'}
+        {...labelTip(props.logsOpen ? 'Hide logs' : 'Show build / server logs')}
         onClick={props.onToggleLogs}
       >
         <TerminalIcon />
@@ -166,7 +183,7 @@ export function SceneTopbar(props: { logsOpen: boolean; onToggleLogs: () => void
         <div className="eui-topbar-menu-wrap">
           <button
             className={`eui-topbar-btn ${upd.state === 'downloaded' ? 'eui-has-update' : ''}`}
-            data-tip={upd.state === 'downloaded' ? 'Settings — update ready' : 'Settings'}
+            {...labelTip(upd.state === 'downloaded' ? 'Settings — update ready' : 'Settings')}
             onClick={() => {
               setUpdateHint(false) // a stale "deploy running" hint must not survive a re-open
               setMenuOpen((v) => !v)
@@ -190,8 +207,11 @@ export function SceneTopbar(props: { logsOpen: boolean; onToggleLogs: () => void
                     Scene settings…
                   </button>
                 )}
-                <button className="eui-menu-item" onClick={home}>Back to projects</button>
-                <button className="eui-menu-item" onClick={() => window.location.reload()}>Reload editor</button>
+                <button className="eui-menu-item" onClick={home}>{backLabel()}</button>
+                {host !== null && (
+                  <button className="eui-menu-item" onClick={() => host.exit()}>Back to Decentraland</button>
+                )}
+                <button className="eui-menu-item" onClick={reloadEditor}>Reload editor</button>
                 {upd.state === 'downloaded' && (
                   <button
                     className="eui-menu-item"

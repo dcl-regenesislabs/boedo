@@ -2,10 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import type { ServersReady } from '@dcl-editor/contract'
 import { Button, Spinner } from '../../ds'
 import { setDataLayerRealm } from '../../engine/datalayer'
+import { isHosted } from '../../engine/hosted'
 import { folderName } from '../../lib/format'
-import { backToProjects } from './nav'
+import { useStore } from '../../core/store'
+import { AiPanel } from '../../panels/AiPanel'
+import { aiStore, openCodeAt } from '../../panels/ai-store'
+import { backLabel, backToProjects } from './nav'
 import { Editor } from './Editor'
-import { stripAnsi, useSceneHealth } from './scene-health'
+import { errorLocation, stripAnsi, useSceneHealth } from './scene-health'
 
 // Scene-loading lifecycle: the page lands here (with ?project, no realm) while
 // main starts the scene servers. Streams build logs; on servers-ready it mounts
@@ -16,6 +20,8 @@ export function SceneLoader(props: { project: string }): JSX.Element {
   const [ready, setReady] = useState<ServersReady | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [logs, setLogs] = useState<string[]>([])
+  // hosted the id is a slug the creator never typed: name the scene by its title
+  const [title, setTitle] = useState<string | null>(null)
   const pre = useRef<HTMLPreElement>(null)
   // A code error in the scene kills `sdk-commands start` at the bundling step,
   // so the server never comes up and main gives up after its restarts. With the
@@ -23,15 +29,20 @@ export function SceneLoader(props: { project: string }): JSX.Element {
   // which is why this screen needs an explicit Try again, unlike the in-editor
   // flow where a rebuild lands on save.
   const health = useSceneHealth()
+  const studio = useStore(() => aiStore.mode === 'studio')
   useEffect(() => {
     if (shell === undefined) return
     const apply = (info: ServersReady): void => {
       // the host page URL has no ?realm — give the data-layer the realm so model
-      // import/upload (which write files over the data-layer) can connect
-      setDataLayerRealm(info.realm)
+      // import/upload (which write files over the data-layer) can connect.
+      // Hosted, the project store is handed in and there is nothing to dial.
+      if (!isHosted()) setDataLayerRealm(info.realm)
       setReady(info)
     }
-    void shell.getState().then((s) => setLogs(s.logs.slice(-80)))
+    void shell.getState().then((s) => {
+      setLogs(s.logs.slice(-80))
+      setTitle(s.projects.find((p) => p.path === props.project)?.title ?? null)
+    })
     shell.onStackLog((line) => setLogs((prev) => [...prev.slice(-200), line]))
     shell.onServersReady?.(apply)
     shell.onServersError?.((msg) => setError(msg))
@@ -57,20 +68,33 @@ export function SceneLoader(props: { project: string }): JSX.Element {
   }
   // the creator's own code stopped the server — lead with their error, not ours
   const codeError = error !== null && health !== null
+  // hosted, the project stays open after a failed first build, so its code can be fixed here
+  const where = codeError && isHosted() ? errorLocation(health) : null
+  if (studio && isHosted() && error !== null) {
+    return (
+      <div className="eui-loading-studio">
+        <AiPanel shown fill height={360} />
+      </div>
+    )
+  }
+  // a scene that is only on the account is fetched first: say how far along it is
+  const downloading = [...logs].reverse().find((line) => line.startsWith('Downloading'))
   return (
     <div className="eui-loading">
       <div className="eui-loading-card">
         {error === null ? <Spinner size="xl" /> : <div className="eui-loading-x">✖</div>}
         <div className="eui-loading-title">
           {error === null
-            ? `Starting ${folderName(props.project)}…`
+            ? `Starting ${isHosted() ? (title ?? 'your scene') : folderName(props.project)}…`
             : codeError
               ? 'Your scene has a code error'
               : 'Failed to start the scene'}
         </div>
         <div className="eui-loading-sub">
           {error === null
-            ? 'Building the scene and launching the local servers.'
+            ? isHosted()
+              ? (downloading ?? 'Building the scene.')
+              : 'Building the scene and launching the local servers.'
             : codeError
               ? 'The scene can’t build until it’s fixed. Fix the file, then try again.'
               : error}
@@ -81,13 +105,18 @@ export function SceneLoader(props: { project: string }): JSX.Element {
             {logs.length > 0 ? logs.map(stripAnsi).join('\n') : '…'}
           </pre>
         )}
+        {where !== null && (
+          <Button variant="primary" size="lg" onClick={() => openCodeAt(where.path, where.line)}>
+            Open the code
+          </Button>
+        )}
         {error !== null && (
           <Button variant="secondary" size="lg" onClick={() => void shell?.openProject(props.project)}>
             Try again
           </Button>
         )}
         <Button variant="ghost" size="lg" onClick={backToProjects}>
-          Back to projects
+          {backLabel()}
         </Button>
       </div>
     </div>

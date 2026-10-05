@@ -2,9 +2,11 @@
 // top-right avatar, the Home rail chip, and the Home Account section all reflect
 // one state. All DS-reuse: Button, Spinner, .eui-ctx/.eui-menu-item, useOutsideClose.
 import { useRef, useState } from 'react'
-import { Button, Spinner, useOutsideClose } from '../../ds'
+import { Button, Spinner, labelTip, useOutsideClose } from '../../ds'
 import { useAuth, type AuthState, type SignInErrorReason } from './auth'
 import { UpdateCard } from '../update/UpdateCard'
+import { getHost } from '../../engine/hosted'
+import { GUEST_NOTE } from '../publish/publish-copy'
 
 export const shortWallet = (w: string): string => `${w.slice(0, 6)}…${w.slice(-4)}`
 
@@ -71,16 +73,20 @@ function AccountMenu(props: { auth: AuthState; onAccount?: () => void; onClose: 
           Account
         </button>
       )}
-      <div className="eui-menu-sep" />
-      <button
-        className="eui-menu-item danger"
-        onClick={() => {
-          props.onClose()
-          auth.signOut()
-        }}
-      >
-        Sign out
-      </button>
+      {!auth.external && (
+        <>
+          <div className="eui-menu-sep" />
+          <button
+            className="eui-menu-item danger"
+            onClick={() => {
+              props.onClose()
+              auth.signOut()
+            }}
+          >
+            Sign out
+          </button>
+        </>
+      )}
     </div>
   )
 }
@@ -103,13 +109,22 @@ export function AccountBadge(props: { size?: 'sm' | 'lg'; onAccount?: () => void
       <div className="eui-topbar-menu-wrap" ref={ref}>
         <button
           className={`eui-topbar-avatar ${size} ${open ? 'on' : ''}`}
-          data-tip={auth.profile?.name !== undefined && auth.profile.name !== '' ? auth.profile.name : shortWallet(auth.wallet)}
+          {...labelTip(auth.profile?.name !== undefined && auth.profile.name !== '' ? auth.profile.name : shortWallet(auth.wallet))}
           onClick={() => setOpen((v) => !v)}
         >
           <Avatar face={auth.profile?.face256 ?? null} size={AVATAR_FACE[size]} />
         </button>
         {menu}
       </div>
+    )
+  }
+
+  if (auth.external) {
+    return (
+      <span className={`eui-topbar-signin ${size}`} data-tip="Editing as a guest. Sign in to Decentraland to publish.">
+        <PersonIcon />
+        <span>Guest</span>
+      </span>
     )
   }
 
@@ -242,7 +257,20 @@ export function AccountSection(): JSX.Element {
           <p>{auth.wallet !== null ? 'Signed in with Decentraland.' : 'Sign in with Decentraland to publish scenes to your Worlds and Land.'}</p>
         </div>
       </header>
-      {auth.wallet === null ? (
+      {auth.wallet === null && auth.external ? (
+        <div className="eui-account-card">
+          <div className="eui-signin">
+            <div className="eui-account-empty-icon">◆</div>
+            <p className="t">You are editing as a guest</p>
+            <p className="s">{GUEST_NOTE}</p>
+            {getHost() !== null && (
+              <Button variant="primary" size="md" onClick={() => getHost()?.exit()}>
+                Back to Decentraland
+              </Button>
+            )}
+          </div>
+        </div>
+      ) : auth.wallet === null ? (
         <div className="eui-account-card">
           <SignInFlow />
         </div>
@@ -255,7 +283,7 @@ export function AccountSection(): JSX.Element {
               <span className="wa" data-tip={auth.wallet}>{shortWallet(auth.wallet)}</span>
             </div>
             <span style={{ flex: 1 }} />
-            <Button className="eui-account-signout" onClick={auth.signOut}>Sign out</Button>
+            {!auth.external && <Button className="eui-account-signout" onClick={auth.signOut}>Sign out</Button>}
           </div>
           <div className="eui-account-soon">
             You can publish scenes to your worlds — use <b>Publish</b> on any scene, and manage what's live in the <b>Worlds</b> tab.

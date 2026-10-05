@@ -115,3 +115,18 @@ export function worldToScreenPx(
   }
 }
 
+// Inverse of worldToScreenPx for a +Z-forward camera: the world direction through a viewport pixel.
+export function screenPxToWorldDir(
+  left: number,
+  top: number,
+  cameraRot: Quaternion,
+  fovRad: number,
+  viewportWidth: number,
+  viewportHeight: number
+): Vector3 {
+  const tanHalf = Math.tan(fovRad / 2)
+  const ndcX = (left / viewportWidth) * 2 - 1
+  const ndcY = 1 - (top / viewportHeight) * 2
+  const cam = Vector3.create(ndcX * tanHalf * (viewportWidth / viewportHeight), ndcY * tanHalf, 1)
+  return Vector3.normalize(rotateVec3ByQuat(cam, cameraRot))
+}

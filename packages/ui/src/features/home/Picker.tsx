@@ -2,8 +2,8 @@
 // Account) and a content area. No logs here — those live in the in-scene
 // Build/Server drawer.
 import { useEffect, useRef, useState } from 'react'
-import type { HostState, ProjectInfo } from '@dcl-editor/contract'
-import { Button, SearchField, Select, Toast } from '../../ds'
+import type { HostState, ProjectImportResult, ProjectInfo } from '@dcl-editor/contract'
+import { Button, LinkButton, SearchField, Select, Toast } from '../../ds'
 import { useAuth } from '../account/auth'
 import { ensureWorlds } from '../worlds/worlds-store'
 import { AccountBadge, AccountSection } from '../account/account'
@@ -18,6 +18,8 @@ import { useStore } from '../../core/store'
 import { Welcome, welcomeGate } from './Welcome'
 import { OpsDashboard } from '../ops/OpsDashboard'
 import { canSeeOps } from '../ops/ops-access'
+import { ImportResultModal } from '../sync/ImportResultModal'
+import { syncLine, useSyncStatus } from '../sync/sync'
 
 type HomeSection = 'scenes' | 'worlds' | 'account' | 'ops'
 
@@ -53,14 +55,17 @@ export function Picker(): JSX.Element {
   const [pending, setPending] = useState<{ path: string; name: string } | null>(null)
   const [publish, setPublish] = useState<{ dir: string; title: string; world: string | null } | null>(null)
   const [worldsFocus, setWorldsFocus] = useState<string | null>(null) // deep-link into a world's detail
+  const [trash, setTrash] = useState<ProjectInfo[]>([])
+  const [imported, setImported] = useState<ProjectImportResult | null>(null)
   const removeTimer = useRef<ReturnType<typeof setTimeout>>()
   const refresh = (): void => {
     void shell?.getState().then(setCfg)
+    void shell?.trashedProjects?.().then(setTrash)
   }
-  useEffect(() => {
-    if (shell === undefined) return
-    void shell.getState().then(setCfg)
-  }, [])
+  // the list is read again when the account's copy adds, removes or replaces a scene
+  const sync = useSyncStatus()
+  const listRevision = sync?.revision
+  useEffect(refresh, [listRevision])
   // Prefetch the worlds inventory the moment the home screen loads (and on
   // sign-in) so the Worlds tab is already populated — no skeleton on first
   // open. Idempotent: WorldsSection's own ensureWorlds() then finds it warm.
@@ -71,6 +76,10 @@ export function Picker(): JSX.Element {
     return <div className="eui-boot">Editor host — pass ?realm=…&systemScene=… to attach to a running stack</div>
   }
   if (welcome) return <Welcome />
+
+  // scenes are folders the creator picks, or the shell keeps them itself
+  const folders = shell.pickFolder !== undefined
+  const newLabel = folders ? 'New or open scene' : 'New scene'
 
   // Undo-able remove: hide the card, commit the removal after a grace period.
   const requestRemove = (p: ProjectInfo): void => {
@@ -94,10 +103,32 @@ export function Picker(): JSX.Element {
   const favs = sorted.filter((p) => p.favourite === true)
   const recents = sorted.filter((p) => p.favourite !== true)
 
+  const runImport = (kind: 'zip' | 'folder'): void => {
+    void shell.importProject?.(kind).then((result) => {
+      if (result === null) return
+      setImported(result)
+      refresh()
+    })
+  }
+  const importActions = shell.importProject !== undefined && (
+    <div className="eui-home-cta">
+      <Button variant="secondary" size="md" tip="A .zip of a scene folder, from the desktop editor or an export" onClick={() => runImport('zip')}>
+        Import .zip
+      </Button>
+      {shell.canImportFolder === true && (
+        <Button variant="secondary" size="md" tip="A scene folder on this computer" onClick={() => runImport('folder')}>
+          Import folder
+        </Button>
+      )}
+    </div>
+  )
+  const line = sync === null ? null : syncLine(sync)
+
   const card = (p: ProjectInfo): JSX.Element => (
     <SceneCard
       key={p.path}
       p={p}
+      sync={sync?.projects[p.path] ?? p.sync}
       shell={shell}
       onOpen={() => void shell.openProject(p.path)}
       onChanged={refresh}
@@ -106,6 +137,8 @@ export function Picker(): JSX.Element {
     />
   )
 
+  const nav = canSeeOps(auth.wallet) ? [...NAV, ['ops', 'Ops'] as [HomeSection, string]] : NAV
+
   return (
     <div className="eui-home">
       <nav className="eui-home-rail">
@@ -113,7 +146,7 @@ export function Picker(): JSX.Element {
           <img className="eui-home-logo" src={dclLogo} alt="" />
           <span>Decentraland Studio</span>
         </div>
-        {(canSeeOps(auth.wallet) ? [...NAV, ['ops', 'Ops'] as [HomeSection, string]] : NAV).map(([key, label]) => (
+        {nav.map(([key, label]) => (
           <button
             key={key}
             className={`eui-home-navitem ${section === key ? 'on' : ''}`}
@@ -140,7 +173,9 @@ export function Picker(): JSX.Element {
               <div>
                 <h1>Your scenes</h1>
                 <p>Create, open and manage your Decentraland scenes.</p>
+                {line !== null && <p className={`eui-home-sync ${line.tone}`}>{line.text}</p>}
               </div>
+              {all.length > 0 && importActions}
             </header>
 
             {all.length > 0 && (
@@ -180,8 +215,15 @@ export function Picker(): JSX.Element {
               <div className="eui-home-first">
                 <FolderIcon />
                 <p className="t">Create your first scene</p>
-                <p className="s">Pick a starter, or open an existing scene folder.</p>
+                <p className="s">
+                  {folders
+                    ? 'Pick a starter, or open an existing scene folder.'
+                    : shell.importProject !== undefined
+                      ? 'Pick a starter to begin, or import a scene you already have.'
+                      : 'Pick a starter to begin.'}
+                </p>
                 <Button variant="primary" size="md" onClick={() => setCreating(true)}>+ New scene</Button>
+                {importActions}
               </div>
             )}
             {q !== '' && sorted.length === 0 && all.length > 0 && (
@@ -194,13 +236,33 @@ export function Picker(): JSX.Element {
             {all.length > 0 && (
               <button
                 className="eui-home-fab"
-                aria-label="New or open scene"
-                data-tip="New or open scene"
+                aria-label={newLabel}
+                data-tip={newLabel}
                 onClick={() => setCreating(true)}
               >
                 <PlusIcon />
-                <span className="eui-sr-only">New or open scene</span>
+                <span className="eui-sr-only">{newLabel}</span>
               </button>
+            )}
+            {trash.length > 0 && (
+              <>
+                <div className="eui-home-shelf">Trash</div>
+                <div className="eui-scene-grid">
+                  {trash.map((p) => (
+                    <div key={p.path} className="eui-scene-card trashed">
+                      <div className="eui-scene-thumb">
+                        {p.thumbnail !== null ? <img src={p.thumbnail} alt="" /> : <div className="eui-scene-thumb-fallback"><FolderIcon /></div>}
+                      </div>
+                      <div className="eui-scene-meta">
+                        <span className="eui-scene-name">{p.title}</span>
+                        <span className="eui-scene-sub">
+                          <LinkButton onClick={() => void shell.restoreProject?.(p.path).then(refresh)}>Restore</LinkButton>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </>
         )}
@@ -222,10 +284,14 @@ export function Picker(): JSX.Element {
       {creating && (
         <NewSceneModal
           shell={shell}
-          onOpenExisting={() => {
-            setCreating(false)
-            void shell.pickProject()
-          }}
+          onOpenExisting={
+            folders
+              ? () => {
+                  setCreating(false)
+                  void shell.pickProject()
+                }
+              : undefined
+          }
           onClose={() => setCreating(false)}
           onCreated={(dir) => {
             setCreating(false)
@@ -255,6 +321,16 @@ export function Picker(): JSX.Element {
           Removed “{pending.name}”
           <button className="eui-link" onClick={undoRemove}>Undo</button>
         </Toast>
+      )}
+      {imported !== null && (
+        <ImportResultModal
+          result={imported}
+          onClose={() => setImported(null)}
+          onOpen={(id) => {
+            setImported(null)
+            void shell.openProject(id)
+          }}
+        />
       )}
       {pending === null && <WhatsNewToast />}
     </div>

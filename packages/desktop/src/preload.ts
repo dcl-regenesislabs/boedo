@@ -1,7 +1,7 @@
 // Bridge exposed to the host renderer page (editor-app.html). The editor UI
 // uses it for project management and the scene-loading lifecycle; everything
 // engine-related goes through the same-origin iframe instead.
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { EDITOR_CHORD_CHANNEL, type EditorChord, AUTH_SIGNIN_CHANNEL, PUBLISH_EVENT_CHANNEL, UPDATE_EVENT_CHANNEL } from '@dcl-editor/contract'
 import type { AiEvent, AiProviderInfo, AiSendParams, AuthSigninPayload, DeployCapability, EditorShell, MobilePreview, OpenPreview, PrefabCopyResult, PrefabImportInspect, PrefabLibraryEntry, PublishEvent, SceneSettings, SceneTemplate, ServersReady, UpdateStatus } from '@dcl-editor/contract'
 
@@ -104,7 +104,11 @@ const shell = {
   aiSend: (params: AiSendParams): Promise<{ turnId: string }> => ipcRenderer.invoke('ai-send', params),
   aiStop: (): Promise<void> => ipcRenderer.invoke('ai-stop'),
   aiReset: (): Promise<void> => ipcRenderer.invoke('ai-reset'),
-  onAiEvent: (cb: (e: AiEvent) => void) => ipcRenderer.on('ai-event', (_e, evt: AiEvent) => cb(evt)),
+  onAiEvent: (cb: (e: AiEvent) => void) => {
+    const listener = (_e: IpcRendererEvent, evt: AiEvent): void => cb(evt)
+    ipcRenderer.on('ai-event', listener)
+    return () => { ipcRenderer.removeListener('ai-event', listener) }
+  },
   // Prefab library: the builtin + userData prefab trees, and the staged-import
   // flow (pick/fetch → confirm → commit). All fs work happens in main.
   prefabLibraryList: (): Promise<PrefabLibraryEntry[]> => ipcRenderer.invoke('prefab-library-list'),

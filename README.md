@@ -6,6 +6,10 @@ scenes and worlds — a modern take on the Creator Hub, powered by the
 engine. Edit your scene in a live 3D viewport, write scripts with the built-in
 assistant, and publish straight to your Decentraland world.
 
+For a public web deployment, follow the [service deployment guide](packages/service/README.md#container-deployment)
+and [security policy](SECURITY.md). The web assistant uses server-held OAuth and
+browser-scoped tools; it does not run a shell on the service.
+
 ## Download & install
 
 Grab the installer for your platform from the
@@ -175,7 +179,7 @@ files, open any of them side by side with the chat, and edit them yourself.
 You can also paste or attach screenshots and reference images — "make the door
 look like this" — and the assistant sees them.
 
-It works through an AI coding tool installed on your machine, billed to **that
+In the desktop app, it works through an AI coding tool installed on your machine, billed to **that
 tool's subscription** (Claude Pro/Max for Claude Code, a ChatGPT plan for
 Codex) — no API key, no per-token charges. Setting one up is the one terminal
 moment in this app:
@@ -192,6 +196,16 @@ Install either or both — the assistant panel offers whichever is available, an
 none is set up it tells you what's missing; the rest of the editor works fine
 without it.
 
+In the **web editor**, the assistant connects through the editor service. You
+don't install a coding tool on your computer: it reads and edits the project open
+in your browser, including imported projects, and builds there. Sign in to
+Decentraland and use the assistant when the hosting service has enabled it.
+If another edit changes a file while it is working, it must read the new version
+before saving. Service setup: [Web assistant](./docs/WEB-ASSISTANT.md).
+For self-hosting, use the [service Docker deployment](./packages/service/README.md#container-deployment).
+The web assistant includes [Decentraland SDK skills](./packages/service/skills/README.md)
+for scene scripting, interactions, UI, animation and other SDK features, loaded on demand.
+
 **Script Studio** (the Script component's *Edit code in Studio* button) opens
 the full view: your code and the chat side by side, with the 3D scene still
 live. Select some code and press **⌘K** to ask about it (one-tap Explain / Fix
@@ -202,7 +216,7 @@ The Studio speaks editor: **⌘P** jumps to any file, **⌘F** finds in the open
 one, **⌘S** saves, **⌘W** closes the tab, **⌘⇧[** / **⌘⇧]** cycle tabs, and
 **Esc** closes the Studio (your unsaved edits are flushed first).
 
-> **A word of caution:** the assistant can change any file in your scene
+> **A word of caution for the desktop assistant:** it can change any file in your scene
 > project — and run commands on your computer — without asking first. Only use
 > it on scenes and prompts you trust, especially scenes downloaded from other
 > people. Details in [`docs/AI-ASSISTANT.md`](./docs/AI-ASSISTANT.md).

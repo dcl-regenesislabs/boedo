@@ -79,11 +79,10 @@ export function clearPendingCodeMove(): void {
   if (aiStore.codeMove !== null) aiStore.codeMove = null
 }
 
-// Whether there is an assistant to hand a prompt to at all — false in the web
-// build, where there is no Electron shell to run a CLI. Every surface that offers
-// to ask the assistant (a chip, a menu item, a coaching line) asks here first.
+// Assistant entry points follow the capabilities supplied by the current shell.
 export function canAskAssistant(): boolean {
-  return window.editorShell?.aiSend !== undefined
+  const shell = window.editorShell
+  return shell?.aiSend !== undefined && (shell.aiOffered?.() ?? true)
 }
 
 // Drop a prompt into the composer and show it — deliberately WITHOUT sending.

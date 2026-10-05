@@ -43,7 +43,9 @@ export type CameraMode = 'off' | 'free' | 'target'
 
 
 export type PageToSceneMessage =
-  | { type: 'init' } // page UI announces itself; scene hides its panels and replies scene-ready
+  // page UI announces itself; scene hides its panels and replies scene-ready. baseCorner: the
+  // edited scene's base parcel corner in metres, which the world frame is rebuilt from
+  | { type: 'init'; baseCorner?: { x: number; z: number } }
   | { type: 'set-tool'; tool: EditorTool }
   | {
       type: 'set-flags'
@@ -64,6 +66,8 @@ export type PageToSceneMessage =
   // Focus). orbit === false → frame ONCE in free mode (import/place); orbit would
   // chase the entity on every later move and glitch the view.
   | { type: 'focus'; entity: string; orbit?: boolean }
+  // fit several entities in view at once (multi-selection, or the whole scene); selection is untouched
+  | { type: 'frame'; entities: string[] }
   | { type: 'refresh' } // page changed scene content; scene re-pulls (running scenes only)
   // the pointer was released over a DOM panel mid gizmo-drag — the scene's engine
   // input misses that release, so the page forwards it to avoid a ghost-drag
@@ -82,6 +86,8 @@ export type PageToSceneMessage =
   | { type: 'component-deleted'; entity: string; name: string }
   | { type: 'entity-deleted'; entity: string; recursive: boolean }
   | { type: 'rpc'; id: number; method: string; args?: unknown[] }
+  // hosted: the engine canvas's size in the CSS pixels the pointer is reported in
+  | { type: 'pointer-space'; width: number; height: number }
 
 export type SceneToPageMessage =
   | {
@@ -146,6 +152,7 @@ export const PROTOCOL_KINDS = [
   'set-camera',
   'set-frozen',
   'focus',
+  'frame',
   'refresh',
   'pointer-up',
   'pick-at-pointer',
@@ -155,6 +162,7 @@ export const PROTOCOL_KINDS = [
   'component-deleted',
   'entity-deleted',
   'rpc',
+  'pointer-space',
   // scene → page
   'scene-ready',
   'scene-found',

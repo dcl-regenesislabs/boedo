@@ -40,7 +40,9 @@ export const IDLE_JOB: PublishState = {
   at: null,
   total: null,
   review: null,
-  blocked: null
+  blocked: null,
+  signing: false,
+  retry: true
 }
 
 export const job = (over: Partial<PublishState>): PublishState => ({ ...IDLE_JOB, ...over })
@@ -142,6 +144,8 @@ export const PUBLISH_CASES: PublishCase[] = [
   { id: 'W1', family: 'wait', mark: 'none', job: job({ phase: 'checking', world: JOB_WORLD }) },
   { id: 'W2', family: 'wait', mark: 'none', job: job({ phase: 'building', world: JOB_WORLD, logs: ['compiling'] }) },
   { id: 'W3', family: 'wait', mark: 'none', job: job({ phase: 'uploading', world: JOB_WORLD, logs: ['compiling'] }) },
+  // a shell that publishes by itself: the hosting page is asking the creator to confirm
+  { id: 'W4', family: 'wait', mark: 'none', job: job({ phase: 'uploading', world: JOB_WORLD, logs: ['compiling'], signing: true }) },
   { id: 'D1', family: 'decide', mark: 'none', align: 'start', job: review(CONFLICT, 'review') },
   { id: 'D2', family: 'decide', mark: 'none', align: 'start', job: review(CONFLICT, 'checking') },
   { id: 'D3', family: 'decide', mark: 'none', align: 'start', job: review({ ...CONFLICT, working: true }, 'review') },

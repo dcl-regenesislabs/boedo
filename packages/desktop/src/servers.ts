@@ -96,7 +96,7 @@ const PROXY_MAX_BYTES = 256 * 1024 * 1024 // generous vs real GLBs (~tens of MB)
 
 function proxyOpendcl(url: URL, res: http.ServerResponse, method = 'GET'): void {
   if (url.pathname === '/opendcl/ping') {
-    res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' }).end('ok')
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }).end('{"ok":true}')
     return
   }
   if (method !== 'GET' && method !== 'HEAD') {

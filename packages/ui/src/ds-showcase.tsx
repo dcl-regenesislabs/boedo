@@ -14,7 +14,7 @@ import { IconWarn } from './icons'
 import {
   Button, IconButton, LinkButton, ControlButton, Segmented, Toggle, Checkbox, TextInput, NumberField,
   Select, MultiSelect, Popover, Slider, ColorSwatch, TextArea, IdBadge, Panel, GroupLabel, PropRow, MenuItem,
-  FieldLabel, Notice, SearchField, Shelf, Tooltip, Spinner, Toast, AutoSaveChip,
+  FieldLabel, Notice, SearchField, Shelf, Splitter, Tooltip, Spinner, Toast, AutoSaveChip,
   Pager, ConfirmButton, CopyField, PanelState, StateBlock, Modal, Chip, ContextMenu, TableEditor, ParcelMap, CardPicker,
   type TableColumn, type TableRow
 } from './ds'
@@ -432,6 +432,9 @@ function Inputs(): JSX.Element {
       <Story title="SearchField"><div style={{ width: 240 }}><SearchField value={q} onChange={setQ} placeholder="Search assets" /></div></Story>
       <Story title="SearchField — sm (panel rows)"><div style={{ width: 240 }}><SearchField size="sm" placeholder="Search prefabs" /></div></Story>
       <Story title="SearchField — lg (launch-window toolbar)"><div style={{ width: 240 }}><SearchField size="lg" placeholder="Search scenes" /></div></Story>
+      <Story title="Splitter (stacked panels)">
+        <SplitterDemo />
+      </Story>
       <Story title="Notice">
         <div style={{ width: 260 }}>
           <Notice>2 built-in copies aren’t used in this scene.</Notice>
@@ -749,3 +752,14 @@ style.textContent = collectCss() + SHOWCASE_CSS
 document.head.appendChild(style)
 const rootEl = document.getElementById('root')
 if (rootEl) createRoot(rootEl).render(<Showcase />)
+
+function SplitterDemo(): JSX.Element {
+  const [h, setH] = useState(60)
+  return (
+    <div style={{ width: 240, height: 200, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <Panel title="Above"><div /></Panel>
+      <Splitter label="Resize the lower panel" value={h} min={40} max={140} onChange={setH} />
+      <div style={{ height: h, flex: 'none' }}><Panel title="Below"><div /></Panel></div>
+    </div>
+  )
+}

@@ -13,6 +13,7 @@
 // reach it).
 import { state } from '@scene/state'
 import { notify } from '@scene/reactive'
+import { NAME_COMPONENT } from '@scene/custom-components'
 import { isMod } from '../lib/keys'
 import {
   writeComponent,
@@ -59,6 +60,12 @@ export function pushHistory(batch: HistoryEntry[]): void {
 export function pushEntityDelete(restore: EntityRestore): void {
   if (suppress) return
   push({ kind: 'delete', restore })
+}
+
+export function clearHistory(): void {
+  undoStack.length = 0
+  redoStack.length = 0
+  notify()
 }
 
 export function canUndo(): boolean {
@@ -205,4 +212,27 @@ export function setDuplicateAction(fn: (id: string) => Promise<void>): void {
 export function snapshotValue(entityId: string, name: string): unknown {
   const v = state.snapshot[entityId]?.[name]
   return v === undefined ? undefined : JSON.parse(JSON.stringify(v))
+}
+
+// A creation as one step: undo leaves the entity carrying nothing (gone from the
+// tree, never saved). Callers list Name first so redo re-adds it first.
+export function creationEntries(entityId: string, names: string[]): HistoryEntry[] {
+  return names
+    .filter((name) => snapshotValue(entityId, name) !== undefined)
+    .map((name) => ({ entityId, name, before: undefined, after: snapshotValue(entityId, name) }))
+}
+
+// A created subtree (duplicate, paste, placed prefab) as one step, parents first.
+export function treeCreationEntries(rootId: string): HistoryEntry[] {
+  const order = [rootId]
+  for (let i = 0; i < order.length; i++) {
+    for (const [id, comps] of Object.entries(state.snapshot)) {
+      const parent = (comps.Transform as { parent?: number } | undefined)?.parent
+      if (parent === Number(order[i]) && !order.includes(id)) order.push(id)
+    }
+  }
+  return order.flatMap((id) => {
+    const rest = Object.keys(state.snapshot[id] ?? {}).filter((n) => n !== NAME_COMPONENT)
+    return creationEntries(id, [NAME_COMPONENT, ...rest])
+  })
 }

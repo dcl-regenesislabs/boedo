@@ -22,9 +22,10 @@ import {
 } from '@scene/schema'
 import { useStore } from '../../core/store'
 import { AssetPickerModal } from './asset-picker'
-import { ScrubNumberField, EnumField, prettyLabel, prettyEnumName, type Commit } from '../fields'
+import { ColorField, ScrubNumberField, EnumField, prettyLabel, prettyEnumName, type Commit } from '../fields'
 import { SchemaLeaf } from '../schema-editor'
-import { MultiSelect, Select, SelectTrigger } from '../../ds'
+import { MultiSelect, Select, SelectTrigger, Shelf } from '../../ds'
+import { PresetSelect, type PresetSpec } from './preset-select'
 import type { ComponentView, ComponentViewProps } from './types'
 
 type LeafNode = Extract<SchemaNode, { kind: 'leaf' }>
@@ -41,7 +42,11 @@ export type FileSpec = { ext: string[] }
 // oneof case names; numeric (repeated-index) segments normalize to '*' for
 // override lookups, so 'states.*.weight' targets every element.
 export type ViewConfig = {
-  groups?: Array<{ title?: string; fields: string[] }>
+  // a collapsed group starts folded; '@name' entries are rows from `presets`
+  groups?: Array<{ title?: string; collapsed?: boolean; fields: string[] }>
+  presets?: Record<string, PresetSpec>
+  // what the engine uses for an unset optional number or color the schema gives no default for
+  defaults?: Record<string, number | { r: number; g: number; b: number }>
   hide?: string[]
   labels?: Record<string, string>
   sliders?: Record<string, SliderSpec>
@@ -130,6 +135,13 @@ function CuratedBody(props: ComponentViewProps & { cfg: ViewConfig }): JSX.Eleme
       .filter((el): el is JSX.Element => el !== null)
     if (items.length === 0) return null
     if (g.title === undefined) return <Fragment key={i}>{items}</Fragment>
+    if (g.collapsed === true) {
+      return (
+        <Shelf key={i} title={g.title} defaultOpen={false}>
+          <div className="eui-group">{items}</div>
+        </Shelf>
+      )
+    }
     return (
       <Fragment key={i}>
         <div className="eui-group-label">{g.title}</div>
@@ -189,6 +201,8 @@ function resolvePath(
 }
 
 function renderPath(ctx: Ctx, root: SchemaNode, path: string): JSX.Element | null {
+  const preset = ctx.cfg.presets?.[path]
+  if (preset !== undefined) return presetRow(ctx, root, path, preset)
   const r = resolvePath(ctx, root, path)
   if (r === null || r.inactive) return null
   const label = ctx.cfg.labels?.[normPath(path)] ?? path.split('.').pop() ?? path
@@ -359,6 +373,15 @@ function CuratedLeaf(props: {
     )
   }
 
+  const color = ctx.cfg.defaults?.[np]
+  if (typeof color === 'object' && valueAt(ctx.value, path) == null) {
+    return (
+      <PropRow label={label} doc={doc}>
+        <ColorField cKey={ctx.cKey} path={path} base={color} hasAlpha={node.semantic.startsWith('color4')} commit={ctx.commit} />
+      </PropRow>
+    )
+  }
+
   const slider = ctx.cfg.sliders?.[np]
   if (slider !== undefined) {
     return (
@@ -388,11 +411,34 @@ function CuratedLeaf(props: {
   )
 }
 
+// null while any field it sets is hidden (another mode), so its group can drop out
+function presetRow(ctx: Ctx, root: SchemaNode, key: string, spec: PresetSpec): JSX.Element | null {
+  const leaves = Object.keys(spec.options[0]?.values ?? {}).map((path) => ({ path, r: resolvePath(ctx, root, path) }))
+  if (leaves.some(({ r }) => r === null || r.inactive || r.node.kind !== 'leaf')) return null
+  const read = (path: string): number => {
+    const node = leaves.find((l) => l.path === path)?.r?.node
+    return node?.kind === 'leaf' ? parseFloat(currentNumberText(ctx.cKey, path, leafNumber(ctx, node, path, 0))) : NaN
+  }
+  return (
+    <PropRow key={key} label={spec.label} doc={spec.doc}>
+      <PresetSelect
+        spec={spec}
+        read={read}
+        apply={(values) => {
+          for (const [path, v] of Object.entries(values)) setField(ctx.cKey, path, String(v))
+          ctx.commit()
+        }}
+      />
+    </PropRow>
+  )
+}
+
 function leafNumber(ctx: Ctx, node: LeafNode, path: string, fb: number): number {
   const cur = valueAt(ctx.value, path)
   if (typeof cur === 'number') return cur
   const def = effectiveDefault(ctx.cKey, node)
-  return typeof def === 'number' ? def : fb
+  const engine = ctx.cfg.defaults?.[normPath(path)]
+  return typeof def === 'number' ? def : typeof engine === 'number' ? engine : fb
 }
 
 function PropRow(props: { label: string; doc?: string; children: ReactNode }): JSX.Element {
@@ -536,9 +582,15 @@ function TextureUnionField(props: {
   label: string
 }): JSX.Element {
   const { ctx, oneof, path, label } = props
+  const [picking, setPicking] = useState(false)
   const opath = joinPath(path, 'tex')
-  const active = activeCase(ctx.cKey, opath, oneof, ctx.value)
+  const src = joinPath(opath, 'texture.src')
+  // a file texture is only written once it has a file: an empty source never finishes loading
+  const files = ctx.cfg.files?.[normPath(src)]
+  const unset = valueAt(ctx.value, opath) == null && !state.fieldEdits.has(`${fieldKey(ctx.cKey, opath)}#case`)
+  const active = files !== undefined && unset ? null : activeCase(ctx.cKey, opath, oneof, ctx.value)
   const c = oneof.cases.find((x) => x.name === active)
+  const options = oneof.cases.map((x) => ({ value: x.name, label: prettyLabel(x.name) }))
   return (
     <>
       <div className="eui-group-label">{prettyLabel(label)}</div>
@@ -547,10 +599,18 @@ function TextureUnionField(props: {
           <Select
             compact
             value={active ?? ''}
-            options={oneof.cases.map((x) => ({ value: x.name, label: prettyLabel(x.name) }))}
+            options={files === undefined ? options : [{ value: '', label: 'None' }, ...options]}
             onChange={(v) => {
-              setCase(ctx.cKey, opath, v)
-              ctx.commit()
+              if (files !== undefined && v === '') {
+                if (active !== 'texture') return
+                setField(ctx.cKey, src, '')
+                ctx.commit()
+              } else if (files !== undefined && v === 'texture') {
+                setPicking(true)
+              } else {
+                setCase(ctx.cKey, opath, v)
+                ctx.commit()
+              }
             }}
           />
         </PropRow>
@@ -558,6 +618,20 @@ function TextureUnionField(props: {
           <CuratedNode ctx={ctx} node={c.field} path={joinPath(opath, c.name)} label={null} />
         )}
       </div>
+      {picking && files !== undefined && (
+        <AssetPickerModal
+          ext={files.ext}
+          current=""
+          onPick={(file) => {
+            setPicking(false)
+            if (file === '') return
+            setCase(ctx.cKey, opath, 'texture')
+            setField(ctx.cKey, src, file)
+            ctx.commit()
+          }}
+          onClose={() => setPicking(false)}
+        />
+      )}
     </>
   )
 }

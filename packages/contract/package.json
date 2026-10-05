@@ -9,7 +9,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./bus": "./src/bus-protocol.ts",
-    "./shell": "./src/shell.ts"
+    "./shell": "./src/shell.ts",
+    "./assistant": "./src/assistant.ts",
+    "./cid": "./src/cid.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

@@ -9,6 +9,7 @@ import {
 } from '@scene/bridge-protocol'
 import { EDITOR_BUS_CHANNEL, type BusEnvelope } from '@scene/editor-channel'
 import { RPC_TIMEOUT_MS } from '../config'
+import { busChannelName } from './hosted'
 
 // `?editorDebug` traces every bus message to the console, timestamped — the
 // tool for diagnosing desyncs (stale gizmo, transform snap-back) in the field.
@@ -28,7 +29,13 @@ const pendingRpcs = new Map<
 let nextRpcId = 1
 let started = false
 
-const channel = new BroadcastChannel(EDITOR_BUS_CHANNEL)
+// Opened on first use: in hosted mode the name carries the tab's session, which
+// is only known once the host has been handed over.
+let channel: BroadcastChannel | null = null
+function open(): BroadcastChannel {
+  channel ??= new BroadcastChannel(busChannelName(EDITOR_BUS_CHANNEL))
+  return channel
+}
 
 export function onSceneMessage(fn: Listener): () => void {
   listeners.add(fn)
@@ -37,7 +44,7 @@ export function onSceneMessage(fn: Listener): () => void {
 
 export async function sendToScene(msg: PageToSceneMessage): Promise<void> {
   trace('page→scene', msg)
-  channel.postMessage({ to: 'scene', msg } satisfies BusEnvelope<PageToSceneMessage>)
+  open().postMessage({ to: 'scene', msg } satisfies BusEnvelope<PageToSceneMessage>)
 }
 
 export async function sceneRpc<T>(method: string, args?: unknown[]): Promise<T> {
@@ -57,11 +64,20 @@ export async function sceneRpc<T>(method: string, args?: unknown[]): Promise<T> 
 export function startBusPolling(): void {
   if (started) return
   started = true
-  channel.onmessage = (ev: MessageEvent): void => {
+  open().onmessage = (ev: MessageEvent): void => {
     const env = ev.data as BusEnvelope<SceneToPageMessage> | null
     if (env === null || typeof env !== 'object' || env.to !== 'page') return
     dispatch(env.msg)
   }
+}
+
+// Hosted mode leaves a project without leaving the page: stop hearing its scene.
+export function stopBus(): void {
+  channel?.close()
+  channel = null
+  started = false
+  for (const pending of pendingRpcs.values()) pending.reject(new Error('editor bus closed'))
+  pendingRpcs.clear()
 }
 
 function dispatch(msg: SceneToPageMessage): void {

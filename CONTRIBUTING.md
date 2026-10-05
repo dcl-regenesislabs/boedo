@@ -47,6 +47,28 @@ Engine resolution order: `BEVY_WEB_DIR` env → installed npm package →
 `../bevy-explorer/deploy/web` sibling fallback. Bump the engine by changing the
 package version in the root `package.json`.
 
+### The web editor, with the project service
+
+The web target (`packages/web`) runs inside bevy-explorer's HUD, so it needs a bevy-explorer
+checkout with an engine build (`just wasm` there). One command builds the editor, starts the
+project service and the HUD's dev server, and stops them all on Ctrl+C:
+
+```bash
+npm run dev:web                                    # bevy-explorer next to this checkout
+npm run dev:web -- --bevy <bevy-explorer> --world gate.eth   # also a stand-in Worlds server to publish to
+```
+
+Open the printed url (`http://localhost:5173/?editor`) and sign in to sync projects to the local
+service (`http://localhost:8787`, data in `.data/service`); a guest's projects stay in the
+browser. After editing the editor, `npm run build -w @dcl-editor/web` and reload the page.
+The assistant stays hidden until the service has a model session: put
+`ANTHROPIC_OAUTH_SETUP_TOKEN=<token from claude setup-token>` in `packages/service/.env`
+(git-ignored), or sign in once with
+`node packages/service/scripts/assistant-login.ts --provider claude --auth .data/assistant/.auth.json`,
+then add `--ai-auth .data/assistant/.auth.json` to `npm run dev:web`.
+`node packages/service/scripts/session.ts --url http://localhost:8787 --origin http://localhost:5173`
+checks the service on its own.
+
 > **Engine devs only:** if you're building bevy-explorer itself, you need the Rust
 > toolchain + `wasm-pack`, then point the editor at your local build with
 > `BEVY_WEB_DIR=/path/to/bevy-explorer/deploy/web`. This is not part of editor
@@ -178,6 +200,7 @@ For packaging, CI images, and the release process, see
 | [`docs/TESTING.md`](./docs/TESTING.md) | `validate` vs `validate:e2e` vs unit tests; running subsets; writing tests. |
 | [`docs/AI-AGENT.md`](./docs/AI-AGENT.md) | Driving/testing the editor with an AI agent + the e2e/CDP harness. |
 | [`docs/AI-ASSISTANT.md`](./docs/AI-ASSISTANT.md) | The in-app AI assistant: CLI providers (Claude/Codex), SDK7 skills, Script Studio. |
+| [`docs/WEB-ASSISTANT.md`](./docs/WEB-ASSISTANT.md) | Web assistant: deployment secrets, OAuth, browser tools and validation. |
 | [`docs/SIGN-IN.md`](./docs/SIGN-IN.md) | Sign in with Decentraland: auth deep-link flow, dev shim, packaged-scheme requirements. |
 | [`docs/WORLDS.md`](./docs/WORLDS.md) | Worlds: publish & manage — inventory, permissions, streaming, storage, logs, the deploy/linker flow. |
 | [`docs/RELEASING.md`](./docs/RELEASING.md) | Desktop images: packaging, CI builds, the release process, auto-update, signing. |

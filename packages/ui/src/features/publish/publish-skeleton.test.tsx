@@ -362,7 +362,7 @@ describe('the publish dialog, rendered', () => {
 
 describe('the guard is not vacuous', () => {
   it('mounts the real dialog, in every enumerated state', () => {
-    expect(PUBLISH_CASES.length, 'the spec enumerates 19 states (B1–B5, C1, W1–W3, D1–D7, O1–O3)').toBe(19)
+    expect(PUBLISH_CASES.length, 'the spec enumerates 20 states (B1–B5, C1, W1–W4, D1–D7, O1–O3)').toBe(20)
     const seen = new Set<string>()
     eachState((c, o) => {
       expect(o.view.find('.eui-modal'), `${c.id} did not mount`).not.toBeNull()

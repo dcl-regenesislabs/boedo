@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { NAME_COMPONENT } from '@scene/custom-components'
 import { state, type Snapshot } from '@scene/state'
 import { HierarchyPanel } from './HierarchyPanel'
+import { act } from 'react'
 import { mount } from '../test/render'
 
 const ZOMBIE_ID = 'a1'
@@ -71,6 +72,27 @@ describe('HierarchyPanel Game Config', () => {
     expect(view.find('.eui-modal')).toBeNull()
     view.click(view.find('[aria-label="Game Config"]'))
     expect(view.find('.eui-modal')?.textContent).toContain('Game Config')
+    view.unmount()
+  })
+})
+
+describe('HierarchyPanel keyboard', () => {
+  it('rows are a tree the arrows walk, selecting as they go, and Shift+F10 opens the row menu', () => {
+    state.snapshot = { '512': row('Bench'), '513': row('Lamp') } as Snapshot
+    const view = panel()
+    const items = view.all('[role="treeitem"]')
+    expect(items.map((el) => el.getAttribute('aria-selected'))).toEqual(['false', 'false'])
+    const press = (target: HTMLElement, key: string, shiftKey = false): void => {
+      act(() => {
+        target.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true }))
+      })
+    }
+    press(items[0], 'Enter')
+    press(view.all('[role="treeitem"]')[0], 'ArrowDown')
+    expect([...state.selected]).toEqual([view.all('[role="treeitem"]')[1].dataset.entity])
+    expect(view.all('[role="treeitem"]').map((el) => el.getAttribute('tabindex'))).toEqual(['-1', '0'])
+    press(view.all('[role="treeitem"]')[1], 'F10', true)
+    expect(view.find('.eui-ctx')).not.toBeNull()
     view.unmount()
   })
 })

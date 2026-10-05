@@ -20,7 +20,7 @@ import { tsFacet, tsSync, tsLinter, tsAutocomplete, tsHover } from '@valtown/cod
 import { createScriptTsEnv, resetProjectSources } from './ts-env'
 import { ensureScriptRuntime } from '../prefabs/generate'
 import { dataLayerReadFile, dataLayerSaveFile } from '../engine/datalayer'
-import { restartScene } from '../boot/boot'
+import { isRestarting, restartScene } from '../boot/boot'
 import { waitForRebuild } from '../engine/rebuild'
 import { uiPlay } from '../actions/playback'
 import { state } from '@scene/state'
@@ -168,7 +168,8 @@ export const CodeEditor = forwardRef<
     baselineRef.current = content
     setDirty(false)
     onStatus?.('Building…', 'dim')
-    const wasPlaying = !state.frozen
+    // a restart still in flight runs the scene for a moment by itself: not the creator playing
+    const wasPlaying = !state.frozen && !isRestarting()
     await waitForRebuild()
     await restartScene()
     if (wasPlaying) await uiPlay()
@@ -384,7 +385,7 @@ export const CodeEditor = forwardRef<
       )}
       <div className="eui-studio-cm" ref={hostRef}>
         {status === 'loading' && <div className="eui-studio-cmloading">loading…</div>}
-        {pill !== null && !reviewing && (
+        {pill !== null && !reviewing && onAsk !== undefined && (
           <button
             className="eui-studio-askpill"
             style={{ top: pill.top, left: pill.left }}

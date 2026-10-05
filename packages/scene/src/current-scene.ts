@@ -1,6 +1,7 @@
 import { Transform, engine } from '@dcl/sdk/ecs'
 import { BevyApi } from './bevy-api'
 import { type LiveSceneInfo } from './bevy-api/interface'
+import { isHosted } from './hosted'
 
 // Player parcel from the (world-space) player Transform. 16m per parcel; the z
 // axis runs negative-north, matching the explorer's vec3->parcel convention.
@@ -49,10 +50,14 @@ export async function resolveInspectableScene(): Promise<{
 }> {
   const all = (await BevyApi.liveSceneInfo()) ?? []
   const parcel = getPlayerParcel()
+  // Hosted, the player arrives from a live world: only a preview scene (b64- id) is
+  // ever the edit target, never the deployed scene they happen to be standing in.
+  const previewOnly = isHosted()
   const scene = all.find(
     (s) =>
       !s.isPortable &&
       !s.isSuper &&
+      (!previewOnly || s.hash.startsWith('b64-')) &&
       s.parcels.some((p) => p.x === parcel.x && p.y === parcel.y)
   )
   return { scene, diag: { parcel, live: all.length, summary: summarise(all) } }

@@ -16,7 +16,7 @@ Read [`ARCHITECTURE.md`](./ARCHITECTURE.md) first for the architecture. This fil
 2. MODIFY   → make the change, following the conventions below
 3. BUILD    → npm run build        (scene → ui → desktop)
 4. VALIDATE → npm run validate     (typecheck + unit tests + build; the gate — must pass)
-5. RUNTIME  → npm run validate:e2e (run it whenever behavior could change; 10/10 expected)
+5. RUNTIME  → npm run validate:e2e (run it whenever behavior could change; every step green)
 6. REPORT   → summarize what changed + the validation result
 ```
 
@@ -26,7 +26,7 @@ sound. Never report a change as done without it passing.
 
 The e2e harness in step 5 is **not optional busywork** — if your change touches
 runtime behavior (anything a user clicks or sees), run it and expect a green
-10/10. It only gets skipped when the environment genuinely can't run it (no
+15/15. It only gets skipped when the environment genuinely can't run it (no
 GPU/scene); say so explicitly when you skip it.
 
 ---

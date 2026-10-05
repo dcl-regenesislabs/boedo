@@ -184,7 +184,7 @@ describe('every publish state', () => {
 
   it('G14 warns that closing hides rather than stops, and only then', () => {
     for (const [id, v] of ALL) {
-      const hides = id === 'W2' || id === 'W3'
+      const hides = id === 'W2' || id === 'W3' || id === 'W4'
       expect(v.closeTip, `${id} tip`).toBe(hides ? 'Hide — publishing continues' : 'Close')
     }
   })
@@ -239,7 +239,7 @@ describe('the states themselves', () => {
   // and controls on its own — growing an action row halfway through — is the
   // dialog jumping while they watch.
   it('is one wait from the first step to the last', () => {
-    for (const id of ['W1', 'W2', 'W3']) {
+    for (const id of ['W1', 'W2', 'W3', 'W4']) {
       expect(VIEWS[id].headline, `${id} headline`).toBe('Publishing to w.dcl.eth')
       expect(VIEWS[id].actions.destructive?.label, `${id} lever`).toBe('Cancel publish')
       expect(Object.keys(VIEWS[id].actions), `${id} slots`).toEqual(['destructive'])

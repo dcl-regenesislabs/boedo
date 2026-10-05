@@ -10,6 +10,13 @@
 import { state, provenanceBaseline, type Snapshot } from '@scene/state'
 import { authoredIds, hierarchyModel } from './hierarchy-model'
 import { authoredFromComposite } from './authored-ids'
+import { isHosted } from '../engine/hosted'
+
+// Hosted, ready-made prefabs come from the shell's library, and a shell may have
+// none: an empty scene is then not sent to an empty Prefabs tab.
+export function hasReadyMadePrefabs(): boolean {
+  return !isHosted() || window.editorShell?.prefabLibraryList !== undefined
+}
 
 export function sceneEmptiness(): boolean | null {
   if (state.status !== 'ready') return null

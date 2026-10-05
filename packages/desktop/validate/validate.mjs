@@ -181,14 +181,23 @@ const focusViewport = () =>
     return !!c
   })()`)
 
+// Tool keys are ⌘/Ctrl+letter chords, claimed by the main process (src/chords.ts).
+const PRIMARY = process.platform === 'darwin' ? { meta: true } : { ctrl: true }
+
 // Dispatch a key (down+up) to whatever holds focus. mods: {meta,ctrl,shift,alt}.
 const pressKey = async (key, code, vk, mods = {}) => {
   const modifiers =
     (mods.alt ? 1 : 0) | (mods.ctrl ? 2 : 0) | (mods.meta ? 4 : 0) | (mods.shift ? 8 : 0)
   const base = { key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers }
-  await send('Input.dispatchKeyEvent', { type: 'keyDown', ...base }, pageSession).catch(() => {})
+  // a ⌘/Ctrl chord types no text; only a rawKeyDown reaches the main process's before-input-event,
+  // and it is pressed and released around the letter as a person would
+  const held = mods.meta ? ['Meta', 'MetaLeft', 91] : mods.ctrl ? ['Control', 'ControlLeft', 17] : null
+  const modKey = held && { key: held[0], code: held[1], windowsVirtualKeyCode: held[2], nativeVirtualKeyCode: held[2], modifiers }
+  if (modKey) await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...modKey }, pageSession).catch(() => {})
+  await send('Input.dispatchKeyEvent', { type: held ? 'rawKeyDown' : 'keyDown', ...base }, pageSession).catch(() => {})
   await sleep(80)
   await send('Input.dispatchKeyEvent', { type: 'keyUp', ...base }, pageSession).catch(() => {})
+  if (modKey) await send('Input.dispatchKeyEvent', { type: 'keyUp', ...modKey, modifiers: 0 }, pageSession).catch(() => {})
   await sleep(150)
 }
 
@@ -232,7 +241,8 @@ async function main() {
   }
   electron = spawn(electronPath, ['.', `--remote-debugging-port=${CDP_PORT}`], {
     cwd: root,
-    env: { ...process.env, BEVY_EDITOR_DEBUG: '1' },
+    // the app opens BEVY_EDITOR_PROJECT at launch, which skips the picker this run drives
+    env: { ...process.env, BEVY_EDITOR_PROJECT: undefined, BEVY_EDITOR_DEBUG: '1' },
     stdio: ['ignore', 'pipe', 'pipe']
   })
   electron.stdout.on('data', (d) => consoleLines.push(`[main] ${d}`.trimEnd()))
@@ -364,8 +374,10 @@ async function main() {
       const v = await evalIn(
         `(async () => {
           const sh = document.getElementById('editor-ui-host').shadowRoot
-          const rows = [...sh.querySelectorAll('*')].filter((e) => e.children.length === 0 && /\\w/.test(e.textContent))
-          const row = rows.find((e) => (window.__eui.snapshot && Object.keys(window.__eui.snapshot).length > 0) && e.closest('.eui-panel-body'))
+          // the open left tab is remembered across runs
+          ;[...sh.querySelectorAll('.eui-ltab')].find((t) => t.textContent.trim() === 'Scene')?.click()
+          await new Promise((r) => setTimeout(r, 400))
+          const row = sh.querySelector('.eui-panel-body [role="treeitem"][data-entity]')
           if (!row) return { ok: false, why: 'no hierarchy rows' }
           row.click()
           await new Promise((r) => setTimeout(r, 1200))
@@ -461,8 +473,8 @@ async function extraSteps() {
 
   // ---- shortcut: a keystroke while the VIEWPORT (engine iframe) holds focus must
   // still drive an editor shortcut. This is the "bevy intercepts the keys" case —
-  // the host forwards engine-window keys (embed.ts forwardEngineKeys). We focus the
-  // engine canvas, set a known tool, press 'e', and expect activeAction='rotate'.
+  // the main process claims the chord before any frame (chords.ts). We focus the
+  // engine canvas, set a known tool, press ⌘/Ctrl+E, and expect activeAction='rotate'.
   if (STEPS.includes('shortcut') && results.find((r) => r.step === 'scene')?.ok) {
     try {
       // focus the engine canvas so the key targets the engine window, not the host
@@ -479,21 +491,18 @@ async function extraSteps() {
         return true
       })()`)
       await new Promise((r) => setTimeout(r, 250))
-      for (const type of ['keyDown', 'keyUp']) {
-        await send('Input.dispatchKeyEvent', { type, key: 'e', code: 'KeyE', windowsVirtualKeyCode: 69, nativeVirtualKeyCode: 69 }, pageSession, 10000).catch(() => {})
-        await new Promise((r) => setTimeout(r, 100))
-      }
+      await pressKey('e', 'KeyE', 69, PRIMARY)
       await new Promise((r) => setTimeout(r, 600))
       const tool = await evalIn(`window.__eui.activeAction`)
-      record('shortcut', tool === 'rotate', `viewport-focused 'e' -> activeAction='${tool}' (expected 'rotate')`)
+      record('shortcut', tool === 'rotate', `viewport-focused primary+E -> activeAction='${tool}' (expected 'rotate')`)
       await screenshot('06b-shortcut.png')
     } catch (e) {
       record('shortcut', false, e.message)
     }
   }
 
-  // ---- tools: Q/W/E/R from the viewport cycle the active tool ----------------
-  // Each key is forwarded engine→host and must land on uiSetTool. Gated to a
+  // ---- tools: ⌘/Ctrl+Q/W/E/R from the viewport cycle the active tool ---------
+  // Each chord is claimed by the main process and must land on uiSetTool. Gated to a
   // static camera ('none'), since tool letters are intentionally suppressed while
   // a navigation camera owns WASD/QE.
   if (STEPS.includes('tools') && sceneReady()) {
@@ -504,7 +513,7 @@ async function extraSteps() {
       // through the scene, so it's covered by the cheatsheet, not asserted here).
       const seen = []
       for (const [k, code, vk, tool] of [['w', 'KeyW', 87, 'translate'], ['e', 'KeyE', 69, 'rotate'], ['r', 'KeyR', 82, 'scale']]) {
-        await pressKey(k, code, vk)
+        await pressKey(k, code, vk, PRIMARY)
         const got = await waitState(`s.activeAction === '${tool}' ? s.activeAction : null`, 4000).catch(() => getState('s.activeAction'))
         seen.push(`${k}→${got}`)
         expect(got === tool, `'${k}' set tool '${got}', expected '${tool}' (${seen.join(', ')})`)

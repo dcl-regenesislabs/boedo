@@ -94,3 +94,22 @@ describe('AiPanel turn end', () => {
     view.unmount()
   })
 })
+
+describe('AiPanel new chat', () => {
+  it('clears the chat kept for this wallet and project', async () => {
+    const save = vi.fn(async (_messages: unknown) => {})
+    const transcript = { owner: 'p1@0xabc', load: async () => [{ role: 'user', text: 'Make a door' }], save }
+    Object.assign(shellHost.editorShell ?? {}, { aiTranscript: () => transcript })
+    const view = mount(<AiPanel shown fill={false} height={300} />)
+    await view.settle()
+    expect(view.text()).toContain('Make a door')
+
+    view.click(view.find('[aria-label="New chat"]'))
+    view.click(view.byText('Yes'))
+    await view.settle()
+
+    expect(view.text()).not.toContain('Make a door')
+    expect(save).toHaveBeenLastCalledWith([])
+    view.unmount()
+  })
+})

@@ -3,19 +3,21 @@ import { state } from '@scene/state'
 import { isLocalScene } from '@scene/inspector'
 import { type EditorTool } from '@scene/bridge-protocol'
 import { uiPause, uiPlay, uiSave, uiStep } from '../actions/playback'
-import { uiSetCamera, uiSetTool } from '../actions/selection'
+import { uiFrameSelectionOrScene, uiSetCamera, uiSetTool } from '../actions/selection'
 import { uiToggleColliders, uiToggleSnap, uiToggleSpawnAreas } from '../actions/viewport'
 import { restartScene } from '../boot/boot'
 import { undo, redo, canUndo, canRedo } from '../core/history'
-import { autoSaveEnabled, autoSaveStatus } from '../core/autosave'
+import { autoSaveEnabled } from '../core/autosave'
 import { sceneUi, toggleSceneUi } from '../engine/scene-ui'
 import { sceneAudio, toggleSceneAudio } from '../engine/audio'
+import { isHosted } from '../engine/hosted'
+import { toolCombo } from '../shortcuts'
 import { useStore } from '../core/store'
 import { usePersistentFlag, usePersistentNum } from '../core/persist'
 import { MOD, SHIFT, keyCombo } from '../lib/keys'
 import { dragCapture } from '../core/drag'
 import { aiStore } from './ai-store'
-import { AutoSaveChip as DsAutoSaveChip, Toggle } from '../ds'
+import { Toggle, labelTip } from '../ds'
 import {
   IconSelect,
   IconMove,
@@ -29,6 +31,7 @@ import {
   IconSidebarLeft,
   IconSidebarRight,
   IconCamera,
+  IconFrame,
   IconGrid,
   IconUndo,
   IconRedo,
@@ -48,11 +51,11 @@ const CAM_TITLE = {
   target: 'Orbiting the selection — click to return to the player (` to fly)'
 } as const
 
-const TOOLS: Array<{ id: EditorTool; icon: () => JSX.Element; title: string }> = [
-  { id: 'select', icon: IconSelect, title: `Select (${keyCombo(MOD, 'Q')})` },
-  { id: 'translate', icon: IconMove, title: `Move (${keyCombo(MOD, 'W')})` },
-  { id: 'rotate', icon: IconRotate, title: `Rotate (${keyCombo(MOD, 'E')})` },
-  { id: 'scale', icon: IconScale, title: `Scale (${keyCombo(MOD, 'R')})` }
+const TOOLS: Array<{ id: EditorTool; icon: () => JSX.Element; label: string; key: string }> = [
+  { id: 'select', icon: IconSelect, label: 'Select', key: 'Q' },
+  { id: 'translate', icon: IconMove, label: 'Move', key: 'W' },
+  { id: 'rotate', icon: IconRotate, label: 'Rotate', key: 'E' },
+  { id: 'scale', icon: IconScale, label: 'Scale', key: 'R' }
 ]
 
 export function Toolbar(props: {
@@ -71,6 +74,7 @@ export function Toolbar(props: {
   const activeAction = useStore(() => state.activeAction)
   const frozen = useStore(() => state.frozen)
   const camMode = useStore(() => state.camMode)
+  const hasSelection = useStore(() => state.activeEntity !== null || state.selected.size > 0)
   // subscribe to the non-proxied module state these read, so the buttons/chip
   // re-render when it changes (the mutators call notify())
   const undoable = useStore(() => canUndo())
@@ -145,7 +149,7 @@ export function Toolbar(props: {
       />
       <button
         className={`eui-btn icon ${props.leftOpen ? '' : 'closed'}`}
-        data-tip={props.leftOpen ? 'Hide hierarchy' : 'Show hierarchy'}
+        {...labelTip(props.leftOpen ? 'Hide hierarchy' : 'Show hierarchy')}
         onClick={props.onToggleLeft}
       >
         <IconSidebarLeft />
@@ -155,7 +159,7 @@ export function Toolbar(props: {
         {TOOLS.map((t) => (
           <button
             key={t.id}
-            data-tip={t.title}
+            {...labelTip(`${t.label} (${toolCombo(t.key)})`)}
             className={`eui-btn icon ${activeAction === t.id ? 'active' : ''}`}
             onClick={() => uiSetTool(t.id)}
           >
@@ -169,19 +173,19 @@ export function Toolbar(props: {
           <>
             <button
               className="eui-btn icon"
-              data-tip={`Run the scene (${keyCombo(MOD, 'P')})`}
+              {...labelTip(`Run the scene (${keyCombo(MOD, 'P')})`)}
               onClick={() => void uiPlay()}
             >
               <IconPlay />
             </button>
-            <button className="eui-btn icon" data-tip="Advance one tick" onClick={() => void uiStep(1)}>
+            <button className="eui-btn icon" {...labelTip('Advance one tick')} onClick={() => void uiStep(1)}>
               <IconStep />
             </button>
           </>
         ) : (
           <button
             className="eui-btn icon active"
-            data-tip={`Scene is running — pause (${keyCombo(MOD, 'P')})`}
+            {...labelTip(`Scene is running — pause (${keyCombo(MOD, 'P')})`)}
             onClick={() => void uiPause()}
           >
             <IconPause />
@@ -189,43 +193,42 @@ export function Toolbar(props: {
         )}
         <button
           className="eui-btn icon"
-          data-tip="Restart the scene from tick 0"
+          {...labelTip('Restart the scene from tick 0')}
           disabled={restarting}
           onClick={() => void restartScene()}
         >
           <IconStop />
         </button>
         {/* Muting belongs beside the transport: it's the same kind of control —
-            what the scene is doing right now, not what you're editing. */}
-        <button
-          className={`eui-btn icon ${muted ? 'active' : ''}`}
-          data-tip={muted ? `Unmute the scene (${keyCombo(MOD, 'M')})` : `Mute (${keyCombo(MOD, 'M')})`}
-          aria-pressed={muted}
-          onClick={toggleSceneAudio}
-        >
-          {muted ? <IconSoundMuted /> : <IconSound />}
-        </button>
+            what the scene is doing right now, not what you're editing.
+            Hosted, the volume is the host page's own setting. */}
+        {!isHosted() && (
+          <button
+            className={`eui-btn icon ${muted ? 'active' : ''}`}
+            {...labelTip(muted ? `Unmute the scene (${keyCombo(MOD, 'M')})` : `Mute (${keyCombo(MOD, 'M')})`)}
+            aria-pressed={muted}
+            onClick={toggleSceneAudio}
+          >
+            {muted ? <IconSoundMuted /> : <IconSound />}
+          </button>
+        )}
       </div>
 
       <div className="eui-tool-group">
         <button
           className={`eui-btn icon ${snap ? 'active' : ''}`}
-          data-tip={
-            snap
+          {...labelTip(snap
               ? `Snap is on — 0.5m / 15° / 0.1× steps. Hold ${SHIFT} while dragging for free movement`
-              : `Snap to grid — 0.5m / 15° / 0.1× steps. Hold ${SHIFT} while dragging to snap just once`
-          }
+              : `Snap to grid — 0.5m / 15° / 0.1× steps. Hold ${SHIFT} while dragging to snap just once`)}
           onClick={uiToggleSnap}
         >
           <IconGrid />
         </button>
         <button
           className={`eui-btn icon ${sceneUiHidden ? 'active' : ''}`}
-          data-tip={
-            sceneUiHidden
+          {...labelTip(sceneUiHidden
               ? "Scene UI hidden — click to show it again"
-              : "Hide the scene's UI (HUD, menus) to see the world behind it"
-          }
+              : "Hide the scene's UI (HUD, menus) to see the world behind it")}
           onClick={() => void toggleSceneUi()}
         >
           <IconSceneUi />
@@ -235,7 +238,7 @@ export function Toolbar(props: {
       <div className="eui-tool-group">
         <button
           className="eui-btn icon"
-          data-tip={`Undo (${keyCombo(MOD, 'Z')})`}
+          {...labelTip(`Undo (${keyCombo(MOD, 'Z')})`)}
           disabled={!undoable}
           onClick={() => void undo()}
         >
@@ -243,7 +246,7 @@ export function Toolbar(props: {
         </button>
         <button
           className="eui-btn icon"
-          data-tip={`Redo (${keyCombo(MOD, SHIFT, 'Z')})`}
+          {...labelTip(`Redo (${keyCombo(MOD, SHIFT, 'Z')})`)}
           disabled={!redoable}
           onClick={() => void redo()}
         >
@@ -252,11 +255,16 @@ export function Toolbar(props: {
       </div>
 
       <div className="eui-tool-tail">
+      <button
+        className="eui-btn icon"
+        {...labelTip(`${hasSelection ? 'Frame the selection' : 'Frame the whole scene'} (${toolCombo('F')})`)}
+        onClick={uiFrameSelectionOrScene}
+      >
+        <IconFrame />
+      </button>
       <CameraControl camMode={camMode} />
 
-      {autoSaveEnabled() ? (
-        <AutoSaveChip />
-      ) : (
+      {!autoSaveEnabled() && (
         <button
           className="eui-btn primary"
           data-tip={
@@ -277,7 +285,7 @@ export function Toolbar(props: {
 
       <button
         className="eui-btn icon"
-        data-tip="Keyboard shortcuts (?)"
+        {...labelTip('Keyboard shortcuts (?)')}
         onClick={props.onShortcuts}
       >
         ?
@@ -285,7 +293,7 @@ export function Toolbar(props: {
 
       <button
         className={`eui-btn icon ${props.rightOpen ? '' : 'closed'}`}
-        data-tip={props.rightOpen ? 'Hide inspector & assistant' : 'Show inspector & assistant'}
+        {...labelTip(props.rightOpen ? 'Hide inspector & assistant' : 'Show inspector & assistant')}
         onClick={props.onToggleRight}
       >
         <IconSidebarRight />
@@ -293,25 +301,6 @@ export function Toolbar(props: {
       </div>
     </div>
   )
-}
-
-const CHIP: Record<string, { label: string; cls: string; title: string }> = {
-  idle: { label: 'Saved', cls: 'ok', title: 'Auto-save on — changes write to main.composite' },
-  saved: { label: 'Saved', cls: 'ok', title: 'All changes written to main.composite' },
-  dirty: { label: 'Unsaved', cls: 'dim', title: 'Changes pending — saving shortly' },
-  saving: { label: 'Saving…', cls: 'dim', title: 'Writing main.composite' },
-  error: { label: 'Save failed', cls: 'err', title: 'Auto-save failed — is the scene server running with --data-layer?' }
-}
-
-function AutoSaveChip(): JSX.Element {
-  const frozen = useStore(() => state.frozen)
-  const status = useStore(() => autoSaveStatus()) // re-render when the status changes
-  // While playing, edits are runtime-only (not written to main.composite) and
-  // revert on Stop — surface that instead of a save state, so it's not a surprise.
-  const c = frozen
-    ? CHIP[status] ?? CHIP.idle
-    : { label: 'Runtime', cls: 'dim', title: "Scene is playing — edits are live only and revert on Stop (not saved)" }
-  return <DsAutoSaveChip state={c.cls as 'ok' | 'dim' | 'err' | undefined} tip={c.title}>{c.label}</DsAutoSaveChip>
 }
 
 // Camera: one button, two states — player camera or free fly. Orbit stays
@@ -322,7 +311,7 @@ function CameraControl(props: { camMode: 'none' | 'free' | 'target' }): JSX.Elem
   return (
     <button
       className={`eui-btn icon ${camMode !== 'none' ? 'active' : ''}`}
-      data-tip={CAM_TITLE[camMode]}
+      {...labelTip(CAM_TITLE[camMode])}
       onClick={() => uiSetCamera(camMode === 'none' ? 'free' : 'off')}
     >
       <IconCamera />
@@ -364,7 +353,7 @@ function MoreMenu(props: {
     <div ref={ref} style={{ position: 'relative', display: 'flex' }}>
       <button
         className={`eui-btn icon ${open ? 'active' : ''}`}
-        data-tip="More options"
+        {...labelTip('More options')}
         onClick={() => setOpen(!open)}
       >
         <IconDots />
@@ -372,9 +361,12 @@ function MoreMenu(props: {
       {open && (
         <div className="eui-menu">
           <div className="eui-menu-label">Viewport</div>
-          <MenuToggleItem checked={showColliders} onClick={() => void uiToggleColliders()}>
-            Show collider &amp; trigger volumes
-          </MenuToggleItem>
+          {/* the web engine registers /debug_colliders only in preview mode */}
+          {!isHosted() && (
+            <MenuToggleItem checked={showColliders} onClick={() => void uiToggleColliders()}>
+              Show collider &amp; trigger volumes
+            </MenuToggleItem>
+          )}
           <MenuToggleItem checked={showSpawnAreas} onClick={uiToggleSpawnAreas}>
             Show spawn points
           </MenuToggleItem>

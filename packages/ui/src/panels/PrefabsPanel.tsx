@@ -9,7 +9,7 @@ import { sceneEmptiness } from './empty-scene'
 import { SearchEmpty } from './SearchEmpty'
 import { countCatalogMatches, matchHint, prefabMatches } from './search-hints'
 import { originDetail, originLabel, originTip, scopeOrigin } from '../prefabs/provenance'
-import { libraryAvailable } from '../prefabs/library'
+import { importAvailable, libraryAvailable, userLibraryState } from '../prefabs/library'
 import { unusedBuiltinCopies } from '../prefabs/unused'
 import { consumerStore, ensureConsumersLoaded, refreshConsumers, sceneLayouts } from '../prefabs/consumers'
 import {
@@ -114,6 +114,7 @@ function PrefabsTab(props: { onCreatePrefab: () => void; onView: (v: LeftView) =
   }
 
   const hasLibrary = libraryAvailable()
+  const userLibrary = userLibraryState()
 
   useEffect(ensurePrefabsLoaded, [])
   useEffect(() => {
@@ -208,7 +209,7 @@ function PrefabsTab(props: { onCreatePrefab: () => void; onView: (v: LeftView) =
     <>
       <div className="eui-search" style={{ display: 'flex', gap: 6 }}>
         <SearchField size="sm" placeholder="Search prefabs…" value={filter} onChange={setFilter} />
-        {hasLibrary && (
+        {hasLibrary && importAvailable() && (
           <IconButton
             tip="Import a prefab from a folder, a .zip or GitHub"
             style={{ flex: 'none' }}
@@ -381,6 +382,9 @@ function PrefabsTab(props: { onCreatePrefab: () => void; onView: (v: LeftView) =
             </Shelf>
           )
         })}
+        {hasLibrary && userLibrary === 'guest' && f === '' && (
+          <Notice>Sign in to keep prefabs in your own library. The built-ins work without it.</Notice>
+        )}
         {loaded && cards.length === 0 && error === null && (
           <div className="eui-empty">
             <p className="eui-empty-line">{NO_PREFABS_YET}</p>
@@ -400,7 +404,7 @@ function PrefabsTab(props: { onCreatePrefab: () => void; onView: (v: LeftView) =
           x={menu.x}
           y={menu.y}
           card={menuCard}
-          hasLibrary={hasLibrary}
+          canSaveToLibrary={hasLibrary && userLibrary === 'on'}
           onClose={() => setMenu(null)}
           onRename={() => setRenaming(menuCard.id)}
           onDelete={() => setConfirmDelete(menuCard)}
@@ -592,7 +596,7 @@ function PrefabMenu(props: {
   x: number
   y: number
   card: PrefabCardModel
-  hasLibrary: boolean
+  canSaveToLibrary: boolean
   onClose: () => void
   onRename: () => void
   onDelete: () => void
@@ -612,7 +616,7 @@ function PrefabMenu(props: {
           <button className="eui-menu-item" onClick={act(props.onRename)}>
             <IconEdit /> Rename
           </button>
-          {props.hasLibrary && (
+          {props.canSaveToLibrary && (
             <button className="eui-menu-item" onClick={act(() => void uiSavePrefabToLibrary(card.id))}>
               <IconExport /> Save to my library
             </button>

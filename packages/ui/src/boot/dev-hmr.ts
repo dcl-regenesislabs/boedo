@@ -10,6 +10,7 @@
 import type { LiveSceneInfo, EditorTool } from '@dcl-editor/contract'
 import { sceneRpc, sendToScene } from '../engine/bus'
 import { cmd } from '../engine/cmd'
+import { editorSceneHash } from '../engine/hosted'
 import { state } from '@scene/state'
 import { sendSpawnPoints } from '../spawn-points'
 
@@ -49,7 +50,9 @@ export function startDevSceneReload(): void {
 async function reloadEditorScene(): Promise<void> {
   try {
     const scenes = await sceneRpc<LiveSceneInfo[]>('liveSceneInfo')
-    const sys = scenes.find((s) => s.isSuper)
+    // hosted, the host page's own scene is privileged too
+    const editor = editorSceneHash()
+    const sys = scenes.find((s) => (editor === null ? s.isSuper : s.hash === editor))
     if (sys === undefined) {
       location.reload()
       return

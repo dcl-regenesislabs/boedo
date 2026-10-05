@@ -1,9 +1,10 @@
 // The one modal shell. Promoted from panels/Dialogs.tsx and extended for the
 // publish flow: `scrimClose` (turn off backdrop-click while a job runs) and an
 // optional header ✕ whose close is always allowed (hide ≠ cancel).
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import css from './Modal.css?inline'
 import { cx } from './cx'
+import { cycleFocus } from './focus'
 import { registerCss } from './styles/registry'
 
 registerCss('ds/Modal', 'primitives', css)
@@ -31,9 +32,17 @@ export function Modal(props: {
   const box = useRef<HTMLDivElement>(null)
   // Focus moves into the dialog on open: without it the engine iframe can still
   // hold focus and every key (Escape included) goes to the engine, never here.
+  // and goes back where it was when the dialog closes
   useEffect(() => {
-    box.current?.focus()
+    const el = box.current
+    const root = el?.getRootNode() as Document | ShadowRoot | undefined
+    const before = root?.activeElement
+    el?.focus()
+    return () => {
+      if (before instanceof HTMLElement && before.isConnected) before.focus()
+    }
   }, [])
+  const titleId = useId()
   // Registered ONCE and kept alive through a ref, never re-subscribed per
   // render. A caller's `onClose` is usually an inline arrow, so a dep on it
   // re-subscribed constantly — and an earlier Escape listener (shortcuts.ts
@@ -70,16 +79,24 @@ export function Modal(props: {
       <div
         ref={box}
         tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={props.title !== undefined ? titleId : undefined}
         className={cx('eui-modal', props.size, props.className)}
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (box.current !== null) cycleFocus(e, box.current)
+        }}
       >
         {props.title !== undefined && (
           <div className="eui-modal-head">
-            {props.title}
+            <span id={titleId} style={{ display: 'contents' }}>
+              {props.title}
+            </span>
             {props.closeX === true && (
               <>
                 <span style={{ flex: 1 }} />
-                <button className="eui-modal-x" data-tip={props.closeTip} onClick={props.onClose}>
+                <button className="eui-modal-x" data-tip={props.closeTip} aria-label={props.closeTip ?? 'Close'} onClick={props.onClose}>
                   ✕
                 </button>
               </>

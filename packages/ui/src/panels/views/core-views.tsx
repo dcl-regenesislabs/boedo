@@ -68,61 +68,89 @@ const meshCollider: ViewConfig = {
   }
 }
 
+const notPreviewed = ' Not shown in the editor preview; other clients may use it.'
+
 const material: ViewConfig = {
   groups: [
     { fields: ['material'] },
+    { title: 'Surface', fields: ['material.pbr.albedoColor', '@finish'] },
+    { title: 'Glow', fields: ['material.pbr.emissiveColor', 'material.pbr.emissiveIntensity'] },
+    { fields: ['material.pbr.texture'] },
     {
-      title: 'Surface',
+      title: 'Advanced',
+      collapsed: true,
       fields: [
-        'material.pbr.albedoColor',
         'material.pbr.metallic',
         'material.pbr.roughness',
-        'material.pbr.specularIntensity',
-        'material.pbr.directIntensity',
-        'material.pbr.reflectivityColor'
-      ]
-    },
-    { title: 'Emissive', fields: ['material.pbr.emissiveColor', 'material.pbr.emissiveIntensity'] },
-    {
-      title: 'Transparency',
-      fields: ['material.pbr.transparencyMode', 'material.pbr.alphaTest', 'material.pbr.castShadows']
-    },
-    {
-      title: 'Textures',
-      fields: [
-        'material.pbr.texture',
+        'material.pbr.transparencyMode',
+        'material.pbr.alphaTest',
+        'material.pbr.castShadows',
         'material.pbr.emissiveTexture',
         'material.pbr.bumpTexture',
-        'material.pbr.alphaTexture'
+        'material.pbr.alphaTexture',
+        'material.pbr.specularIntensity',
+        'material.pbr.directIntensity',
+        'material.pbr.reflectivityColor',
+        'gltf'
       ]
     }
   ],
-  labels: { material: 'mode', 'material.pbr.transparencyMode': 'transparency' },
-  sliders: materialSliders(''),
+  labels: {
+    material: 'mode',
+    'material.pbr.albedoColor': 'color',
+    'material.pbr.emissiveColor': 'color',
+    'material.pbr.emissiveIntensity': 'strength',
+    'material.pbr.transparencyMode': 'transparency',
+    gltf: 'GLTF material',
+    'gltf.gltfSrc': 'file'
+  },
+  presets: {
+    '@finish': {
+      label: 'finish',
+      doc: 'How shiny the surface is. Advanced has the exact metallic and roughness.',
+      options: [
+        { label: 'Matte', values: { 'material.pbr.metallic': 0, 'material.pbr.roughness': 1 } },
+        { label: 'Satin', values: { 'material.pbr.metallic': 0, 'material.pbr.roughness': 0.5 } },
+        { label: 'Glossy', values: { 'material.pbr.metallic': 0, 'material.pbr.roughness': 0.15 } },
+        { label: 'Metal', values: { 'material.pbr.metallic': 1, 'material.pbr.roughness': 0.3 } }
+      ]
+    }
+  },
+  defaults: {
+    'material.pbr.metallic': 0.5,
+    'material.pbr.roughness': 0.5,
+    'material.pbr.emissiveIntensity': 2,
+    'material.pbr.emissiveColor': { r: 0, g: 0, b: 0 },
+    'material.pbr.alphaTest': 0.5
+  },
+  sliders: { ...materialSliders(''), 'material.pbr.emissiveIntensity': { min: 0, max: 5, step: 0.1 } },
   files: {
     'material.pbr.texture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg', 'ktx2'] },
     'material.pbr.emissiveTexture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg', 'ktx2'] },
     'material.pbr.bumpTexture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg', 'ktx2'] },
     'material.pbr.alphaTexture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg', 'ktx2'] },
     'material.unlit.texture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg', 'ktx2'] },
-    'material.unlit.alphaTexture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg', 'ktx2'] }
+    'material.unlit.alphaTexture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg', 'ktx2'] },
+    'gltf.gltfSrc': { ext: ['glb', 'gltf'] }
   },
   docs: {
-    material: 'Lighting model: unlit (flat, ignores lights) or PBR (physically-based).',
-    'material.pbr.albedoColor': 'Base surface color.',
+    material: 'Lighting model: unlit (flat, ignores lights) or PBR (lit like the real world).',
+    'material.pbr.albedoColor': 'Base color. A is opacity: 1 solid, 0 invisible.',
+    'material.pbr.emissiveColor': 'Color the surface gives off on its own. Black means no glow.',
+    'material.pbr.emissiveIntensity': 'How bright the glow is. Above about 1 it blooms and can wash out the color.',
+    'material.pbr.texture': 'Image drawn over the base color.',
     'material.pbr.metallic': 'How metallic the surface is (0 dielectric → 1 metal).',
     'material.pbr.roughness': 'Surface microroughness (0 mirror → 1 matte).',
-    'material.pbr.specularIntensity': 'Strength of specular reflections.',
-    'material.pbr.directIntensity': 'Intensity of direct lighting on the material.',
-    'material.pbr.reflectivityColor': 'Tint of reflections on the surface.',
-    'material.pbr.emissiveColor': 'Color the material emits (glows) regardless of lighting.',
-    'material.pbr.emissiveIntensity': 'Strength of the emissive glow.',
-    'material.pbr.transparencyMode': 'How transparency is resolved (opaque, alpha test, blend, or auto).',
-    'material.pbr.alphaTest': 'Alpha cutoff threshold for alpha-test transparency.',
+    'material.pbr.transparencyMode': 'How transparency is resolved. Auto blends when opacity is below 1.',
+    'material.pbr.alphaTest': 'Alpha cutoff for alpha-test transparency. Setting it switches Auto to a cutout.',
     'material.pbr.castShadows': 'Whether the surface casts shadows.',
-    'material.pbr.texture': 'Albedo (base color) texture.',
-    'material.pbr.emissiveTexture': 'Texture that drives the emissive glow.',
-    'material.pbr.bumpTexture': 'Normal/bump map for surface detail.'
+    'material.pbr.emissiveTexture': 'Image that drives the glow.',
+    'material.pbr.bumpTexture': 'Normal map for surface detail.',
+    'material.pbr.alphaTexture': 'Image whose alpha sets the opacity.',
+    'material.pbr.specularIntensity': 'Strength of specular reflections.' + notPreviewed,
+    'material.pbr.directIntensity': 'Intensity of direct lighting on the material.' + notPreviewed,
+    'material.pbr.reflectivityColor': 'Tint of reflections on the surface.' + notPreviewed,
+    gltf: 'Use a material from a glTF file. Only applies once a file is chosen.'
   }
 }
 

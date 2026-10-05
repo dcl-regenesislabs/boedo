@@ -51,6 +51,9 @@ The engine is an external dependency (a prebuilt npm package); the rest is this 
 | `packages/ui` | 3 | The React host-page UI — panels + orchestration; also bundles the scene's logic modules. |
 | `packages/desktop` | 4 | Electron desktop shell. Hosts the UI with the engine in an iframe. |
 | `packages/contract` | seams | Shared types for the editor bus + the Electron IPC shell (single source of truth). |
+| `packages/web-build` | web | Builds a scene in the browser (esbuild-wasm in a Web Worker over an in-memory file system and a snapshot of the pinned SDK) and writes it into the preview realm store. No UI; see its README. |
+| `packages/web` | web | The editor UI as one ES module (`dist/editor.js`) for a page that already runs the engine: it mounts into the host page's container and talks to the engine through the host object the page hands it. Also assembles what is served next to it (`web-build/`, `scene/`). See its README. |
+| `packages/service` | web | Wallet-authenticated project storage and an optional Node assistant, composed with Decentraland Well-Known Components. The agent asks the browser to read/write the working project and execute editor actions over WebSocket. See `docs/WEB-ASSISTANT.md`. |
 
 ---
 

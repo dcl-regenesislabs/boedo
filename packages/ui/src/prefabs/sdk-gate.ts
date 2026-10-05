@@ -6,6 +6,7 @@
 // So check before placing and offer the install, instead of a crash later.
 import { reactive } from '../core/store'
 import { readPrefabFolder } from './storage'
+import { launchParam } from '../boot/launch-params'
 
 export const sdkGate = reactive<{
   /** the prefab we held back, and the folder to retry with once the SDK is in */
@@ -22,7 +23,7 @@ export function holdPrefab(folder: string, prefabName: string): void {
 }
 
 function projectDir(): string | null {
-  return new URLSearchParams(window.location.search).get('project')
+  return launchParam('project')
 }
 
 /**

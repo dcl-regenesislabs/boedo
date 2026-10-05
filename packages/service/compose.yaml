@@ -1,0 +1,32 @@
+services:
+  editor-service:
+    build:
+      context: ../..
+      dockerfile: packages/service/Dockerfile
+    ports:
+      - "127.0.0.1:8787:8787"
+    env_file: .env
+    environment:
+      HTTP_SERVER_HOST: 0.0.0.0
+      HTTP_SERVER_PORT: "8787"
+      STORAGE_DIR: /data/projects
+    volumes:
+      - editor-data:/data
+    restart: unless-stopped
+    stop_grace_period: 30s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 1g
+    cpus: 2
+    tmpfs:
+      - /tmp:size=64m,mode=1777,noexec,nosuid,nodev
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  editor-data:

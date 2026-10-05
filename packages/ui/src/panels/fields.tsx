@@ -33,8 +33,10 @@ export function ScrubNumberField(props: {
   fallback: number
   commit: Commit
   axis?: string
+  range?: [number, number]
 }): JSX.Element {
-  const { cKey, path, fallback, commit } = props
+  const { cKey, path, fallback, commit, range } = props
+  const clamp = (v: number): number => (range === undefined ? v : Math.min(range[1], Math.max(range[0], v)))
   const fieldEdits = useStore(() => state.fieldEdits)
   const text = leafText(cKey, path, fallback)
   const dirty = fieldEdits.has(fieldKey(cKey, path))
@@ -50,7 +52,7 @@ export function ScrubNumberField(props: {
     const onMove = (ev: PointerEvent): void => {
       moved = true
       const step = ev.shiftKey ? 0.01 : 0.1
-      const v = startVal + (ev.clientX - start) * step
+      const v = clamp(startVal + (ev.clientX - start) * step)
       setField(cKey, path, trimNum(v))
       if (ref.current !== null) ref.current.value = trimNum(v)
     }
@@ -89,8 +91,14 @@ export function ScrubNumberField(props: {
         onChange={(e) => {
           setField(cKey, path, e.target.value)
         }}
-        onBlur={() => {
-          if (state.fieldEdits.has(fieldKey(cKey, path))) commit()
+        onBlur={(e) => {
+          if (!state.fieldEdits.has(fieldKey(cKey, path))) return
+          const n = parseFloat(e.target.value)
+          if (!Number.isNaN(n) && clamp(n) !== n) {
+            setField(cKey, path, trimNum(clamp(n)))
+            e.target.value = trimNum(clamp(n))
+          }
+          commit()
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
@@ -206,7 +214,7 @@ export function ColorField(props: {
         onBlur={commit}
       />
       {hasAlpha && (
-        <ScrubNumberField cKey={cKey} path={joinPath(path, 'a')} fallback={base?.a ?? 1} commit={commit} axis="a" />
+        <ScrubNumberField cKey={cKey} path={joinPath(path, 'a')} fallback={base?.a ?? 1} commit={commit} axis="a" range={[0, 1]} />
       )}
     </>
   )

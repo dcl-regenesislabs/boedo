@@ -2,7 +2,7 @@ import { cmd } from '../cmd'
 import { buildComposite } from '../composite'
 import { INERT_BACKUP_COMPONENT } from '../inert'
 import { NAME_COMPONENT, bumpCustomTimestamp, createCustomDefault, customComponentId, customTimestamp, encodeCustomComponent, isCustomComponent } from '../custom-components'
-import { buildEditedJson } from '../fields'
+import { buildEditedJson, isRecord } from '../fields'
 import { captureTransformDefaults, getSchema } from '../schema'
 import { type ComponentKey, type Snapshot, clearComponentEdits, componentKey, deleteSnapshotComponent, markComponentDeleted, markEdited, parentOf, selectEntityInTree, setComponentExpanded, setEditStatus, setSchema, setSelected, state, topLevelSelected } from '../state'
 import { sleep } from '../utils'
@@ -18,6 +18,13 @@ import { SETTLE_MS, applyLocalComponent, onComponentDeleted, reloadAfter, reload
 // fields to edit immediately, even while paused (the write itself still encodes the
 // proto default). Falls back to `{}` if the default fetch fails. The new component is
 // expanded so it's ready to edit. No-op if the entity already has it.
+// A new Material starts as the lit (PBR) one the engine renders for an unset case; left unset,
+// the inspector reads it as its first case (unlit) and the first edit would switch it there.
+function seedMaterial(value: unknown, json: string): string {
+  if (!isRecord(value) || value.material != null) return json
+  return JSON.stringify({ ...value, material: { pbr: {} } })
+}
+
 export async function addComponent(entityId: string, name: string): Promise<void> {
   if (state.snapshot[entityId]?.[name] !== undefined) return
   const key = componentKey(entityId, name)
@@ -31,8 +38,8 @@ export async function addComponent(entityId: string, name: string): Promise<void
   } else {
     try {
       const reply = await cmd.componentDefault(name)
-      JSON.parse(reply) // validate before adopting it
-      json = reply
+      const value: unknown = JSON.parse(reply) // validate before adopting it
+      json = name === 'Material' ? seedMaterial(value, reply) : reply
     } catch (e) {
       console.error('component_default failed (using {}):', name, e)
     }
@@ -292,10 +299,12 @@ export async function instantiateEntityTree(
 export async function addEntity(
   name: string,
   parent: number,
-  position: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 }
-): Promise<void> {
+  position: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 },
+  components: Record<string, unknown> = {}
+): Promise<string | null> {
   const ids = await createEntities([
     {
+      ...components,
       // Full default Transform (explicit scale 1 — a partial write would leave scale 0 → invisible).
       Transform: {
         position,
@@ -312,7 +321,9 @@ export async function addEntity(
     state.activeEntity = eid
     // expand ancestors and scroll the tree to the new row
     selectEntityInTree(state.snapshot, eid)
+    return eid
   }
+  return null
 }
 
 // Remove a component from an entity (optimistic local removal + /delete_component).

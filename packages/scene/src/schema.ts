@@ -343,7 +343,8 @@ function buildNode(
     case 'message': {
       const cur = valueAt(value, path)
       // An untouched, absent, optional sub-message stays null (don't fabricate it).
-      if (!forceObject && node.optional && cur === undefined && !hasEditUnder(key, path)) {
+      // the engine snapshots an unset optional as null
+      if (!forceObject && node.optional && (cur === undefined || cur === null) && !hasEditUnder(key, path)) {
         return null
       }
       const out: Record<string, unknown> = {}
@@ -395,7 +396,8 @@ function buildLeaf(
     if (node.optional && baseObj === undefined && !hasEditUnder(key, path)) return null
     const out: Record<string, number> = {}
     for (const ch of channels) {
-      const fallback = typeof baseObj?.[ch] === 'number' ? (baseObj[ch] as number) : 0
+      // a missing color channel is white and opaque, as the color widget shows it
+      const fallback = typeof baseObj?.[ch] === 'number' ? (baseObj[ch] as number) : sem0.startsWith('color') ? 1 : 0
       out[ch] = currentNumber(key, join(path, ch), fallback)
     }
     return out

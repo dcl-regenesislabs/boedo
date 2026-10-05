@@ -18,6 +18,7 @@ import { dataLayerSaveFileBytes, dataLayerAvailable, dataLayerListFiles } from '
 import { IGNORED_DIRS } from './script/project-files'
 import { referencedNames } from './script/references'
 import { gltfExternalUris } from './gltf-refs'
+import { launchParam } from './boot/launch-params'
 
 const OPENDCL_ORIGIN = 'https://models.dclregenesislabs.xyz'
 const CATALOG_URL = `${OPENDCL_ORIGIN}/catalog/asset-catalog.json`
@@ -31,7 +32,8 @@ async function resolveProxy(): Promise<string | null> {
   if (proxyBase !== undefined) return proxyBase
   try {
     const r = await fetch('/opendcl/ping')
-    proxyBase = r.ok ? '/opendcl' : null
+    // a single-page host answers every path with its index.html
+    proxyBase = r.ok && (r.headers.get('content-type') ?? '').includes('application/json') ? '/opendcl' : null
   } catch {
     proxyBase = null
   }
@@ -318,7 +320,7 @@ export async function uploadModel(
 // (?position=x,y), at ground level. Used when the camera-aware drop can't be
 // computed (camera/world-origin not ready, or the scene didn't answer).
 export function defaultDropPosition(): { x: number; y: number; z: number } {
-  const raw = new URLSearchParams(window.location.search).get('position') ?? '0,0'
+  const raw = launchParam('position') ?? '0,0'
   const [px, py] = raw.split(',').map((n) => parseInt(n, 10))
   return {
     x: (Number.isFinite(px) ? px : 0) * 16 + 8,

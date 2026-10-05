@@ -15,6 +15,7 @@
 import { reactive } from '../core/store'
 import { setStoredFlag, storedFlag } from '../core/persist'
 import { BevyApi } from './bevy-api-web'
+import { isHosted } from './hosted'
 
 // Persisted because the engine persists too: master 0 lands in its config file,
 // so a crash while muted would otherwise come back silent under an unmuted UI.
@@ -24,6 +25,8 @@ const MUTED_KEY = 'scene-muted'
 export const sceneAudio = reactive({ muted: storedFlag(MUTED_KEY, false) })
 
 function apply(): void {
+  // hosted: the master volume is the host page's own sound setting
+  if (isHosted()) return
   BevyApi.setSetting('Master Volume', sceneAudio.muted ? 0 : 100).catch((e) => {
     console.warn('[audio] setSetting Master Volume failed:', e)
   })

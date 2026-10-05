@@ -64,3 +64,50 @@ describe('buildFromSchema repeated elements', () => {
     expect(out.states[0].playing).toBe(true)
   })
 })
+
+// Material-shaped: the engine snapshots an unset optional message as null.
+const MATERIAL: ComponentSchema = {
+  name: 'Material',
+  root: {
+    kind: 'message',
+    name: '',
+    fields: [
+      { kind: 'leaf', name: 'metallic', semantic: 'number', default: 0.5 },
+      {
+        kind: 'message',
+        name: 'gltf',
+        optional: true,
+        fields: [
+          { kind: 'leaf', name: 'gltfSrc', semantic: 'string', default: '' },
+          { kind: 'leaf', name: 'name', semantic: 'string', default: '' }
+        ]
+      }
+    ]
+  },
+  enums: {}
+} as unknown as ComponentSchema
+
+describe('buildFromSchema optional messages', () => {
+  it('keeps an unset optional message unset when the engine reports it as null', () => {
+    const res = buildFromSchema('e::Material', MATERIAL, { metallic: 0, gltf: null })
+    expect(res.ok && JSON.parse(res.json)).toEqual({ metallic: 0, gltf: null })
+  })
+})
+
+const SURFACE: ComponentSchema = {
+  name: 'Material',
+  root: { kind: 'message', name: '', fields: [{ kind: 'leaf', name: 'albedoColor', semantic: 'color4', optional: true }] },
+  enums: {}
+} as unknown as ComponentSchema
+
+describe('buildFromSchema colors', () => {
+  it('keeps a newly picked color opaque', () => {
+    state.fieldEdits = new Map([
+      ['e::Material::albedoColor.r', '0.1'],
+      ['e::Material::albedoColor.g', '0.8'],
+      ['e::Material::albedoColor.b', '0.2']
+    ])
+    const res = buildFromSchema('e::Material', SURFACE, { albedoColor: null })
+    expect(res.ok && JSON.parse(res.json)).toEqual({ albedoColor: { r: 0.1, g: 0.8, b: 0.2, a: 1 } })
+  })
+})

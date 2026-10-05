@@ -13,6 +13,8 @@ export default defineConfig({
     alias: {
       // same @scene seam the ui build uses (packages/ui/vite.config.ts)
       '@scene': path.resolve(here, 'packages/scene/src'),
+      // the web target's own alias for the ui sources (packages/web/vite.config.ts)
+      '@ui': path.resolve(here, 'packages/ui/src'),
       // the alias prefab scripts import the runtime through — mirrors
       // packages/desktop/prefabs/tsconfig.json so a suite that loads a prefab
       // script resolves it to the same master module the suite imports directly

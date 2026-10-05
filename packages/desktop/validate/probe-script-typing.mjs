@@ -154,13 +154,13 @@ async function main() {
   const pickerState = await evalIn(`(() => {
     const sh = document.getElementById('editor-ui-host').shadowRoot
     const filter = sh.querySelector('.eui-pop input')
-    const items = [...sh.querySelectorAll('.eui-pop-item')].map((e) => e.textContent)
+    const items = [...sh.querySelectorAll('.eui-pop .eui-menu-item')].map((e) => e.textContent)
     return { filterValue: filter?.value ?? null, items }
   })()`)
   console.log('picker after typing "script":', JSON.stringify(pickerState))
   const item = await evalIn(`(() => {
     const sh = document.getElementById('editor-ui-host').shadowRoot
-    const item = [...sh.querySelectorAll('.eui-pop-item')].find((el) => /script/i.test(el.textContent))
+    const item = [...sh.querySelectorAll('.eui-pop .eui-menu-item')].find((el) => /script/i.test(el.textContent))
     if (!item) return false
     item.click()
     return true

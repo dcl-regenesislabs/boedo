@@ -5,10 +5,10 @@
 > agent (console commands, editor bus, the CDP e2e harness), see
 > [`AI-AGENT.md`](./AI-AGENT.md).
 
-A floating 🤖 button in the editor — draggable, bottom-right by default — opens
-a chat panel that edits your **Script components** by prompt. It's rendered by
-`AiFab` (`packages/ui/src/panels/AiPanel.tsx`) and only exists in the desktop
-app; a browser tab has no assistant.
+The assistant panel edits your **Script components** by prompt. The desktop and
+web shells share `packages/ui/src/panels/AiPanel.tsx` and Script Studio. This
+document describes the desktop CLI backend. The web backend runs an agent service
+with browser-owned files and browser tools; see [Web assistant](./WEB-ASSISTANT.md).
 
 ---
 
@@ -378,5 +378,6 @@ gutter.
 `packages/desktop/src/ai.ts` (spawn + stream parsing, with the system prompt in
 `ai-prompt.ts` beside it) → IPC in
 `main.ts`/`preload.ts` (`@dcl-editor/contract` `Ai*` types) → the
-`packages/ui/src/panels/AiPanel.tsx` chat UI. The panel only appears in the
-Electron shell (the renderer can't spawn processes).
+`packages/ui/src/panels/AiPanel.tsx` chat UI. The web shell implements the same
+contract through `packages/web/src/ai/client.ts`; its server transport and pi agent
+live in `packages/service/src/ai/`.

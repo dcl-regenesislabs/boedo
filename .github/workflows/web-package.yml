@@ -1,0 +1,53 @@
+# Publishes the web editor (packages/web/dist) as @dcl-regenesislabs/web-editor. The explorer page
+# loads it by exact version from jsDelivr, pinned by hash, so a version only reaches players
+# through an explorer PR that sets PINNED_EDITOR (`node packages/web/scripts/pin.mjs <version>`).
+#
+# Every main push publishes a deterministic oddish snapshot on `next`; a manual dispatch publishes
+# the chosen ref on `latest`. Publishing uses npm OIDC trusted publishing, no token. The first
+# publish of the name has to be done by hand (npm attaches a trusted publisher only to an existing
+# package): `npm publish --access public` in packages/web/dist while logged in, then add this repo
+# and workflow as its trusted publisher on npmjs.com.
+name: web-package
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/**'
+      - 'package-lock.json'
+      - '.github/workflows/web-package.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-package-${{ github.ref }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - run: npm run export-static -w @dcl-editor/scene
+      - run: npm run build -w @dcl-editor/web
+      - run: node packages/web/scripts/package-dist.mjs
+      - name: Publish
+        uses: decentraland/oddish-action@v1
+        with:
+          cwd: './packages/web/dist'
+          deterministic-snapshot: true
+          registry-url: 'https://registry.npmjs.org'
+          access: public
+          # a dispatch is a release: oddish publishes a branch it is told about on that tag
+          custom-tag: ${{ github.event_name == 'workflow_dispatch' && 'latest' || '' }}
+          branch-to-custom-tag: ${{ github.event_name == 'workflow_dispatch' && github.ref_name || '' }}

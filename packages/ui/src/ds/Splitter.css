@@ -1,0 +1,14 @@
+/* Fills the column's 10px gaps on both sides (net zero height), so the hit area
+   costs neither panel space. */
+.eui-ds-splitter {
+  position: relative; flex: none; height: 20px; margin: -10px 0;
+  z-index: 6; cursor: ns-resize; pointer-events: auto; outline: none; touch-action: none;
+}
+.eui-ds-splitter::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 36px; height: 3px;
+  transform: translate(-50%, -50%); border-radius: 3px;
+  background: var(--divider); transition: background var(--dur-fast), width var(--dur-fast);
+}
+.eui-ds-splitter:hover::after, .eui-ds-splitter:focus-visible::after, .eui-ds-splitter[data-dragging]::after {
+  width: 100%; background: var(--primary);
+}

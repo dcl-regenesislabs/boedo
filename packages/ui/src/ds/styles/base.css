@@ -290,6 +290,8 @@
 }
 .eui-row:hover { background: var(--hover); }
 .eui-row.selected { background: var(--primary-selected); box-shadow: inset 2px 0 0 var(--primary); }
+.eui-row:focus, [role='tree']:focus { outline: none; }
+.eui-row:focus-visible, [role='tree']:focus-visible { outline: 1px solid var(--primary); outline-offset: -1px; }
 .eui-row.drop-into { background: var(--primary-selected); box-shadow: inset 0 0 0 1px var(--primary); }
 .eui-row[draggable='true'] { cursor: grab; }
 /* a quiet nudge in the marks column: bare glyph, flag-toned, never a chip */
@@ -466,10 +468,7 @@
 
 /* add-component popover */
 .eui-pop { padding: 10px 12px; border-bottom: 1px solid var(--divider-soft); display: flex; flex-direction: column; gap: 8px; }
-.eui-pop-list { max-height: 220px; overflow-y: auto; }
-.eui-pop-item { height: var(--control-h); display: flex; align-items: center; padding: 0 9px; border-radius: var(--r-control); cursor: pointer; font-size: 12.5px; }
-.eui-pop-item:hover { background: var(--hover); }
-.eui-pop-item .hint { color: var(--text-3); font-family: var(--font-mono); font-size: 10px; margin-left: 8px; }
+.eui-pop-list { max-height: 320px; overflow-y: auto; scrollbar-width: thin; }
 
 /* ---------- modals / toast ---------- */
 /* Visually hidden, still in the accessibility tree AND still in textContent —
@@ -581,6 +580,7 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   animation: eui-toast 0.22s cubic-bezier(0.2, 0.9, 0.3, 1) both;
 }
+.eui-toast.err { box-shadow: var(--shadow-float), inset 2px 0 0 var(--error); }
 /* The boot pill is the same wait as the full-window overlays, one step later. It
    is control-shaped but passive, so it takes a control rung rather than a bigger
    one — at 49.4px it was taller than any control the ds permits. */
@@ -608,6 +608,7 @@
   text-transform: uppercase; color: var(--text-3); padding: 4px 12px 6px;
 }
 .eui-asset-category { width: 96px; flex: none; min-width: 0; }
+.eui-asset-note { margin: 0; padding: var(--space-2) var(--space-3); color: var(--text-2); font-size: 12px; line-height: 1.45; }
 .eui-asset-sentinel { grid-column: 1 / -1; height: 8px; }
 .eui-asset-more { padding: 0 var(--space-3) var(--space-2); text-align: center; }
 .eui-asset {
@@ -633,11 +634,6 @@
 .eui-right-resize { position: absolute; top: 12px; bottom: 12px; width: 10px; z-index: 6; cursor: ew-resize; pointer-events: auto; }
 .eui-right-resize::after { content: ''; position: absolute; right: 4px; top: 0; bottom: 0; width: 3px; border-radius: 3px; background: transparent; transition: background 0.12s; }
 .eui-right-resize:hover::after { background: var(--primary); }
-/* horizontal splitter between the inspector and the docked assistant — straddles
-   the seam so the hit area doesn't eat panel space */
-.eui-col-split { position: relative; flex: none; height: 8px; margin: -4px 0; z-index: 6; cursor: ns-resize; pointer-events: auto; }
-.eui-col-split::after { content: ''; position: absolute; left: 0; right: 0; top: 3px; height: 3px; border-radius: 3px; background: transparent; transition: background 0.12s; }
-.eui-col-split:hover::after { background: var(--primary); }
 
 /* left-dock tabs (Scene | Prefabs | Assets) */
 .eui-left-tabs { display: flex; gap: 4px; padding: 8px 8px 0; flex: none; }

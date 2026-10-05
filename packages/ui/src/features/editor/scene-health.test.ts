@@ -2,6 +2,7 @@
 // `congoel.log()` in src/index.ts), ANSI escapes included.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  applyBuildEvent,
   buildInFlight,
   compositeAwaitingBuild,
   errorLocation,
@@ -355,5 +356,39 @@ describe('does the scene need a reload before Play', () => {
     parseLine('Bundle saved bin/index.js')
     expect(compositeAwaitingBuild()).toBe(false)
     expect(sceneNeedsReload()).toBe(true)
+  })
+})
+
+// A shell that builds the scene itself (the web target) reports the same facts as data.
+describe('build events in place of log lines', () => {
+  beforeEach(resetForTest)
+
+  it('a code error opens at its line and clears on the fix; only changed source asks for a reload', () => {
+    noteCompositeWritten()
+    applyBuildEvent({ type: 'buildStarted', changed: ['assets/scene/main.composite'] })
+    expect(compositeAwaitingBuild()).toBe(false)
+    expect(buildInFlight()).toBe(true)
+    applyBuildEvent({ type: 'bundleSaved' })
+    expect(buildInFlight()).toBe(false)
+    expect(sceneNeedsReload()).toBe(false)
+
+    applyBuildEvent({ type: 'buildStarted', changed: ['src/index.ts'] })
+    applyBuildEvent({
+      type: 'diagnostics',
+      diagnostics: [{ severity: 'error', message: 'Expected ";" but found "}"', file: 'src/index.ts', line: 19, column: 20 }]
+    })
+    applyBuildEvent({ type: 'failed', message: 'Build failed with 1 error' })
+    expect(buildInFlight()).toBe(false)
+    expect(sceneNeedsReload()).toBe(true)
+    expect(healthForTest()?.kind).toBe('build')
+    expect(errorLocation(healthForTest() as SceneHealth)).toEqual({ path: 'src/index.ts', line: 19, column: 20 })
+
+    applyBuildEvent({ type: 'buildStarted', changed: ['src/index.ts'] })
+    applyBuildEvent({ type: 'diagnostics', diagnostics: [] })
+    applyBuildEvent({ type: 'bundleSaved' })
+    expect(healthForTest()).toBeNull()
+
+    applyBuildEvent({ type: 'sessionStarted' })
+    expect(sceneNeedsReload()).toBe(false)
   })
 })

@@ -10,18 +10,26 @@
 // autosave writes main.composite into the project, which the watcher rebuilds too.
 // So it's safe to WAIT on after a save you just made, and not safe to trigger
 // anything from on its own.
+import type { EditorShell } from '@dcl-editor/contract'
 import { REBUILD_WAIT_MS, REBUILD_SETTLE_MS } from '../config'
 
 const BUILD_LINE = /rebuil|recompil|compiled|built in|updated|hmr|watch/i
 
 let lastBuildAt = 0
-let wired = false
+// hosted, each mount of the editor brings a new shell
+let wiredTo: EditorShell | null = null
 
 function wire(): void {
-  if (wired) return
   const shell = window.editorShell
-  if (shell?.onStackLog === undefined) return
-  wired = true
+  if (shell === undefined || wiredTo === shell) return
+  wiredTo = shell
+  // a shell that builds the scene itself says so; failed counts, the wait is over either way
+  if (shell.onBuildEvent !== undefined) {
+    shell.onBuildEvent((event) => {
+      if (event.type === 'bundleSaved' || event.type === 'failed') lastBuildAt = Date.now()
+    })
+    return
+  }
   shell.onStackLog((line) => {
     if (BUILD_LINE.test(line)) lastBuildAt = Date.now()
   })

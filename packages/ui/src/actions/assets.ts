@@ -27,6 +27,10 @@ export const uiFetchCatalog = async (): Promise<void> => {
       pack: m.collection,
       thumbnail: m.thumbnailUrl ?? null
     }))
+    state.assetCatalogFailed = false
+  } catch (e) {
+    state.assetCatalogFailed = true
+    throw e
   } finally {
     state.assetBusy = false
   }

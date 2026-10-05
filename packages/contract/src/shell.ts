@@ -4,6 +4,9 @@
 // surface — previously `EditorShell` and `ProjectInfo` were duplicated in the
 // desktop main process and the renderer with no shared type.
 
+import type { ProjectImportResult, ProjectPackages, ProjectSync, SyncConflictChoice, SyncStatus } from './projects'
+import type { PublishProgress, PublishWorld, PublishedScene, ScenePublishResult } from './publish'
+
 // Per-project metadata shown on the home/picker screen.
 export interface ProjectInfo {
   path: string
@@ -15,6 +18,10 @@ export interface ProjectInfo {
   favourite?: boolean // pinned in the Home Favourites shelf
   lastOpened?: number // epoch ms of the last open (for "last opened" sort)
   missing?: boolean // the folder (or its scene.json) is gone — greyed, remove-only
+  sync?: ProjectSync // where the account's copy stands; absent: the shell keeps no such copy
+  remoteOnly?: boolean // on the account, not on this device yet: opening it downloads it
+  published?: PublishedScene // the last publish made from this device
+  deletedAt?: number // epoch ms it went into the shell's own trash
 }
 
 // Payload of the `servers-ready` event: where the renderer should attach.
@@ -45,6 +52,28 @@ export interface SceneTemplate {
   name: string
   description: string
 }
+
+// ---- Scene build events ----
+// A shell that builds the scene itself (the web target) reports the build as
+// data. The desktop shell relays its dev server's output instead (onStackLog),
+// and the editor reads the same facts out of those lines.
+export interface SceneBuildDiagnostic {
+  severity: 'error' | 'warning'
+  message: string
+  file?: string // project-relative
+  line?: number
+  column?: number
+}
+
+export type SceneBuildEvent =
+  // a project is being opened or was closed: what came before is another project's
+  | { type: 'sessionStarted' }
+  // `changed`: the project files written since the previous build started
+  | { type: 'buildStarted'; changed: string[] }
+  | { type: 'diagnostics'; diagnostics: SceneBuildDiagnostic[] }
+  // the scene the engine loads on its next reload is this build
+  | { type: 'bundleSaved' }
+  | { type: 'failed'; message: string }
 
 // ---- Decentraland account (deep-link sign-in) ----
 // The renderer starts a sign-in by opening decentraland.org/auth in the user's
@@ -96,6 +125,7 @@ export interface AiProviderInfo {
   models: string[]
   defaultModel: string
   reason?: string
+  transport?: 'local' | 'service'
 }
 
 // A single user turn to run. `text` is the prompt the user typed; `context` is
@@ -125,8 +155,16 @@ export type AiEvent =
   | { kind: 'started'; turnId: string }
   | { kind: 'text'; turnId: string; text: string }
   | { kind: 'tool'; turnId: string; tool: string; detail: string }
-  | { kind: 'error'; turnId: string; message: string }
+  // resumable: a limit paused the turn and the same conversation can continue (hosted only)
+  | { kind: 'error'; turnId: string; message: string; resumable?: boolean }
   | { kind: 'done'; turnId: string; ok: boolean }
+
+// One wallet's assistant chat on one project, kept for display only; `owner` names that pair.
+export interface AiTranscript {
+  owner: string
+  load(): Promise<unknown>
+  save(messages: unknown): Promise<void>
+}
 
 // ---- Publish to Worlds ----
 // Publishing drives `sdk-commands deploy --no-browser --port N` (the scene's own
@@ -223,9 +261,10 @@ export type UpdateStatus =
 
 // ---- Prefab library (cross-scene) ----
 // Prefabs live in a project as `custom/<slug>/` folders, but the library that
-// spans projects lives outside any scene: read-only builtins shipped in the app
-// resources, plus the user's own collection in the Electron userData dir. Main
-// owns both trees (plain fs); the renderer only ever names entries by `ref` and
+// spans projects lives outside any scene: read-only builtins shipped with the
+// app, plus the user's own collection (desktop: the Electron userData dir; web:
+// the wallet's library on the project service). The shell owns both trees; the
+// renderer only ever names entries by `ref` and
 // parses the raw data.json text with its own defensive parser — the prefab
 // format stays in the ui package rather than leaking into this contract.
 export type PrefabLibraryScope = 'builtin' | 'user'
@@ -308,6 +347,8 @@ export interface EditorShell {
   // clear corrupt engine browser storage when boot stalls; resolves true if cleared
   recoverEngineStorage?: () => Promise<boolean>
   onStackLog: (cb: (line: string) => void) => void
+  // typed build reports (see SceneBuildEvent); when present, onStackLog lines are for reading only
+  onBuildEvent?: (cb: (event: SceneBuildEvent) => void) => void
   // tool chords claimed in main (see EDITOR_CHORD_CHANNEL)
   onEditorChord?: (cb: (c: EditorChord) => void) => void
   onServersReady?: (cb: (info: ServersReady) => void) => void
@@ -322,6 +363,26 @@ export interface EditorShell {
   removeFromRecents?: (dir: string) => Promise<void>
   // move the scene folder to the OS Trash (confirmed in main); resolves true if deleted
   deleteProject?: (dir: string) => Promise<boolean>
+  // a shell whose delete is its own trash: what is in it, and putting one back
+  trashedProjects?: () => Promise<ProjectInfo[]>
+  restoreProject?: (dir: string) => Promise<boolean>
+  // ---- Project sync (see SyncStatus) ----
+  syncStatus?: () => Promise<SyncStatus>
+  // returns an unsubscribe function
+  onSyncStatus?: (cb: (status: SyncStatus) => void) => () => void
+  resolveSyncConflict?: (dir: string, choice: SyncConflictChoice) => Promise<void>
+  // ---- Import / export ----
+  // save the project's source files as a .zip download
+  exportProject?: (dir: string) => Promise<void>
+  // make a project from a picked .zip or folder; null when the picker was dismissed
+  importProject?: (kind: 'zip' | 'folder') => Promise<ProjectImportResult | null>
+  // false where the browser cannot pick a folder
+  canImportFolder?: boolean
+  // ---- npm packages (see ProjectPackages) ----
+  // where the project's packages stand; null when it asks for none
+  projectPackages?: (dir: string) => Promise<ProjectPackages | null>
+  // returns an unsubscribe function
+  onProjectPackages?: (cb: (dir: string, packages: ProjectPackages) => void) => () => void
   // open the scene folder in the OS file manager
   revealInFinder?: (dir: string) => Promise<void>
   // set the scene's display.title in scene.json (folder path is unchanged)
@@ -360,6 +421,11 @@ export interface EditorShell {
   publishStop?: () => Promise<void>
   // subscribe to publish progress events; returns an unsubscribe function
   onPublishEvent?: (cb: (e: PublishEvent) => void) => () => void
+  // publish the scene to `world` without a CLI (see ScenePublishResult); set by a
+  // shell that has no publishStart. publishStop cancels it.
+  publishScene?: (dir: string, world: string, onProgress: (progress: PublishProgress) => void) => Promise<ScenePublishResult>
+  // the worlds the signed-in wallet can publish to, where the shell is the one that knows
+  publishWorlds?: () => Promise<PublishWorld[]>
   // can this scene's sdk-commands publish next to a world's existing scenes?
   // resolves `unknown` while the scene has no node_modules — publishStart
   // installs them first, so the answer can change after a publish is started.
@@ -414,10 +480,17 @@ export interface EditorShell {
   // AI assistant: enumerate backends, run a turn (resolves with its turnId),
   // interrupt the running turn, drop the conversation, subscribe to stream events
   aiProviders?: () => Promise<AiProviderInfo[]>
+  // false while nobody here can use the assistant (a guest, no service, an account not let in),
+  // which hides it; absent means it is always offered
+  aiOffered?: () => boolean
   aiSend?: (params: AiSendParams) => Promise<{ turnId: string }>
   aiStop?: () => Promise<void>
   aiReset?: () => Promise<void>
-  onAiEvent?: (cb: (e: AiEvent) => void) => void
+  // true while the conversation a limit paused is still held, so a continue prompt reaches it
+  aiCanResume?: () => boolean
+  // the signed-in wallet's kept chat for the open project; null when there is no one to keep it for
+  aiTranscript?: () => AiTranscript | null
+  onAiEvent?: (cb: (e: AiEvent) => void) => void | (() => void)
   // ---- Prefab library ----
   // every builtin + user-library prefab, newest tree read on each call
   prefabLibraryList?: () => Promise<PrefabLibraryEntry[]>
@@ -428,6 +501,9 @@ export interface EditorShell {
   prefabLibraryUpdateCopy?: (ref: string, projectDir: string) => Promise<string | null>
   // copy a project prefab folder out into the user library
   prefabLibraryCopyOut?: (projectDir: string, folder: string) => Promise<PrefabLibraryEntry>
+  // whether the user library can be written now: 'guest' until someone signs in
+  // (web); undefined reads as 'on' wherever prefabLibraryCopyOut exists
+  prefabUserLibrary?: () => 'on' | 'guest' | 'unavailable'
   // remove a user-library entry (builtins are read-only and refuse)
   prefabLibraryDelete?: (ref: string) => Promise<boolean>
   // stage an import from a picked folder or .zip; null when the picker was cancelled

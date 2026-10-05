@@ -41,8 +41,7 @@ export function TooltipLayer(): JSX.Element {
       setTip(null)
     }
 
-    const onOver = (e: Event): void => {
-      const target = e.target
+    const show = (target: EventTarget | null): void => {
       // skip the engine iframe (its title is an a11y name, not a button tooltip)
       const el =
         target instanceof Element && target.tagName !== 'IFRAME' ? target.closest('[data-tip]') : null
@@ -68,11 +67,20 @@ export function TooltipLayer(): JSX.Element {
       }, DELAY_MS)
     }
 
+    const onOver = (e: Event): void => show(e.target)
+    // keyboard focus shows the same tip a hover does; a click's focus does not
+    const onFocusIn = (e: Event): void => {
+      if (e.target instanceof Element && e.target.matches(':focus-visible')) show(e.target)
+    }
     root.addEventListener('pointerover', onOver, true)
+    root.addEventListener('focusin', onFocusIn, true)
+    root.addEventListener('focusout', hide, true)
     root.addEventListener('pointerdown', hide, true) // a click shouldn't leave the tip lingering
     window.addEventListener('blur', hide)
     return () => {
       root.removeEventListener('pointerover', onOver, true)
+      root.removeEventListener('focusin', onFocusIn, true)
+      root.removeEventListener('focusout', hide, true)
       root.removeEventListener('pointerdown', hide, true)
       window.removeEventListener('blur', hide)
       clearTimeout(timer)

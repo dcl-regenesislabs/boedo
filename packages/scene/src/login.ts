@@ -20,6 +20,11 @@ async function playerWithin(ms: number): Promise<boolean> {
 // Worst case we give up waiting and let the editor proceed (the free-cam editor
 // doesn't strictly need the avatar) rather than hang.
 export async function autoLogin(): Promise<void> {
+  // a session that already exists (a reload of this scene, a host's sign-in) is not replaced
+  if (getPlayer() !== null) {
+    trace('login: player already present', 'keeping the session')
+    return
+  }
   const previous = await BevyApi.getPreviousLogin().catch(() => null)
 
   if (previous?.userId !== null && previous?.userId !== undefined) {

@@ -123,6 +123,7 @@ vi.mock('../prefabs/library', () => ({
   copyLibraryPrefabIntoProject: async () => ({}),
   deleteLibraryPrefab: async () => {},
   libraryAvailable: () => false,
+  userLibraryState: () => 'unavailable',
   savePrefabToLibrary: async () => ({})
 }))
 vi.mock('../panels/prefab-store', () => ({
@@ -135,11 +136,14 @@ vi.mock('../panels/prefab-store', () => ({
 }))
 vi.mock('../core/autosave', () => ({ flushPendingSave: async () => {} }))
 vi.mock('../core/history', () => ({
-  pushHistory: (batch: Array<{ entityId: string; name: string }>) => history.batches.push(batch),
+  pushHistory: (batch: Array<{ entityId: string; name: string }>) => {
+    if (batch.length > 0) history.batches.push(batch)
+  },
   snapshotValue: (id: string, name: string) => {
     const value = state.snapshot[id]?.[name]
     return value === undefined ? undefined : (JSON.parse(JSON.stringify(value)) as unknown)
   },
+  treeCreationEntries: () => [],
   withHistorySuppressed: async (fn: () => Promise<void>) => fn()
 }))
 vi.mock('../panels/reveal', () => ({ revealInTree }))

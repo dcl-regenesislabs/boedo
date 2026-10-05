@@ -15,6 +15,7 @@ import { state, parentOf, buildForest } from '../state'
 import { computeWorldPositions } from '../world-pos'
 import { cameraFovY } from '../camera/camera-projection'
 import { liveWorldPos } from './gizmo'
+import { syncTextureCamera } from './texture-camera'
 
 // A render layer drawn only by the relations camera, composited over the world
 // (and under the gizmo) to draw parent/child links for the current selection.
@@ -88,11 +89,7 @@ function mirrorCamera(camT: { position: Vector3; rotation: Quaternion }): void {
   const g = Transform.getMutable(relCamera)
   g.position = { ...camT.position }
   g.rotation = { ...camT.rotation }
-  const fov = cameraFovY()
-  if (fov !== null) {
-    const tc = TextureCamera.getMutable(relCamera)
-    if (tc.mode?.$case === 'perspective') tc.mode.perspective.fieldOfView = fov
-  }
+  syncTextureCamera(relCamera, cameraFovY(), null)
 }
 
 // The colour + alpha for an edge from parent P to child C. The active endpoint's

@@ -2,7 +2,7 @@
 // chat column. Every way of leaving the open tab routes through `onLeaveTab`,
 // which owns the dirty-buffer / pending-diff guard.
 import type { ReactNode, RefObject } from 'react'
-import { AutoSaveChip } from '../../ds'
+import { AutoSaveChip, labelTip } from '../../ds'
 import { IconCode } from '../../icons'
 import { CodeEditor, type CodeEditorHandle } from '../../script/code-editor'
 import { baseName, isEditable } from '../../script/project-files'
@@ -38,8 +38,10 @@ export function StudioShell(props: {
   onOpenDoc: (path: string) => void
   onDirty: (dirty: boolean) => void
   onStatus: (text: string, kind: 'dim' | 'ok' | 'err') => void
-  onAsk: (s: CodeSelection) => void
+  // both absent when there is no assistant: the Studio is then only the code editor
+  onAsk?: (s: CodeSelection) => void
   chat: ReactNode
+  headActions?: ReactNode
 }): JSX.Element {
   const { file } = props
   return (
@@ -49,7 +51,12 @@ export function StudioShell(props: {
           <IconCode /> Script Studio
         </span>
         <span style={{ flex: 1 }} />
-        <button className="eui-studio-hbtn" onClick={() => props.onLeaveTab(leaveStudio)} data-tip="Back to the chat dock (Esc)">
+        {props.headActions}
+        <button
+          className="eui-studio-hbtn"
+          onClick={() => props.onLeaveTab(leaveStudio)}
+          {...labelTip(props.chat === null ? 'Back to the scene (Esc)' : 'Back to the chat dock (Esc)')}
+        >
           ⤡
         </button>
       </header>
@@ -74,7 +81,7 @@ export function StudioShell(props: {
               <FileCrumbs path={file} />
               {isEntryPoint(file) && <span className="eui-studio-entry" data-tip="The scene's entry point — it must keep a working main()">entry point</span>}
               <span style={{ flex: 1 }} />
-              {props.fileStatus.text !== '' && <AutoSaveChip state={props.fileStatus.kind}>{props.fileStatus.text}</AutoSaveChip>}
+              {props.fileStatus.text !== '' && <AutoSaveChip state={props.fileStatus.kind} role={props.fileStatus.kind === 'err' ? 'alert' : undefined}>{props.fileStatus.text}</AutoSaveChip>}
             </div>
           )}
           {file === null ? (
@@ -101,7 +108,7 @@ export function StudioShell(props: {
             <FilePreview key={file} path={file} />
           )}
         </div>
-        <div className="eui-studio-right">{props.chat}</div>
+        {props.chat !== null && <div className="eui-studio-right">{props.chat}</div>}
       </div>
     </aside>
   )

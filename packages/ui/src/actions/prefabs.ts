@@ -20,7 +20,7 @@ import {
   isRecord
 } from '../prefabs/format'
 import { instancesOf, sceneInstances } from '../prefabs/placement'
-import { instantiatePrefab } from '../prefabs/instantiate'
+import { instantiatePrefab, type InstantiateResult } from '../prefabs/instantiate'
 import { updatePrefabCopy } from '../prefabs/update'
 import { blockedBySdk } from '../prefabs/sdk-gate'
 import {
@@ -32,8 +32,8 @@ import {
   commitPrefabImport,
   copyLibraryPrefabIntoProject,
   deleteLibraryPrefab,
-  libraryAvailable,
-  savePrefabToLibrary
+  savePrefabToLibrary,
+  userLibraryState
 } from '../prefabs/library'
 import {
   announceCreated,
@@ -44,7 +44,13 @@ import {
   revealPrefab
 } from '../panels/prefab-store'
 import { flushPendingSave } from '../core/autosave'
-import { pushHistory, snapshotValue, withHistorySuppressed, type HistoryEntry } from '../core/history'
+import {
+  pushHistory,
+  snapshotValue,
+  treeCreationEntries,
+  withHistorySuppressed,
+  type HistoryEntry
+} from '../core/history'
 import { regenerateSpawnables } from '../prefabs/generate'
 import { log } from '../log'
 import { run } from './run'
@@ -67,9 +73,9 @@ export interface PrefabPlacement {
 }
 
 // Size and name overrides land as ordinary component writes on the placed root,
-// so they undo, autosave and mirror exactly like a gizmo drag or an inline
-// rename would. A prefab root is parented to 0, so its local scale IS its world
-// size — no conversion, unlike the position.
+// so they autosave and mirror like a gizmo drag; they undo with the placement.
+// A prefab root is parented to 0, so its local scale IS its world size — no
+// conversion, unlike the position.
 async function applyPlacement(rootId: string, placement: PrefabPlacement): Promise<void> {
   if (placement.scale !== undefined) {
     const transform = state.snapshot[rootId]?.[TRANSFORM_COMPONENT]
@@ -104,13 +110,19 @@ const placePrefab = async (
     const asked = placement?.position
     const drop =
       asked === undefined ? await dropPosition() : (rootLocalForWorld(state.snapshot, asked) ?? asked)
-    const placed = await instantiatePrefab(folder, drop)
+    let placed = null as InstantiateResult | null
+    await withHistorySuppressed(async () => {
+      placed = await instantiatePrefab(folder, drop)
+      const root = placed.rootId
+      if (root !== null && placement !== undefined) await applyPlacement(root, placement)
+      // Only for camera drops: an explicit position is the caller's (the assistant is
+      // instructed to set y so the volume reaches the ground — lifting again would
+      // double it).
+      if (root !== null && asked === undefined) await liftOntoGround(root)
+    })
+    if (placed === null) return null
     rootId = placed.rootId
-    if (rootId !== null && placement !== undefined) await applyPlacement(rootId, placement)
-    // Only for camera drops: an explicit position is the caller's (the assistant is
-    // instructed to set y so the volume reaches the ground — lifting again would
-    // double it).
-    if (rootId !== null && asked === undefined) await liftOntoGround(rootId)
+    if (rootId !== null) pushHistory(treeCreationEntries(rootId))
     focusPlaced()
     notes.push(...placed.warnings)
     if (placed.permissionsAdded.length > 0) {
@@ -192,8 +204,8 @@ export const uiCreatePrefabFromSelection = async (
     const notes = [`in ${created.folder}`, ...created.warnings]
     if (roots.length > 1) notes.push('the selection has several roots, so none was marked as an instance')
     // every prefab goes straight to the cross-scene library — a project deleted from
-    // the terminal must not take the only copy with it (web build: project-only)
-    if (libraryAvailable()) {
+    // the terminal must not take the only copy with it (signed out on the web: project-only)
+    if (userLibraryState() === 'on') {
       try {
         await savePrefabToLibrary(created.folder)
         await refreshLibrary()

@@ -8,6 +8,8 @@ import { sleep } from '../utils'
 import { stripAnimationHolds } from '../viewport/animation-hold'
 import { resetHidden, stripHidden } from '../viewport/hidden'
 import { invalidatePickLayer, stripPickColliders } from '../viewport/pick-layer'
+import { withWorldOrigin } from '../world-origin'
+import { sanitizeMaterial } from './material'
 import { directChildren } from './transform'
 
 // what the viewport actually renders from; the rest of a backup is editor-side
@@ -60,7 +62,7 @@ export async function pullSnapshot(): Promise<boolean> {
     // our own editor-only hide writes echo back in the snapshot; swap the
     // authored visibility in so nothing downstream mistakes the echo for truth
     stripHidden(snapshot)
-    state.snapshot = snapshot
+    state.snapshot = withWorldOrigin(snapshot)
     // and push what it put back to the ENGINE: the engine loaded main.composite
     // itself, so it is still rendering the projection — an inert anchor drawn
     // invisible, its colliders off. Only the render-side components are pushed;
@@ -268,6 +270,7 @@ export async function writeComponent(entityId: string, name: string, json: strin
     log.debug('refused component write carrying a folder token', entityId, name, json.slice(0, 200))
     return
   }
+  if (name === 'Material') json = sanitizeMaterial(json)
   const prevRaw = state.snapshot[entityId]?.[name]
   const prev = prevRaw === undefined ? undefined : (JSON.parse(JSON.stringify(prevRaw)) as unknown)
   applyLocalComponent(entityId, name, json)

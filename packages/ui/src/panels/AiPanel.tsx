@@ -10,23 +10,24 @@
 // Claude/Codex CLI (main process), which edits project files on disk — Scripts
 // under src/scripts/ and the scene's entry point src/index.ts; in Studio those
 // edits arrive as an accept/reject diff via the CodeEditor handle — nothing runs
-// in the scene until the creator accepts. Absent in a browser tab.
+// in the scene until the creator accepts. The web shell runs tools in the browser.
 import { useEffect, useRef, useState } from 'react'
-import type { AiEvent, AiImageAttachment, AiProvider, AiProviderInfo } from '@dcl-editor/contract'
-import { Button, Modal } from '../ds'
+import type { AiEvent, AiImageAttachment, AiProvider, AiProviderInfo, AiTranscript } from '@dcl-editor/contract'
+import { ASSISTANT_MAX_IMAGE_BYTES } from '@dcl-editor/contract'
+import { Button, labelTip, Modal } from '../ds'
 import { useStore } from '../core/store'
 import { state, entityLabel, type Snapshot } from '@scene/state'
 import { entityName } from '@scene/custom-components'
 import { type CodeEditorHandle } from '../script/code-editor'
-import { IconBot, IconChevron } from '../icons'
-import { aiStore, clearRevealLine, closeDoc, leaveStudio, openDoc, openStudio, refreshFileRail, setMode, setSelection, setStudioChordHandler, setStudioFile, toggleAssistantCollapsed, vendorRuntimeAfterTurn } from './ai-store'
+import { IconBot, IconChevron, IconNewChat } from '../icons'
+import { aiStore, canAskAssistant, clearRevealLine, closeDoc, leaveStudio, openDoc, openStudio, refreshFileRail, setMode, setSelection, setStudioChordHandler, setStudioFile, toggleAssistantCollapsed, vendorRuntimeAfterTurn } from './ai-store'
 import { uiSelectEntity } from '../actions/selection'
 import { QuickOpen } from '../features/ai/QuickOpen'
 import { StudioShell } from '../features/ai/StudioShell'
 import { Composer } from '../features/ai/Composer'
 import { AiEmpty, AiSetup, MessageList, type ChatMsg } from '../features/ai/transcript'
 import { type ToolUse } from '../features/ai/activity'
-import { friendlyError, MAX_ATTACH, readImages, sameFile } from '../features/ai/chat-helpers'
+import { friendlyError, keptTranscript, MAX_ATTACH, readImages, restoredTranscript, sameFile } from '../features/ai/chat-helpers'
 import { baseName } from '../script/project-files'
 import { attachScript } from '../script/attach'
 import { attachablePath } from '../script/template'
@@ -51,11 +52,22 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
   const [provider, setProvider] = useState<AiProvider>('claude')
   const [model, setModel] = useState('default')
   const [messages, setMessages] = useState<ChatMsg[]>([])
+  // the kept chat of an earlier session: shown, never sent back as context
+  const [history, setHistory] = useState<ChatMsg[]>([])
+  const kept = useRef<AiTranscript | null>(null)
+  const owner = useStore(() => shell?.aiTranscript?.()?.owner ?? null)
+  const lastOwner = useRef(owner)
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<AiImageAttachment[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
   const addImages = (files: Iterable<File>): void => {
-    void readImages(files, MAX_ATTACH - attachments.length).then(
+    const picked = [...files]
+    const hosted = current?.transport === 'service'
+    if (hosted && picked.some((f) => f.size > ASSISTANT_MAX_IMAGE_BYTES)) {
+      setErrorDetail('Use images of at most 2 MB each.')
+      return
+    }
+    void readImages(picked, MAX_ATTACH - attachments.length, hosted ? ASSISTANT_MAX_IMAGE_BYTES : undefined).then(
       (imgs) => imgs.length > 0 && setAttachments((prev) => [...prev, ...imgs].slice(0, MAX_ATTACH))
     )
   }
@@ -80,6 +92,9 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
   useStore(() => state.snapshot)
   const entities = selectedEntities()
   const current = providers.find((p) => p.id === provider)
+  // the hosted tools attach a new script as it is written; only the desktop CLI attaches at turn end
+  const attachAtTurnEnd = useRef(true)
+  attachAtTurnEnd.current = current?.transport !== 'service'
   const available = current?.available ?? false
   const anyAvailable = providers.some((p) => p.available)
 
@@ -123,15 +138,18 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
       if (target !== null && rest.length > 0) await autoAttach(turnId, target, rest)
     }
 
-    shell.onAiEvent((e: AiEvent) => {
+    return shell.onAiEvent((e: AiEvent) => {
       if (e.kind === 'started') activeTurn.current = e.turnId
       else if (e.turnId !== activeTurn.current) return
+      if (e.kind === 'tool' && e.tool === 'AttachScript') {
+        createdScripts.current = createdScripts.current.filter((path) => path !== e.detail)
+      }
       if (e.kind === 'tool' && (e.tool === 'Edit' || e.tool === 'Write')) {
         if (aiStore.file !== null && sameFile(e.detail, aiStore.file)) openFileTouched.current = true
         if (e.tool === 'Write') {
           refreshFileRail()
           const p = attachablePath(e.detail)
-          if (p !== null && !createdScripts.current.includes(p)) createdScripts.current.push(p)
+          if (p !== null && attachAtTurnEnd.current && !createdScripts.current.includes(p)) createdScripts.current.push(p)
         }
       }
       setMessages((prev) => {
@@ -153,7 +171,7 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
         if (e.kind === 'started') next[i] = { ...msg, turnId: e.turnId }
         else if (e.kind === 'text') next[i] = { ...msg, turnId: e.turnId, text: msg.text + e.text }
         else if (e.kind === 'tool') next[i] = { ...msg, turnId: e.turnId, tools: [...msg.tools, { tool: e.tool, detail: e.detail }] }
-        else if (e.kind === 'error') next[i] = { ...msg, error: e.message }
+        else if (e.kind === 'error') next[i] = e.resumable === true ? { ...msg, paused: e.message } : { ...msg, error: e.message }
         else if (e.kind === 'done') next[i] = { ...msg, done: true }
         return next
       })
@@ -188,8 +206,36 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
   }, [])
 
   useEffect(() => {
+    kept.current = null
+    setHistory([])
+    // another wallet signed in: what is on screen is not theirs
+    if (lastOwner.current !== owner) setMessages([])
+    lastOwner.current = owner
+    const handle = shell?.aiTranscript?.()
+    if (handle == null || handle.owner !== owner) return
+    let live = true
+    handle.load().then(
+      (value) => {
+        if (!live) return
+        setHistory(restoredTranscript(value))
+        kept.current = handle
+      },
+      (error: unknown) => console.warn('could not restore the assistant chat:', error)
+    )
+    return () => {
+      live = false
+    }
+  }, [owner])
+
+  useEffect(() => {
+    const handle = kept.current
+    if (busy || handle === null) return
+    handle.save(keptTranscript([...history, ...messages])).catch((error: unknown) => console.warn('could not keep the assistant chat:', error))
+  }, [history, messages, busy])
+
+  useEffect(() => {
     if (scrollRef.current !== null) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [messages, visible, mode])
+  }, [messages, history, visible, mode])
 
   useEffect(() => {
     if (!visible) return
@@ -354,7 +400,9 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
     return () => setStudioChordHandler(null)
   }, [mode])
 
-  if (shell?.aiSend === undefined) return null
+  // with no assistant there is no dock; the Studio is still the code editor
+  const assistant = useStore(canAskAssistant)
+  if (shell === undefined || (!assistant && mode !== 'studio')) return null
 
   const scriptFiles = entityScriptFiles() // scripts on the selected entity → Studio entry from the dock
 
@@ -380,13 +428,14 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
       .finally(() => setRechecking(false))
   }
 
-  const send = (text: string): void => {
+  // resuming keeps the composer and the original ask, so a later Retry resends that, not "Continue"
+  const send = (text: string, resuming = false): void => {
     const t = text.trim()
     if ((t === '' && attachments.length === 0) || busy || !available) return
     const asked = t === '' ? 'Look at the attached image.' : t
-    lastPrompt.current = asked
+    if (!resuming) lastPrompt.current = asked
     const sel = aiStore.selection
-    const imgs = attachments
+    const imgs = resuming ? [] : attachments
     const run = (): void => {
       openFileTouched.current = false
       attachTarget.current = state.activeEntity
@@ -397,8 +446,10 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
         { role: 'user', text: asked, images: imgs.length > 0 ? imgs.map((i) => i.dataUrl) : undefined },
         { role: 'assistant', text: '', tools: [], done: false }
       ])
-      setInput('')
-      setAttachments([])
+      if (!resuming) {
+        setInput('')
+        setAttachments([])
+      }
       setBusy(true)
       void shell.aiSend?.({ provider, model, text: asked, context: buildContext(sel, aiStore.file), images: imgs.length > 0 ? imgs : undefined }).catch((err: unknown) => {
         setMessages((prev) => {
@@ -434,6 +485,15 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
   const retry = (): void => {
     if (lastPrompt.current !== null) send(lastPrompt.current)
   }
+  const resume = (): void => {
+    if (shell.aiCanResume?.() === true) {
+      send('Continue where you left off.', true)
+      return
+    }
+    if (lastPrompt.current === null) return
+    setMessages((prev) => [...prev, { role: 'note', text: 'The paused conversation was lost, so this starts your request over' }])
+    send(lastPrompt.current)
+  }
   const stop = (): void => {
     void shell.aiStop?.()
     activeTurn.current = null
@@ -448,7 +508,11 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
     activeTurn.current = null
     setMessages([])
     setBusy(false)
-    if (kind !== 'new') {
+    editorRef.current?.freeze(false)
+    if (kind === 'new') setHistory([])
+    else {
+      // a kept chat stays as history: the new provider never saw it
+      if (kept.current !== null) setHistory((prev) => keptTranscript([...prev, ...messages]))
       const p = providers.find((x) => x.id === kind)
       setProvider(kind)
       if (p !== undefined) setModel(p.defaultModel)
@@ -462,13 +526,34 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
     } else doWipe(id)
   }
 
+  // a running turn is stopped by doWipe, so clearing never waits on it
+  const newChat = (
+    <button
+      className="eui-ai-headbtn icon eui-ai-newchat"
+      disabled={messages.length === 0 && history.length === 0}
+      onClick={() => setConfirmWipe({ kind: 'new', label: 'Start a new chat? This clears the conversation for this scene.' })}
+      {...labelTip('New chat')}
+    >
+      <IconNewChat />
+    </button>
+  )
+
   // The conversation column (messages + composer) — identical in both modes.
   const chat = (
     <div className="eui-ai-chat">
       <div className="eui-ai-body" ref={scrollRef}>
         {!available && <AiSetup providers={providers} current={current} anyAvailable={anyAvailable} onRecheck={recheck} rechecking={rechecking} />}
-        {available && messages.length === 0 && <AiEmpty current={current} studio={mode === 'studio'} onExample={send} />}
-        <MessageList messages={messages} onRetry={retry} onShowDetail={setErrorDetail} />
+        {available && messages.length === 0 && history.length === 0 && <AiEmpty current={current} studio={mode === 'studio'} onExample={send} />}
+        {history.length > 0 && (
+          <>
+            <div className="eui-ai-note">Earlier conversation — the assistant doesn’t remember it</div>
+            <div className="eui-ai-earlier">
+              <MessageList messages={history} hosted={current?.transport === 'service'} onShowDetail={setErrorDetail} />
+            </div>
+            {messages.length > 0 && <div className="eui-ai-note">New conversation</div>}
+          </>
+        )}
+        <MessageList messages={messages} hosted={current?.transport === 'service'} onRetry={retry} onContinue={resume} onShowDetail={setErrorDetail} />
       </div>
       <Composer
         available={available}
@@ -515,7 +600,7 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
           </>
         }
       >
-        <div className="eui-ai-modal-hint">{friendlyError(errorDetail)}</div>
+        <div className="eui-ai-modal-hint">{friendlyError(errorDetail, current?.transport === 'service')}</div>
         <pre className="eui-ai-errpre">{errorDetail}</pre>
       </Modal>
     ) : null
@@ -536,11 +621,16 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
           onOpenDoc={openDoc}
           onDirty={setDirty}
           onStatus={(text, kind) => setFileStatus({ text, kind })}
-          onAsk={(s) => {
-            setSelection(s)
-            inputRef.current?.focus()
-          }}
-          chat={chat}
+          onAsk={
+            assistant
+              ? (s) => {
+                  setSelection(s)
+                  inputRef.current?.focus()
+                }
+              : undefined
+          }
+          chat={assistant ? chat : null}
+          headActions={assistant ? newChat : null}
         />
       </>
     )
@@ -566,6 +656,7 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
           <IconBot /> Assistant
         </span>
         <span style={{ flex: 1 }} />
+        {!collapsed && newChat}
         {!collapsed && (
           <button
             className="eui-ai-headbtn eui-ai-studiobtn"

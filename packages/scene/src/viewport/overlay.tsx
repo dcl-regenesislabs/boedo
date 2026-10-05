@@ -3,13 +3,12 @@ import {
   engine,
   inputSystem,
   InputAction,
-  PointerEventType,
-  PrimaryPointerInfo
+  PointerEventType
 } from '@dcl/sdk/ecs'
 import { Color4 } from '@dcl/sdk/math'
 import { state, applyBoxSelection } from '../state'
 import { computeWorldPositions, shouldMark } from '../world-pos'
-import { projectWorldToScreen } from '../camera/camera-projection'
+import { pointerCanvasPx, projectWorldToScreen } from '../camera/camera-projection'
 import { liveWorldPos, gizmoCameraEntity } from './gizmo'
 import { pickAtPointer } from './click-select'
 import { relationsCameraEntity } from './relations'
@@ -29,10 +28,7 @@ function clickModifiers(): { shift: boolean; ctrl: boolean } {
   }
 }
 
-function pointerXY(): { x: number; y: number } | null {
-  const p = PrimaryPointerInfo.getOrNull(engine.RootEntity)?.screenCoordinates
-  return p === undefined ? null : { x: p.x, y: p.y }
-}
+const pointerXY = pointerCanvasPx
 
 // Commit the drag-box and clear it. Idempotent (no-op once cleared).
 function finishBox(): void {

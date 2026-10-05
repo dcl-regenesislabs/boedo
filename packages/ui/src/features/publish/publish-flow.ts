@@ -8,13 +8,18 @@
 // building:  main is installing deps / building / hashing (until linker `ready`)
 // uploading: we signed the entity and POSTed — the linker uploads to the server
 //
+// A shell with no CLI (the web target) publishes by itself: `publishScene` builds,
+// has the hosting page confirm and sign, and uploads. The pre-flight is the same;
+// only the spawn differs, and it only ever adds to a world.
+//
 // Everything that could replace someone's work is decided BEFORE the spawn.
 // Once the CLI runs, the only lever it has left is a stdin prompt nobody can
 // answer (that is the incident publish-classify documents), so a question asked
 // after the spawn is a question that never gets asked at all.
 import { useSyncExternalStore } from 'react'
 import { Authenticator } from '@dcl/crypto'
-import { getAccount, getIdentity, hasValidIdentity } from '../account/auth'
+import type { EditorShell } from '@dcl-editor/contract'
+import { canSign, getAccount, getIdentity } from '../account/auth'
 import { chainId, jumpInUrl, worldsServer } from '../worlds/endpoints'
 import { fetchWorldScenes } from '../worlds/inventory'
 import { refreshWorlds, worldSceneCount } from '../worlds/worlds-store'
@@ -80,6 +85,8 @@ export interface PublishState {
   total: number | null // scenes the world holds AFTER this publish; null = we can't say
   review: PublishReview | null
   blocked: PublishBlock | null
+  signing: boolean // the hosting page is asking the creator to confirm the publish
+  retry: boolean // publishing the same scene again could work
 }
 
 const IDLE: PublishState = {
@@ -92,7 +99,9 @@ const IDLE: PublishState = {
   at: null,
   total: null,
   review: null,
-  blocked: null
+  blocked: null,
+  signing: false,
+  retry: true
 }
 let publishStore: PublishState = IDLE
 const publishListeners = new Set<() => void>()
@@ -250,12 +259,13 @@ async function preflight(a: number, dir: string, world: string): Promise<void> {
 // update and someone else's scene disappearing.
 export function startPublish(dir: string, world: string): void {
   const shell = window.editorShell
-  if (shell?.publishStart === undefined || shell.onPublishEvent === undefined || shell.setWorldName === undefined) {
+  const viaCli = shell?.publishStart !== undefined && shell.onPublishEvent !== undefined && shell.setWorldName !== undefined
+  if (!viaCli && shell?.publishScene === undefined) {
     setPublishStore({ ...IDLE, phase: 'error', error: NEEDS_DESKTOP, dir, world })
     return
   }
   if (publishStore.phase === 'checking' || publishStore.phase === 'building' || publishStore.phase === 'uploading') return
-  if (!hasValidIdentity()) {
+  if (!canSign()) {
     setPublishStore({ ...IDLE, phase: 'error', error: SIGN_IN_TO_PUBLISH, dir, world })
     return
   }
@@ -387,10 +397,44 @@ async function driveLinker(port: number): Promise<string> {
   return info.rootCID
 }
 
+// The shell does the whole job and answers once. A publish declined in the
+// hosting page's own dialog is not a failure: it goes back to the picker.
+function publishInPage(p: Preflight, publishScene: NonNullable<EditorShell['publishScene']>): void {
+  const token: JobToken = { id: null, alive: true }
+  jobToken = token
+  setPublishStore({ ...IDLE, phase: 'building', dir: p.dir, world: p.world, at: p.base })
+  publishScene(p.dir, p.world, (progress) => {
+    if (!token.alive) return
+    const logs = progress.line === undefined ? publishStore.logs : [...publishStore.logs, progress.line].slice(-LOG_CAP)
+    setPublishStore({ phase: progress.step === 'building' ? 'building' : 'uploading', signing: progress.step === 'signing', logs })
+  })
+    .then((result) => {
+      if (!token.alive) return
+      if (result.ok) {
+        rememberPublishedEntity(p.dir, p.world, result.published.entityId)
+        finishPublish({ phase: 'success', jumpIn: result.published.url, total: p.total, signing: false })
+        refreshWorlds()
+      } else if (result.reason === 'cancelled') {
+        finishPublish({ ...IDLE })
+      } else {
+        const error = result.reason === 'not-signed-in' ? SIGN_IN_TO_PUBLISH : result.message
+        finishPublish({ phase: 'error', error, signing: false, retry: result.retryable })
+      }
+    })
+    .catch((err: unknown) => {
+      if (!token.alive) return
+      finishPublish({ phase: 'error', error: err instanceof Error ? err.message : String(err), signing: false })
+    })
+}
+
 function spawn(a: number): void {
   if (!live(a)) return
   const p = pending
   const shell = window.editorShell
+  if (p !== null && shell?.publishStart === undefined && shell?.publishScene !== undefined) {
+    publishInPage(p, shell.publishScene)
+    return
+  }
   const publishStartShell = shell?.publishStart
   const setWorldName = shell?.setWorldName
   if (p === null || shell === undefined || publishStartShell === undefined || shell.onPublishEvent === undefined || setWorldName === undefined) {
@@ -407,7 +451,9 @@ function spawn(a: number): void {
     error: null,
     jumpIn: null,
     review: null,
-    blocked: null
+    blocked: null,
+    signing: false,
+    retry: true
   })
   let uploading = false
   let sawPrompt = false
@@ -461,7 +507,7 @@ function spawn(a: number): void {
 export function cancelPublish(): void {
   abandon()
   void window.editorShell?.publishStop?.()
-  finishPublish({ phase: 'idle', error: null, jumpIn: null, review: null, blocked: null })
+  finishPublish({ phase: 'idle', error: null, jumpIn: null, review: null, blocked: null, signing: false })
 }
 
 // clear a finished (success/error/blocked) publish so the modal returns to the picker
@@ -470,6 +516,16 @@ export function resetPublish(): void {
   abandon()
   finishPublish({ ...IDLE })
 }
+
+// open Publish modals: with none showing the job, its outcome is said elsewhere
+let watching = 0
+export function watchPublish(): () => void {
+  watching++
+  return () => {
+    watching--
+  }
+}
+export const publishWatched = (): boolean => watching > 0
 
 export function usePublish(): PublishState {
   return useSyncExternalStore(

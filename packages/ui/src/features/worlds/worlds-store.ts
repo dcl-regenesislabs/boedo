@@ -1,6 +1,6 @@
 // Worlds store (module singleton, like the account feature's auth.ts).
 import { useSyncExternalStore } from 'react'
-import { getAccount, hasValidIdentity } from '../account/auth'
+import { canSign, getAccount } from '../account/auth'
 import {
   fetchContributable,
   fetchOwnedNames,
@@ -26,6 +26,18 @@ function setWorldsStore(patch: Partial<WorldsState>): void {
   for (const l of worldsListeners) l()
 }
 
+// The wallet's own NAMEs, and the worlds of others it may publish to. A shell
+// that publishes by itself knows both without a signed request.
+async function inventory(wallet: string): Promise<[string[], Array<{ name: string; size: number | null }>]> {
+  const listed = window.editorShell?.publishWorlds
+  if (listed === undefined) return Promise.all([fetchOwnedNames(wallet), fetchContributable().catch(() => [])])
+  const worlds = await listed()
+  return [
+    worlds.filter((world) => world.role === 'owner').map((world) => world.name),
+    worlds.filter((world) => world.role === 'collaborator').map((world) => ({ name: world.name, size: null }))
+  ]
+}
+
 let refreshing = false
 let worldsWallet: string | null = null // whose worlds the store holds
 
@@ -42,7 +54,7 @@ const unread = (): Awaited<ReturnType<typeof fetchWorldScenes>> => ({
 // when the store is empty or belongs to another wallet. refreshWorlds() is the
 // explicit "Refresh" action; this one is idempotent.
 export function ensureWorlds(): void {
-  const wallet = hasValidIdentity() ? getAccount() : null
+  const wallet = canSign() ? getAccount() : null
   if (wallet === null) {
     if (worldsWallet !== null || worldsStore.status !== 'idle') {
       worldsWallet = null
@@ -55,7 +67,7 @@ export function ensureWorlds(): void {
 
 export function refreshWorlds(): void {
   const wallet = getAccount()
-  if (wallet === null || !hasValidIdentity()) {
+  if (wallet === null || !canSign()) {
     worldsWallet = null
     setWorldsStore({ worlds: [], status: 'idle', error: null })
     return
@@ -67,10 +79,7 @@ export function refreshWorlds(): void {
   setWorldsStore({ status: 'loading', error: null })
   void (async () => {
     try {
-      const [owned, contributable] = await Promise.all([
-        fetchOwnedNames(wallet),
-        fetchContributable().catch(() => [])
-      ])
+      const [owned, contributable] = await inventory(wallet)
       const byName = new Map<string, WorldEntry>()
       // A factory, not a shared literal: `scenes` is the one mutable field, and
       // spreading a single object would alias one array across every world.

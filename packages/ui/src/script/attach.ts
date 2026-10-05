@@ -8,7 +8,7 @@ import { SCRIPT_COMPONENT } from '@scene/allowed-components'
 import { componentKey, state } from '@scene/state'
 import { uiAddComponent, uiSetComponentValue } from '../actions/components'
 import { dataLayerReadFile } from '../engine/datalayer'
-import { freshLayout } from './parser'
+import { freshLayout, mergeLayout, parseLayout, type ScriptLayout } from './parser'
 
 export type ScriptItem = { path: string; priority: number; layout?: string }
 
@@ -24,12 +24,12 @@ export function hasScript(entityId: string, path: string): boolean {
 
 // Append `path` to the entity's script list. No-op when it's already there.
 // Returns whether an attachment happened.
-export async function attachScript(entityId: string, path: string): Promise<boolean> {
+export async function attachScript(entityId: string, path: string, content?: string): Promise<boolean> {
   if (state.snapshot[entityId] === undefined || hasScript(entityId, path)) return false
 
   let layout: string | undefined
   try {
-    layout = freshLayout(await dataLayerReadFile(path))
+    layout = freshLayout(content ?? (await dataLayerReadFile(path)))
   } catch {
     // No data layer, or the file vanished between the write and here — attach
     // anyway; the inspector's ↻ re-parses params on demand.
@@ -48,4 +48,16 @@ export async function attachScript(entityId: string, path: string): Promise<bool
     JSON.stringify({ value: next })
   )
   return true
+}
+
+// Re-read an attached script's params from its new source, keeping the values already set.
+export async function refreshScriptLayout(entityId: string, path: string, content: string): Promise<void> {
+  const items = scriptItems(entityId)
+  if (!items.some((it) => it.path === path)) return
+  const fresh = JSON.parse(freshLayout(content)) as ScriptLayout
+  const next = items.map((it) =>
+    it.path === path ? { ...it, layout: JSON.stringify(mergeLayout(fresh, parseLayout(it.layout) ?? { params: {} })) } : it
+  )
+  if (next.every((it, i) => it.layout === items[i].layout)) return
+  await uiSetComponentValue(componentKey(entityId, SCRIPT_COMPONENT), entityId, SCRIPT_COMPONENT, JSON.stringify({ value: next }))
 }

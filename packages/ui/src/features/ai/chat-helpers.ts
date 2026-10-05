@@ -1,11 +1,13 @@
 // Copy and small pure helpers for the chat surface.
+import { object } from '@dcl-editor/contract'
 import type { AiImageAttachment, AiProvider } from '@dcl-editor/contract'
+import type { ChatMsg } from './transcript'
 
 export const MAX_ATTACH = 4
 const MAX_ATTACH_BYTES = 8 * 1024 * 1024
 
-export function readImages(files: Iterable<File>, room: number): Promise<AiImageAttachment[]> {
-  const picked = [...files].filter((f) => f.type.startsWith('image/') && f.size > 0 && f.size <= MAX_ATTACH_BYTES).slice(0, room)
+export function readImages(files: Iterable<File>, room: number, maxBytes = MAX_ATTACH_BYTES): Promise<AiImageAttachment[]> {
+  const picked = [...files].filter((f) => f.type.startsWith('image/') && f.size > 0 && f.size <= maxBytes).slice(0, room)
   return Promise.all(
     picked.map(
       (f) =>
@@ -39,7 +41,8 @@ export const SETUP: Record<AiProvider, { install: string; signIn: string }> = {
 }
 
 // The CLI's own error text is for developers; creators get the next action.
-export function friendlyError(raw: string): string {
+export function friendlyError(raw: string, hosted = false): string {
+  if (hosted) return raw
   const s = raw.toLowerCase()
   if (s.includes('not found') || s.includes('enoent')) return "The assistant's CLI isn't installed or on PATH."
   if (s.includes('logged in') || s.includes('login') || s.includes('unauthorized') || s.includes('401'))
@@ -62,4 +65,42 @@ export function sameFile(reported: string, open: string): boolean {
   const a = reported.replace(/\\/g, '/').replace(/^\.\//, '')
   const b = open.replace(/^\.\//, '')
   return a === b || a.endsWith(`/${b}`)
+}
+
+const KEPT_MESSAGES = 100
+const KEPT_BYTES = 256 * 1024
+
+// What a chat keeps across reloads: finished text and tool chips, no images, at most ~256 KB.
+export function keptTranscript(messages: ChatMsg[]): ChatMsg[] {
+  const kept: ChatMsg[] = []
+  for (const m of messages) {
+    if (m.role === 'user') kept.push({ role: 'user', text: m.text })
+    else if (m.role === 'assistant' && m.done) {
+      kept.push({ role: 'assistant', text: m.text, tools: m.tools, done: true, ...(m.error === undefined ? {} : { error: m.error }) })
+    }
+  }
+  let out = kept.slice(-KEPT_MESSAGES)
+  while (out.length > 0 && JSON.stringify(out).length > KEPT_BYTES) out = out.slice(1)
+  return out
+}
+
+function isText(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= KEPT_BYTES
+}
+
+// Stored data is only trusted once it reads back as plain chat rows.
+export function restoredTranscript(value: unknown): ChatMsg[] {
+  if (!Array.isArray(value)) return []
+  const out: ChatMsg[] = []
+  for (const row of value.slice(-KEPT_MESSAGES) as unknown[]) {
+    if (!object(row) || !isText(row.text)) continue
+    if (row.role === 'user') out.push({ role: 'user', text: row.text })
+    else if (row.role === 'assistant' && Array.isArray(row.tools)) {
+      const tools = (row.tools as unknown[]).flatMap((t) =>
+        object(t) && isText(t.tool) && isText(t.detail) ? [{ tool: t.tool, detail: t.detail }] : []
+      )
+      out.push({ role: 'assistant', text: row.text, tools, done: true, ...(isText(row.error) ? { error: row.error } : {}) })
+    }
+  }
+  return out
 }

@@ -9,6 +9,7 @@ import { createRpcClient } from '@dcl/rpc'
 import { WebSocketTransport } from '@dcl/rpc/dist/transports/WebSocket'
 import { loadService } from '@dcl/rpc/dist/codegen'
 import { Writer, Reader } from 'protobufjs/minimal'
+import { isHosted } from './hosted'
 
 type SaveFileRequest = { path: string; content: Uint8Array }
 
@@ -223,7 +224,7 @@ const DataServiceLite = {
   }
 } as const
 
-type DataLayerClient = {
+export type DataLayerClient = {
   saveFile: (req: SaveFileRequest) => Promise<unknown>
   getFile: (req: GetFileRequest) => Promise<GetFileResponse>
   removeFiles: (req: RemoveFilesRequest) => Promise<RemoveFilesResponse>
@@ -232,6 +233,14 @@ type DataLayerClient = {
 
 let clientPromise: Promise<DataLayerClient> | null = null
 let availableFlag: boolean | null = null // null = not probed yet
+
+// Hosted mode has no dev server to dial: the project store is handed in.
+let provided: DataLayerClient | null = null
+export function setDataLayerClient(client: DataLayerClient | null): void {
+  provided = client
+  availableFlag = null
+  clientPromise = null
+}
 
 // In-world the page URL carries ?realm; in the electron host it does NOT (the
 // host is editor-app.html?project=…, the realm arrives via servers-ready), so
@@ -279,6 +288,8 @@ async function connect(): Promise<DataLayerClient> {
 }
 
 function getClient(): Promise<DataLayerClient> {
+  if (provided !== null) return Promise.resolve(provided)
+  if (isHosted()) return Promise.reject(new Error('no project store'))
   if (clientPromise === null) clientPromise = connect()
   return clientPromise
 }

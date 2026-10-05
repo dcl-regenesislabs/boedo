@@ -1,0 +1,11 @@
+.eui-sync-lead { margin: 0 0 var(--space-4); color: var(--text-2); font-size: var(--fs-md); line-height: 1.5; }
+.eui-sync-choices { display: flex; flex-direction: column; gap: var(--space-3); }
+.eui-sync-choice { display: grid; grid-template-columns: 240px 1fr; align-items: center; gap: var(--space-4); color: var(--text-2); font-size: var(--fs-sm); line-height: 1.45; }
+.eui-sync-error { margin: var(--space-4) 0 0; color: var(--error); font-size: var(--fs-sm); }
+.eui-import-list { margin: var(--space-3) 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); color: var(--text-2); font-size: var(--fs-sm); line-height: 1.45; }
+.eui-import-list li::before { content: '⚠ '; color: var(--warning); }
+.eui-import-lead { margin: 0; font-size: var(--fs-md); line-height: 1.5; }
+.eui-import-lead + .eui-import-lead { margin-top: var(--space-2); color: var(--text-2); }
+.eui-import-packages { margin: var(--space-2) 0 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--text-2); }
+.eui-import-packages[data-state='ready'] { color: var(--success); }
+.eui-import-packages[data-state='error'] { color: var(--error-text); }

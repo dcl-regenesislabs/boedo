@@ -9,6 +9,7 @@
 // drags, and answer system-api rpcs (login, liveSceneInfo) the page can't make
 // itself.
 import { engine } from '@dcl/sdk/ecs'
+import { movePlayerTo } from '~system/RestrictedActions'
 import { BevyApi } from './bevy-api'
 import { log, setSceneDebug } from './log'
 import { state, setActiveAction, topLevelSelected, setSelectionAndActive, type SpawnPointSpec } from './state'
@@ -19,14 +20,17 @@ import {
   applyExternalComponentDelete,
   applyExternalEntityDelete
 } from './inspector'
-import { setCamMode, orientToAxis, frameEntityOnce, adjustFlySpeed, cameraDropLocal } from './camera/free-cam'
-import { endGizmoDrag } from './viewport/gizmo'
+import { setCamMode, orientToAxis, frameEntityOnce, frameEntitiesOnce, adjustFlySpeed, cameraDropLocal } from './camera/free-cam'
+import { setPointerSpace } from './camera/camera-projection'
+import { endGizmoDrag, gizmoDebugReport } from './viewport/gizmo'
 import { forceCursorUnlock } from './system-actions'
 import { pickApplied, synthesized } from './viewport/pick-layer'
 import { resetAnimationHold } from './viewport/animation-hold'
 import { pickAtPointer } from './viewport/click-select'
 import { resetHidden } from './viewport/hidden'
 import { EDITOR_BUS_CHANNEL, type BusEnvelope } from './editor-channel'
+import { isHosted } from './hosted'
+import { setSceneBaseCorner, withWorldOrigin } from './world-origin'
 import { trace, replayTrace } from './boot-trace'
 import {
   type PageToSceneMessage,
@@ -64,10 +68,18 @@ const RPC_METHODS = new Set([
   'setSetting'
 ])
 
+// the session and the engine settings: the host's when hosted, so not the page's to call
+const HOST_OWNED_RPC = new Set(['getPreviousLogin', 'loginPrevious', 'loginGuest', 'setSetting'])
+
 // scene-local rpc methods (computed here, not on BevyApi) — e.g. the camera-aware
 // drop point for imports, which needs the live engine.CameraEntity transform.
 const LOCAL_RPC: Record<string, (...args: unknown[]) => unknown> = {
-  cameraDrop: () => cameraDropLocal()
+  cameraDrop: () => cameraDropLocal(),
+  gizmoDebug: () => gizmoDebugReport(),
+  // world position: this scene's base parcel is 0,0, so relative to it is the same
+  movePlayerTo: async (x, y, z) => {
+    await movePlayerTo({ newRelativePosition: { x: Number(x), y: Number(y), z: Number(z) } })
+  }
 }
 
 let readyAnnounced = false
@@ -80,7 +92,8 @@ let lastDragSig = ''
 export function startPageUiBridge(): void {
   // ?editorDebug turns on the scene's debug logging (per-frame picking,
   // highlight, bus-poll traces) — off by default to keep runs quiet.
-  BevyApi.getParams()
+  // An engine without getParams (a host page's may be newer) answers undefined.
+  Promise.resolve(BevyApi.getParams())
     .then((params) => {
       if (params !== null && typeof params === 'object') {
         if ('editorDebug' in params) setSceneDebug(true)
@@ -123,6 +136,11 @@ async function handle(msg: PageToSceneMessage): Promise<void> {
       // The page attaches its listener after our first steps have already run,
       // and BroadcastChannel doesn't buffer — so hand it the whole trace.
       replayTrace()
+      if (msg.baseCorner !== undefined) {
+        setSceneBaseCorner(msg.baseCorner)
+        // a snapshot pulled before the page said where the scene sits
+        if (state.status === 'ready' && !('5' in state.snapshot)) state.snapshot = withWorldOrigin({ ...state.snapshot })
+      }
       break
     case 'set-tool':
       setActiveAction(msg.tool)
@@ -158,6 +176,9 @@ async function handle(msg: PageToSceneMessage): Promise<void> {
       // Focus never enters orbit mode now — see frameEntityOnce. Orbit is still
       // reachable, but only by asking for it (the camera menu's Target mode).
       frameEntityOnce(msg.entity)
+      break
+    case 'frame':
+      frameEntitiesOnce(msg.entities)
       break
     case 'refresh':
       // a frozen scene's /crdt_snapshot is stale (pre-freeze) — refetching would
@@ -206,6 +227,9 @@ async function handle(msg: PageToSceneMessage): Promise<void> {
     case 'rpc':
       await handleRpc(msg)
       break
+    case 'pointer-space':
+      setPointerSpace(msg)
+      break
   }
 }
 
@@ -218,6 +242,8 @@ async function handleRpc(msg: {
   const local = LOCAL_RPC[msg.method]
   if (local === undefined && !RPC_METHODS.has(msg.method)) {
     reply = { type: 'rpc-reply', id: msg.id, ok: false, error: `unknown rpc ${msg.method}` }
+  } else if (isHosted() && HOST_OWNED_RPC.has(msg.method)) {
+    reply = { type: 'rpc-reply', id: msg.id, ok: false, error: `rpc ${msg.method} belongs to the host` }
   } else {
     try {
       const fn =

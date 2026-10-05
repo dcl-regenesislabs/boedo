@@ -6,6 +6,7 @@
 // and clear again when a fixed build lands (the dev server rebuilds + the
 // engine hot-reloads on save, so recovery needs no user action).
 import { useSyncExternalStore } from 'react'
+import type { EditorShell, SceneBuildDiagnostic, SceneBuildEvent } from '@dcl-editor/contract'
 
 export interface SceneHealth {
   kind: 'build' | 'runtime'
@@ -158,6 +159,48 @@ export function resetForTest(): void {
   compositeUnbuilt = false
 }
 
+function startSession(): void {
+  pending = []
+  building = false
+  // the build/reload latches describe the PREVIOUS project's scene — carrying
+  // them over makes the next project's first Play reload, or stall waiting for
+  // a rebuild that belonged to a scene that is no longer open
+  sceneStale = false
+  compositeUnbuilt = false
+  if (health !== null) set(null)
+}
+
+// In the shape parseLine and errorLocation read an esbuild error in.
+function diagnosticLine(d: SceneBuildDiagnostic): string {
+  return d.file === undefined ? d.message : `${d.file}:${d.line ?? 1}:${d.column ?? 0}: ERROR: ${d.message}`
+}
+
+// The same facts parseLine reads out of a dev server's output, from a shell
+// that builds the scene itself and reports it as data.
+export function applyBuildEvent(event: SceneBuildEvent): void {
+  switch (event.type) {
+    case 'sessionStarted':
+      startSession()
+      return
+    case 'buildStarted':
+      pending = []
+      building = true
+      compositeUnbuilt = false
+      if (event.changed.some((path) => !path.endsWith('.composite'))) noteSceneStale()
+      return
+    case 'diagnostics':
+      for (const d of event.diagnostics) if (d.severity === 'error') pending.push(diagnosticLine(d))
+      return
+    case 'bundleSaved':
+      building = false
+      if (health?.kind === 'build') set(null)
+      return
+    case 'failed':
+      building = false
+      setBuild(pending.length > 0 ? pending.slice(-8) : [event.message])
+  }
+}
+
 // A relayed chunk can hold several lines (pipe buffering — especially on
 // Windows); parse them individually so a reset marker sharing a chunk with a
 // summary can't swallow it.
@@ -177,14 +220,7 @@ export function parseLine(raw: string): void {
   // switches, so without this a crash in one scene haunted the next scene's
   // loading screen through the seeded backlog.
   if (/■ scene closed|▶ port \d+: starting/.test(line)) {
-    pending = []
-    building = false
-    // the build/reload latches describe the PREVIOUS project's scene — carrying
-    // them over makes the next project's first Play reload, or stall waiting for
-    // a rebuild that belonged to a scene that is no longer open
-    sceneStale = false
-    compositeUnbuilt = false
-    if (health !== null) set(null)
+    startSession()
     return
   }
   // a new compile cycle: forget the previous cycle's error lines. "Bundling
@@ -269,11 +305,16 @@ export function parseLine(raw: string): void {
   }
 }
 
-let wired = false
+// hosted, each mount of the editor brings a new shell
+let wiredTo: EditorShell | null = null
 export function wireSceneHealth(): void {
   const shell = window.editorShell
-  if (wired || shell === undefined) return
-  wired = true
+  if (shell === undefined || wiredTo === shell) return
+  wiredTo = shell
+  if (shell.onBuildEvent !== undefined) {
+    shell.onBuildEvent(applyBuildEvent)
+    return
+  }
   // seed from the buffered log so errors from before this page loaded count
   // (reopening a broken scene reloads the page mid-stream)
   void shell.getState().then((s) => {

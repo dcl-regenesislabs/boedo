@@ -3,6 +3,7 @@
 // see Notice.css for why.
 import type { ReactNode } from 'react'
 import css from './Notice.css?inline'
+import { labelTip } from './label-tip'
 import { registerCss } from './styles/registry'
 
 registerCss('ds/Notice', 'primitives', css)
@@ -23,7 +24,7 @@ export function Notice(props: {
     <div className={`eui-ds-notice${tone === 'info' ? '' : ` ${tone}`}`}>
       <div className="body">{props.children}</div>
       {props.onDismiss !== undefined && (
-        <button className="x" data-tip={props.dismissTip ?? 'Dismiss'} onClick={props.onDismiss}>
+        <button className="x" {...labelTip(props.dismissTip ?? 'Dismiss')} onClick={props.onDismiss}>
           ✕
         </button>
       )}

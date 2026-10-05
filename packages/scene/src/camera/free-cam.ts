@@ -25,7 +25,7 @@ export function adjustFlySpeed(factor: number): void {
 }
 
 const DROP_AHEAD = 6 // metres in front of a roaming free-cam
-const PLAYER_AHEAD = 2 // metres in front of the avatar when it's on screen
+const PLAYER_AHEAD = 3 // metres in front of the avatar, clear of it from the follow camera
 const PLAYER_VIEW_DIST = 40 // beyond this the avatar no longer anchors the drop
 const PLAYER_VIEW_DOT = 0.5 // avatar counts as "on screen" within ~60° of the view axis
 
@@ -197,6 +197,29 @@ export function frameEntityOnce(id: string): void {
   // yaw/pitch deltas zero, so the tween moves the position and nothing else.
   const forward = Vector3.rotate(Vector3.Forward(), lookRotation())
   startTween(Vector3.subtract(target, Vector3.scale(forward, standoff)), forward)
+}
+
+const FRAME_PAD = 2 // metres: entity positions are origins, the meshes reach past them
+const FRAME_MAX_DIST = 400
+
+// Fit every given entity's origin in view, keeping the camera's own heading.
+export function frameEntitiesOnce(ids: string[]): void {
+  if (camEntity === null) return
+  const points = ids.flatMap((id) => {
+    const p = worldTransformOf(state.snapshot, id)?.position
+    return p === undefined ? [] : [p]
+  })
+  if (points.length === 0) return
+  const axis = (k: 'x' | 'y' | 'z'): number[] => points.map((p) => p[k])
+  const min = Vector3.create(Math.min(...axis('x')), Math.min(...axis('y')), Math.min(...axis('z')))
+  const max = Vector3.create(Math.max(...axis('x')), Math.max(...axis('y')), Math.max(...axis('z')))
+  const center = Vector3.create((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2)
+  const radius = Vector3.distance(min, max) / 2 + FRAME_PAD
+  const halfFov = (cameraFovY() ?? Math.PI / 3) / 2
+  const dist = Math.min(Math.max(radius / Math.sin(halfFov), MIN_DIST), FRAME_MAX_DIST)
+  setCamMode('free')
+  const forward = Vector3.rotate(Vector3.Forward(), lookRotation())
+  startTween(Vector3.subtract(center, Vector3.scale(forward, dist)), forward)
 }
 
 // Free fly takes over exactly where the camera is — no re-framing tween.
