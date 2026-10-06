@@ -13,7 +13,7 @@ import { AssetsPanel } from './panels/AssetsPanel'
 import { PrefabDropLayer, PrefabsPanel } from './panels/PrefabsPanel'
 import { AiPanel } from './panels/AiPanel'
 import { aiStore, canAskAssistant } from './panels/ai-store'
-import { chrome, toggleRightPanel } from './core/chrome'
+import { chrome, toggleRightPanel, trackRightDock } from './core/chrome'
 import { dragCapture } from './core/drag'
 import { isLeftView, type LeftView } from './panels/left-view'
 import { hasReadyMadePrefabs, sceneEmptiness } from './panels/empty-scene'
@@ -104,23 +104,11 @@ export function App(): JSX.Element {
   // the composer off the bottom — clamp on the way out, not just while dragging.
   const [colEl, setColEl] = useState<HTMLDivElement | null>(null)
   const dockMax = maxDockHeight(useElementHeight(colEl))
-  // the logs drawer ends where the dock begins, so the assistant's composer stays usable
+  // the Studio's own chat column is what the drawer must clear while it is open
   useEffect(() => {
-    if (colEl === null) return
-    const measure = (): void => {
-      const left = colEl.getBoundingClientRect().left
-      chrome.rightDock = colEl.hidden || left <= 0 ? 0 : Math.max(0, Math.round(window.innerWidth - left))
-    }
-    const observer = new ResizeObserver(measure)
-    observer.observe(colEl)
-    window.addEventListener('resize', measure)
-    measure()
-    return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', measure)
-      chrome.rightDock = 0
-    }
-  }, [colEl, rightOpen])
+    if (colEl === null || aiMode === 'studio') return
+    return trackRightDock(colEl)
+  }, [colEl, rightOpen, aiMode])
 
   const dockHeight = Math.max(DOCK_MIN_H, Math.min(aiHeight, dockMax))
   // The dock is one unit: the inspector and the assistant show and hide together

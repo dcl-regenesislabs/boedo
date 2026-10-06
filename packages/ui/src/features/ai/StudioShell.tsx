@@ -1,7 +1,8 @@
 // Studio layout: file rail, tab bar, the editor (or a read-only preview) and the
 // chat column. Every way of leaving the open tab routes through `onLeaveTab`,
 // which owns the dirty-buffer / pending-diff guard.
-import type { ReactNode, RefObject } from 'react'
+import { useEffect, useState, type ReactNode, type RefObject } from 'react'
+import { trackRightDock } from '../../core/chrome'
 import { AutoSaveChip, labelTip } from '../../ds'
 import { IconCode } from '../../icons'
 import { CodeEditor, type CodeEditorHandle } from '../../script/code-editor'
@@ -44,6 +45,8 @@ export function StudioShell(props: {
   headActions?: ReactNode
 }): JSX.Element {
   const { file } = props
+  const [chatEl, setChatEl] = useState<HTMLDivElement | null>(null)
+  useEffect(() => (chatEl === null ? undefined : trackRightDock(chatEl)), [chatEl])
   return (
     <aside className="eui-ai-panel studio">
       <header className="eui-studio-head">
@@ -108,7 +111,7 @@ export function StudioShell(props: {
             <FilePreview key={file} path={file} />
           )}
         </div>
-        {props.chat !== null && <div className="eui-studio-right">{props.chat}</div>}
+        {props.chat !== null && <div ref={setChatEl} className="eui-studio-right">{props.chat}</div>}
       </div>
     </aside>
   )

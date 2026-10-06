@@ -26,3 +26,20 @@ export function setRightOpen(open: boolean): void {
 export function toggleRightPanel(): void {
   setRightOpen(!chrome.rightOpen)
 }
+
+// The logs drawer ends where the right-hand column begins, so the assistant's composer stays usable.
+export function trackRightDock(el: HTMLElement): () => void {
+  const measure = (): void => {
+    const left = el.getBoundingClientRect().left
+    chrome.rightDock = el.hidden || left <= 0 ? 0 : Math.max(0, Math.round(window.innerWidth - left))
+  }
+  const observer = new ResizeObserver(measure)
+  observer.observe(el)
+  window.addEventListener('resize', measure)
+  measure()
+  return () => {
+    observer.disconnect()
+    window.removeEventListener('resize', measure)
+    chrome.rightDock = 0
+  }
+}
