@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { type FakeWorlds, createFakeWorlds } from '../../validate/fake-worlds-server.mjs'
 import { buildDeployment } from './entity'
 import { PublishError, refusal } from './errors'
+import { createPublisher } from './publish'
 import { uploadDeployment } from './upload'
 
 const SERVER = 'http://worlds.test'
@@ -102,6 +103,26 @@ describe('publishing to a world', () => {
     expect(about.configurations.scenesUrn).toEqual([`urn:decentraland:entity:${deployment.entityId}?=&baseUrl=${SERVER}/contents/`])
     const bundle = deployment.entity.content.find((item) => item.file === 'bin/index.js')!
     expect(new Uint8Array(await (await fetch(`${SERVER}/contents/${bundle.hash}`)).arrayBuffer())).toEqual(outputs().get('bin/index.js'))
+  })
+
+  it('links the published scene at its own parcel, since a world holds several', async () => {
+    const owner = await signer()
+    serveWith(createFakeWorlds({ worlds: { [WORLD]: { owner: owner.address } } }))
+    const host = {
+      services: { worldsContent: SERVER },
+      pageDir: 'https://decentraland.zone/bevy-web/',
+      identity: () => ({ address: owner.address, isGuest: false }),
+      signDeployment: async ({ entityId }: { entityId: string }) => owner.sign(entityId)
+    } as unknown as Parameters<typeof createPublisher>[0]['host']
+    const publisher = createPublisher({
+      host,
+      setWorld: async () => {},
+      files: async () => project(),
+      build: async () => ({ ok: true, outputs: outputs(), diagnostics: [], events: [], sdkVersion: '7.25.1' }) as unknown as Awaited<ReturnType<Parameters<typeof createPublisher>[0]['build']>>,
+      published: async () => {}
+    })
+    const result = await publisher.publish('p1', WORLD, () => {})
+    expect(result.ok && result.published.url).toBe(`https://decentraland.zone/bevy-web/?realm=${encodeURIComponent(`${SERVER}/world/${WORLD}`)}&position=0%2C0`)
   })
 
   it('tries again when the server is down, and not when it refuses', async () => {

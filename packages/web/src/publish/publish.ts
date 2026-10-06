@@ -5,7 +5,7 @@
 import type { PublishProgress, PublishedScene, ScenePublishResult } from '@dcl-editor/contract'
 import type { BuildResult } from '@dcl-editor/web-build'
 import type { DclEditorHostV1 } from '@ui/engine/hosted'
-import { buildDeployment } from './entity'
+import { buildDeployment, type Deployment } from './entity'
 import { PublishError } from './errors'
 import { uploadDeployment, validAuthChain } from './upload'
 import { worldRealm } from './worlds'
@@ -38,6 +38,12 @@ export function createPublisher(source: PublishSource): Publisher {
   const { host } = source
   const server = host.services.worldsContent.replace(/\/+$/, '')
   let running: AbortController | null = null
+
+  // a world holds several scenes, and without a position the link lands on its spawn, not this one
+  function position(deployment: Deployment): string {
+    const base = (deployment.entity.metadata.scene as { base?: unknown } | undefined)?.base
+    return typeof base === 'string' ? `&position=${encodeURIComponent(base)}` : ''
+  }
 
   async function run(id: string, world: string, say: (progress: PublishProgress) => void, signal: AbortSignal): Promise<ScenePublishResult> {
     const { address, isGuest } = host.identity()
@@ -93,7 +99,7 @@ export function createPublisher(source: PublishSource): Publisher {
     const published: PublishedScene = {
       world,
       entityId: deployment.entityId,
-      url: `${host.pageDir}?realm=${encodeURIComponent(worldRealm(server, world))}`,
+      url: `${host.pageDir}?realm=${encodeURIComponent(worldRealm(server, world))}${position(deployment)}`,
       files: deployment.fileCount,
       bytes: deployment.bytes,
       at: Date.now()
