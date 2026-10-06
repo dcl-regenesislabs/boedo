@@ -48,6 +48,8 @@ jobs:
           deterministic-snapshot: true
           registry-url: 'https://registry.npmjs.org'
           access: public
+          # npm only accepts provenance from public repositories, and this one is private
+          provenance: false
           # a dispatch is a release: oddish publishes a branch it is told about on that tag
           custom-tag: ${{ github.event_name == 'workflow_dispatch' && 'latest' || '' }}
           branch-to-custom-tag: ${{ github.event_name == 'workflow_dispatch' && github.ref_name || '' }}
