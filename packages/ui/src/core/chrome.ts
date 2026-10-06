@@ -11,7 +11,7 @@ import { setStoredFlag, storedFlag } from './persist'
 // component's usePersistentFlag because module code has to be able to raise the
 // dock: an "ask the assistant" chip or a jump to an error line has to reach a
 // panel the creator may have hidden.
-export const chrome = reactive({ uiHidden: false, rightOpen: storedFlag('right', true) })
+export const chrome = reactive({ uiHidden: false, rightOpen: storedFlag('right', true), rightDock: 0 })
 
 export function toggleUiHidden(): void {
   chrome.uiHidden = !chrome.uiHidden

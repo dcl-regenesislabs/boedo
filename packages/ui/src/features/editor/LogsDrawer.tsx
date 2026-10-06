@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { cmd } from '../../engine/cmd'
+import { useStore } from '../../core/store'
+import { chrome } from '../../core/chrome'
 import { BUILD_TAB_EMPTY, GAME_TAB_EMPTY, GAME_TAB_TIP, gameTabLines, lastSeconds, type RelayedLine } from './log-roles'
 import { stripAnsi } from './scene-health'
 import { labelTip } from '../../ds'
@@ -80,6 +82,7 @@ export function LogsDrawer(props: {
   useEffect(() => {
     if (pre.current !== null) pre.current.scrollTop = pre.current.scrollHeight
   }, [serverLogs, sceneLogs, open, tab])
+  const dock = useStore(() => chrome.rightDock)
   if (!open) return null
   // hosted, the preview realm serves the scene's storage itself
   const host = getHost()
@@ -106,7 +109,7 @@ export function LogsDrawer(props: {
     return BUILD_TAB_EMPTY
   }
   return (
-    <div className="eui-logs-drawer">
+    <div className="eui-logs-drawer" style={{ right: dock }}>
       <div className="eui-logs-tabs">
         {shell !== undefined && (
           <button className={tab === 'server' ? 'on' : ''} onClick={() => setTab('server')}>
