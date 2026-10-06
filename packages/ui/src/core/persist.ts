@@ -6,22 +6,31 @@ import { useState } from 'react'
 
 const storageKey = (name: string): string => `eui:${name}`
 
-/** Whether this choice has ever been made — a first run has no stored value. */
-export function storedValue(name: string): string | null {
+// Storage can throw (private window, blocked site data, or a host that keeps the origin's storage
+// out of the editor's process); a choice then lasts the session.
+export function readKey(key: string): string | null {
   try {
-    return localStorage.getItem(storageKey(name))
+    return localStorage.getItem(key)
   } catch {
     return null
   }
 }
 
-// Storage can throw (private window, blocked site data); the choice then lasts the session.
-function store(name: string, value: string): void {
+export function writeKey(key: string, value: string): void {
   try {
-    localStorage.setItem(storageKey(name), value)
+    localStorage.setItem(key, value)
   } catch {
     // ignore
   }
+}
+
+/** Whether this choice has ever been made — a first run has no stored value. */
+export function storedValue(name: string): string | null {
+  return readKey(storageKey(name))
+}
+
+function store(name: string, value: string): void {
+  writeKey(storageKey(name), value)
 }
 
 /** Read/write a flag outside React — for the module stores (chrome, ai-store),

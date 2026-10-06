@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from 'react'
 import type { UpdateStatus } from '@dcl-editor/contract'
 import { flushPendingSave } from '../../core/autosave'
+import { readKey, writeKey } from '../../core/persist'
 
 let status: UpdateStatus = { state: 'idle' }
 const listeners = new Set<() => void>()
@@ -27,8 +28,8 @@ function initWhatsNew(): void {
   const shell = window.editorShell
   if (shell?.appVersion === undefined) return
   void shell.appVersion().then((v) => {
-    const prev = localStorage.getItem(LAST_RUN_KEY)
-    localStorage.setItem(LAST_RUN_KEY, v)
+    const prev = readKey(LAST_RUN_KEY)
+    writeKey(LAST_RUN_KEY, v)
     if (prev !== null && prev !== v) {
       whatsNew = v
       for (const l of listeners) l()

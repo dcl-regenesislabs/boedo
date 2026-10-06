@@ -6,6 +6,7 @@
 //   - creators-data (the once-a-day analytics export behind the Analytics tab)
 
 import { hostV1, isHosted, type SignedServices } from '../../engine/hosted'
+import { readKey } from '../../core/persist'
 
 // Hosted, the page says which Worlds server deployments go to, and everything
 // read about a world has to come from that same server.
@@ -20,7 +21,7 @@ function signed(key: keyof SignedServices): string | null {
 function zone(): boolean {
   const hosted = hostedWorlds()
   if (hosted !== null) return new URL(hosted).hostname.endsWith('.decentraland.zone')
-  return localStorage.getItem('dcl-auth-env') === 'zone'
+  return readKey('dcl-auth-env') === 'zone'
 }
 export function worldsServer(): string {
   const hosted = hostedWorlds()

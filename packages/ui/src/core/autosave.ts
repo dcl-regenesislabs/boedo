@@ -11,6 +11,7 @@ import { regenerateSpawnables } from '../prefabs/generate'
 import { regenerateGameConfig } from '../gameconfig/generate'
 import { noteCompositeWritten, noteSceneStale } from '../features/editor/scene-health'
 import { log } from '../log'
+import { readKey, writeKey } from './persist'
 
 export type AutoSaveStatus = 'off' | 'idle' | 'dirty' | 'saving' | 'saved' | 'error'
 
@@ -63,7 +64,7 @@ export function markDirty(): void {
   // bake transient state into the authored scene, so don't even schedule a save.
   if (!state.frozen) {
     // first such edit: warn once (unless the user opted out) that it won't persist
-    if (!state.playEditWarn && localStorage.getItem(PLAY_WARN_KEY) !== '1') {
+    if (!state.playEditWarn && readKey(PLAY_WARN_KEY) !== '1') {
       state.playEditWarn = true
     }
     return
@@ -80,7 +81,7 @@ export function markDirty(): void {
 // Dismiss the play-mode-edit warning; persist the opt-out if asked.
 export function dismissPlayEditWarning(dontShowAgain: boolean): void {
   state.playEditWarn = false
-  if (dontShowAgain) localStorage.setItem(PLAY_WARN_KEY, '1')
+  if (dontShowAgain) writeKey(PLAY_WARN_KEY, '1')
 }
 
 export interface FlushResult {

@@ -21,6 +21,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { type AuthIdentity } from '@dcl/crypto'
 import * as sso from '@dcl/single-sign-on-client'
+import { readKey, writeKey } from '../../core/persist'
 
 const STORAGE_KEY_ADDRESS = 'auth-server-provider-address'
 
@@ -39,7 +40,7 @@ const ENVS = {
   zone: { server: 'https://auth-api.decentraland.zone', dapp: 'https://decentraland.zone/auth' }
 }
 function env(): { server: string; dapp: string } {
-  return localStorage.getItem('dcl-auth-env') === 'zone' ? ENVS.zone : ENVS.prod
+  return readKey('dcl-auth-env') === 'zone' ? ENVS.zone : ENVS.prod
 }
 
 export type SignInErrorReason = 'not_found' | 'expired' | 'network' | 'cancelled' | 'unknown'
@@ -88,7 +89,7 @@ async function applyDeepLinkIdentity(identityId: string): Promise<string> {
   // store the identity FIRST — only mark the address once the identity actually
   // persisted, so a throw can't leave a poisoned address behind
   sso.localStorageStoreIdentity(signer, identity)
-  localStorage.setItem(STORAGE_KEY_ADDRESS, signer)
+  writeKey(STORAGE_KEY_ADDRESS, signer)
   return signer
 }
 
@@ -115,7 +116,7 @@ function syncHostIdentity(): void {
 
 export function getAccount(): string | null {
   if (hostIdentity !== null) return hostWallet()
-  return localStorage.getItem(STORAGE_KEY_ADDRESS)
+  return readKey(STORAGE_KEY_ADDRESS)
 }
 
 // sso returns nothing for an expired identity, so this covers expiry too. The
