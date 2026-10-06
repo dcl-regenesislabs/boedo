@@ -157,3 +157,53 @@ export function compositeEntityIds(text: string): number[] {
   }
   return [...ids].sort((a, b) => a - b)
 }
+
+// what the assistant may change in scene.json: never parcels, title or anything published as identity
+export const ASSISTANT_PERMISSIONS = [
+  'ALLOW_TO_MOVE_PLAYER_INSIDE_SCENE',
+  'ALLOW_TO_TRIGGER_AVATAR_EMOTE',
+  'OPEN_EXTERNAL_LINK',
+  'USE_WEB3_API',
+  'USE_FETCH',
+  'USE_WEBSOCKET'
+]
+
+export interface AssistantSceneSettings {
+  permissions?: unknown
+  spawnPoints?: unknown
+}
+
+function point(v: unknown): { x: number; y: number; z: number } | null {
+  if (typeof v !== 'object' || v === null) return null
+  const { x, y, z } = v as Record<string, unknown>
+  return [x, y, z].every((n) => typeof n === 'number' && Number.isFinite(n)) ? { x: x as number, y: y as number, z: z as number } : null
+}
+
+// Adds permissions and replaces the spawn points; throws on anything it would not write.
+export function applyAssistantSettings(raw: RawSceneJson, s: AssistantSceneSettings): RawSceneJson {
+  const next: RawSceneJson = { ...raw }
+  if (s.permissions !== undefined) {
+    if (!Array.isArray(s.permissions) || s.permissions.some((p) => typeof p !== 'string' || !ASSISTANT_PERMISSIONS.includes(p))) {
+      throw new Error(`permissions must be some of: ${ASSISTANT_PERMISSIONS.join(', ')}`)
+    }
+    const current = Array.isArray(raw.requiredPermissions) ? (raw.requiredPermissions as unknown[]).filter((p) => typeof p === 'string') : []
+    next.requiredPermissions = [...new Set([...current, ...(s.permissions as string[])])]
+  }
+  if (s.spawnPoints !== undefined) {
+    if (!Array.isArray(s.spawnPoints) || s.spawnPoints.length > 16) throw new Error('spawnPoints must be a list of up to 16 points')
+    next.spawnPoints = s.spawnPoints.map((p: unknown, i) => {
+      const o = typeof p === 'object' && p !== null ? (p as Record<string, unknown>) : {}
+      const position = point(o.position)
+      if (position === null) throw new Error(`spawn point ${i + 1} needs a position {x,y,z} in scene metres`)
+      const cameraTarget = o.cameraTarget === undefined ? undefined : point(o.cameraTarget)
+      if (cameraTarget === null) throw new Error(`spawn point ${i + 1} has an invalid cameraTarget`)
+      return {
+        name: typeof o.name === 'string' && o.name.trim() !== '' ? o.name.trim().slice(0, 100) : `Spawn Point ${i + 1}`,
+        default: o.default === true || (i === 0 && !(s.spawnPoints as unknown[]).some((q) => (q as Record<string, unknown> | null)?.default === true)),
+        position,
+        ...(cameraTarget !== undefined ? { cameraTarget } : {})
+      }
+    })
+  }
+  return next
+}

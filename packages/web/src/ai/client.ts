@@ -54,6 +54,14 @@ export function createBrowserAssistant(options: {
         emit({ kind: 'tool', turnId, tool: 'Build', detail: 'Scene' })
         return
       case 'scene_request':
+        if (object(call.args.request) && call.args.request.type === 'batch' && Array.isArray(call.args.request.requests)) {
+          emit({ kind: 'tool', turnId, tool: 'Scene', detail: `${call.args.request.requests.length} changes` })
+          return
+        }
+        if (object(call.args.request) && call.args.request.type === 'sceneSettings') {
+          emit({ kind: 'tool', turnId, tool: 'Scene', detail: 'Settings' })
+          return
+        }
         if (object(call.args.request) && call.args.request.type === 'attachScript') {
           const result: unknown = JSON.parse(text)
           if (object(result) && Array.isArray(result.attached)) {

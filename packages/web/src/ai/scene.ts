@@ -1,11 +1,14 @@
 import { object } from '@dcl-editor/contract'
 import { state, componentKey, isUiEntity } from '@scene/state'
+import { buildFromSchema, getSchema, type ComponentSchema } from '@scene/schema'
+import { cmd } from '@ui/engine/cmd'
 import { entityName } from '@scene/custom-components'
 import { isAllowedComponent } from '@scene/allowed-components'
 import { uiAddEntity } from '@ui/actions/entities'
 import { uiSetComponentValue } from '@ui/actions/components'
 import { runRequestText } from '@ui/ai/requests'
 import { resolveEntityRef } from '@ui/ai/request-format'
+import type { AssistantSceneSettings } from '../shell/scene-json'
 
 function entity(ref: unknown): string {
   if (typeof ref !== 'string') throw new Error('An entity id or unique name is required.')
@@ -22,9 +25,62 @@ function toEngineValue(value: unknown): unknown {
   return Object.fromEntries(Object.entries(value).map(([key, field]) => [key, toEngineValue(field)]))
 }
 
-export async function browserSceneRequest(request: unknown, signal: AbortSignal): Promise<unknown> {
+const schemas = new Map<string, Promise<ComponentSchema | null>>()
+
+function schemaOf(name: string): Promise<ComponentSchema | null> {
+  const cached = getSchema(name)
+  if (cached !== undefined) return Promise.resolve(cached)
+  let pending = schemas.get(name)
+  if (pending === undefined) {
+    pending = cmd.componentSchema(name).then((reply) => JSON.parse(reply) as ComponentSchema, () => null)
+    schemas.set(name, pending)
+  }
+  return pending
+}
+
+async function setComponent(id: string, name: unknown, value: unknown, expected: unknown): Promise<void> {
+  if (typeof name !== 'string' || !isAllowedComponent(name) || !object(value)) throw new Error('Invalid component update.')
+  const previous = state.snapshot[id]?.[name] ?? null
+  if (JSON.stringify(previous) !== JSON.stringify(expected)) throw new Error('This component changed. Inspect the scene and retry.')
+  const key = componentKey(id, name)
+  let engineValue = toEngineValue(value)
+  // Transform has no engine schema to fill from; every entity already has a whole one
+  if (name === 'Transform' && object(engineValue) && object(previous)) engineValue = { ...previous, ...engineValue }
+  // the engine refuses a value missing any field, as the inspector's own writes never are
+  const schema = await schemaOf(name)
+  const built = schema === null ? null : buildFromSchema(key, schema, engineValue)
+  await uiSetComponentValue(key, id, name, built?.ok === true ? built.json : JSON.stringify(engineValue))
+  if (state.editStatus.get(key) !== '✓ set') throw new Error('The editor could not apply that component.')
+}
+
+export type SceneSettingsEditor = (settings: AssistantSceneSettings) => Promise<unknown>
+
+const MAX_BATCH = 200
+
+export async function browserSceneRequest(request: unknown, signal: AbortSignal, settings?: SceneSettingsEditor): Promise<unknown> {
   signal.throwIfAborted()
   if (!object(request)) throw new Error('Invalid scene request.')
+  if (request.type === 'batch') {
+    if (!Array.isArray(request.requests) || request.requests.length === 0 || request.requests.length > MAX_BATCH) {
+      throw new Error(`A batch needs 1–${MAX_BATCH} requests.`)
+    }
+    // one failure doesn't stop the rest: each later request may not depend on it
+    const results: unknown[] = []
+    for (const item of request.requests) {
+      if (object(item) && item.type === 'batch') throw new Error('Batches do not nest.')
+      try {
+        results.push({ ok: true, result: await browserSceneRequest(item, signal, settings) })
+      } catch (e) {
+        signal.throwIfAborted()
+        results.push({ ok: false, error: e instanceof Error ? e.message : String(e) })
+      }
+    }
+    return { results }
+  }
+  if (request.type === 'sceneSettings') {
+    if (settings === undefined) throw new Error('Scene settings cannot be changed here.')
+    return settings({ permissions: request.permissions, spawnPoints: request.spawnPoints })
+  }
   if (request.type === 'inspect') {
     const entries = Object.entries(state.snapshot).filter(([id]) => Number(id) >= 512 && !isUiEntity(state.snapshot, id))
     return {
@@ -40,21 +96,25 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal)
     if (typeof request.name !== 'string' || !request.name.trim() || request.name.length > 100) throw new Error('Choose an entity name of 1–100 characters.')
     const parent = request.parent === undefined || request.parent === '0' ? 0 : Number(entity(request.parent))
     const before = new Set(Object.keys(state.snapshot))
+    if (request.components !== undefined && !object(request.components)) throw new Error('components must map component names to values.')
     await uiAddEntity(request.name, parent)
     const id = state.activeEntity
     if (id === null || before.has(id)) throw new Error('The entity could not be created.')
-    return { id, components: state.snapshot[id] }
+    const failed: string[] = []
+    for (const [name, value] of Object.entries(request.components ?? {})) {
+      try {
+        await setComponent(id, name, value, state.snapshot[id]?.[name] ?? null)
+      } catch (e) {
+        failed.push(`${name}: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    }
+    return { id, components: state.snapshot[id], ...(failed.length > 0 ? { failed } : {}) }
   }
   if (request.type === 'setComponent') {
     const id = entity(request.to)
-    const name = request.component
-    if (typeof name !== 'string' || !isAllowedComponent(name) || !object(request.value) || !('expected' in request)) throw new Error('Invalid component update.')
-    const previous = state.snapshot[id]?.[name] ?? null
-    if (JSON.stringify(previous) !== JSON.stringify(request.expected)) throw new Error('This component changed. Inspect the scene and retry.')
-    const key = componentKey(id, name)
-    await uiSetComponentValue(key, id, name, JSON.stringify(toEngineValue(request.value)))
-    if (state.editStatus.get(key) !== '✓ set') throw new Error('The editor could not apply that component.')
-    return { id, component: name, value: state.snapshot[id]?.[name] }
+    if (!('expected' in request)) throw new Error('Invalid component update.')
+    await setComponent(id, request.component, request.value, request.expected)
+    return { id, component: request.component, value: state.snapshot[id]?.[String(request.component)] }
   }
   if (!['attachScript', 'setParams', 'placePrefab'].includes(String(request.type))) throw new Error('Unsupported scene request.')
   if (request.type !== 'placePrefab') entity(request.to)

@@ -9,11 +9,12 @@ const { setValue, status } = vi.hoisted(() => {
   return { setValue, status }
 })
 vi.mock('@scene/state', () => ({
-  state: { snapshot: { '512': {} }, frozen: true, selected: new Set(), editStatus: status, activeEntity: null },
+  state: { snapshot: { '512': {} }, frozen: true, selected: new Set(), editStatus: status, activeEntity: null, schemas: new Map() },
   componentKey: (id: string, name: string) => `${id}:${name}`,
   isUiEntity: () => false
 }))
 vi.mock('@scene/custom-components', () => ({ entityName: () => 'Box' }))
+vi.mock('@ui/engine/cmd', () => ({ cmd: { componentSchema: () => Promise.reject(new Error('no engine')) } }))
 vi.mock('@scene/allowed-components', () => ({ isAllowedComponent: () => true }))
 vi.mock('@ui/actions/entities', () => ({ uiAddEntity: vi.fn() }))
 vi.mock('@ui/actions/components', () => ({ uiSetComponentValue: setValue }))

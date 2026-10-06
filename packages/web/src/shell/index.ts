@@ -53,6 +53,7 @@ import {
   IMG_MIME,
   type RawSceneJson,
   applySettings,
+  applyAssistantSettings,
   compositeEntityIds,
   extensionOf,
   extractSettings,
@@ -168,7 +169,12 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
         tools: {
           files: () => open.files,
           write: (path, bytes, expected, signal) => writeFile(open.id, path, bytes, { expected, signal }),
-          scene: (request, signal) => browserSceneRequest(request, signal),
+          scene: (request, signal) =>
+            browserSceneRequest(request, signal, async (settings) => {
+              await editSceneJson(open.id, (raw) => applyAssistantSettings(raw, settings))
+              const raw = parseSceneJson(await readFile(open.id, 'scene.json'))
+              return { requiredPermissions: raw?.requiredPermissions ?? [], spawnPoints: raw?.spawnPoints ?? [] }
+            }),
           written: scriptAttacher(),
           build: async (signal) => {
             signal.throwIfAborted()
