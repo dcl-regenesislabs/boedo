@@ -2,11 +2,11 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { cmd } from '../../engine/cmd'
 import { useStore } from '../../core/store'
 import { chrome } from '../../core/chrome'
-import { BUILD_TAB_EMPTY, GAME_TAB_EMPTY, GAME_TAB_TIP, gameTabLines, lastSeconds, type RelayedLine } from './log-roles'
+import { BUILD_TAB_EMPTY, GAME_TAB_EMPTY, GAME_TAB_TIP, PROBLEM_MARKER, gameTabLines, lastSeconds, type RelayedLine } from './log-roles'
 import { stripAnsi } from './scene-health'
-import { labelTip } from '../../ds'
+import { SearchField, Segmented, labelTip } from '../../ds'
 import { launchParam } from '../../boot/launch-params'
-import { getHost } from '../../engine/hosted'
+import { getHost, hostV1 } from '../../engine/hosted'
 import { PreviewStorage } from './PreviewStorage'
 
 // Bottom-docked log drawer: the inspected scene's own console output (what the
@@ -46,6 +46,10 @@ export function LogsDrawer(props: {
   const [tab, setTab] = useState<LogsTab>(initialTab ?? (shell !== undefined ? 'server' : 'scene'))
   const [serverLogs, setServerLogs] = useState<ShellLine[]>([])
   const [sceneLogs, setSceneLogs] = useState('')
+  // hosted: the preview's scene server runs in the page, where the shell's stream never reaches
+  const [hostServerLogs, setHostServerLogs] = useState<ShellLine[]>([])
+  const [who, setWho] = useState<'all' | 'client' | 'server'>('all')
+  const [query, setQuery] = useState('')
   const pre = useRef<HTMLPreElement>(null)
   const sceneEpochMs = useRef<number | null>(null)
   useEffect(() => {
@@ -55,6 +59,26 @@ export function LogsDrawer(props: {
       setServerLogs((prev) => [...prev.slice(-MAX_SHELL_LINES), { text: line, ms: Date.now() }])
     )
   }, [])
+  useEffect(() => {
+    const read = hostV1()?.previewServerLogs
+    if (read === undefined || !open || tab !== 'scene') return
+    let after = 0
+    const poll = (): void => {
+      const lines = read(after)
+      if (lines.length === 0) return
+      after = lines[lines.length - 1].seq
+      const now = Date.now()
+      const rows = lines.map((line) => ({
+        text: `[server] ${line.level === 'log' ? '' : `${PROBLEM_MARKER} `}${line.msg}`,
+        ms: now
+      }))
+      setHostServerLogs((prev) => [...prev, ...rows].slice(-MAX_SHELL_LINES))
+    }
+    setHostServerLogs([])
+    poll()
+    const t = setInterval(poll, 2000)
+    return () => clearInterval(t)
+  }, [open, tab])
   useEffect(() => {
     if (open && initialTab !== undefined) setTab(initialTab)
   }, [open, openKey, initialTab])
@@ -88,15 +112,22 @@ export function LogsDrawer(props: {
   const host = getHost()
   const realm = host === null ? null : launchParam('realm')
   const epoch = sceneEpochMs.current
-  const relayed: RelayedLine[] = serverLogs.map((line) => ({
+  const relayed: RelayedLine[] = [...serverLogs, ...hostServerLogs].map((line) => ({
     text: line.text,
     at: line.ms === null || epoch === null ? null : (line.ms - epoch) / 1000
   }))
-  const rows = tab === 'scene' ? gameTabLines(sceneLogs, relayed) : []
-  const quiet = !rows.some((row) => row.role !== null || row.text.trim() !== '')
+  const all = tab === 'scene' ? gameTabLines(sceneLogs, relayed) : []
+  const quiet = !all.some((row) => row.role !== null || row.text.trim() !== '')
+  const needle = query.trim().toLowerCase()
+  const rows = all.filter(
+    (row) =>
+      (who === 'all' || (who === 'server') === (row.role === 'server')) &&
+      (needle === '' || row.text.toLowerCase().includes(needle))
+  )
   function logText(): ReactNode {
     if (tab === 'scene') {
       if (quiet) return GAME_TAB_EMPTY
+      if (rows.length === 0) return 'No lines match.'
       return rows.map((line, i) => (
         <span key={i} className={line.error ? 'eui-logs-line error' : 'eui-logs-line'}>
           {line.role !== null && <span className={`eui-logs-role ${line.role}`}>[{line.role}]</span>}
@@ -125,6 +156,21 @@ export function LogsDrawer(props: {
           </button>
         )}
         <span className="eui-logs-spacer" />
+        {tab === 'scene' && (
+          <>
+            <Segmented
+              aria-label="Which copy printed it"
+              value={who}
+              onChange={setWho}
+              options={[
+                { value: 'all', label: 'All' },
+                { value: 'client', label: 'Client' },
+                { value: 'server', label: 'Server' }
+              ]}
+            />
+            <SearchField size="sm" className="eui-logs-search" placeholder="Search logs" value={query} onChange={setQuery} />
+          </>
+        )}
         <button onClick={onClose} {...labelTip('Hide logs')}>
           ✕
         </button>

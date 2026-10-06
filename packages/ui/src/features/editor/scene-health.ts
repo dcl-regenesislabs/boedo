@@ -36,6 +36,7 @@ function setBuild(lines: string[]): void {
 }
 
 import { stripAnsi } from '../../lib/ansi'
+import { hostV1 } from '../../engine/hosted'
 
 export { stripAnsi }
 
@@ -193,6 +194,7 @@ export function applyBuildEvent(event: SceneBuildEvent): void {
       return
     case 'bundleSaved':
       building = false
+      hostV1()?.previewChanged?.()
       if (health?.kind === 'build') set(null)
       return
     case 'failed':

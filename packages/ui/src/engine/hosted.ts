@@ -65,6 +65,16 @@ export interface DclEditorHostV1 extends Omit<DclEditorHostV0, 'version'> {
   signedFetch(url: string, init?: HostFetchInit): Promise<Response>
   // the host asks the player first; rejects 'cancelled' or 'not-signed-in'
   signDeployment(request: DeploymentRequest): Promise<AuthChain>
+  // contract v1.3: the open preview's scene server console after `after` (a seq it returned, 0 for all)
+  previewServerLogs?(after: number): ServerLogLine[]
+  // contract v1.3: a build landed in the open preview, so the host restarts its scene server on it
+  previewChanged?(): void
+}
+
+export interface ServerLogLine {
+  seq: number
+  level: 'log' | 'error' | 'system'
+  msg: string
 }
 
 export type DclEditorHost = DclEditorHostV0 | DclEditorHostV1

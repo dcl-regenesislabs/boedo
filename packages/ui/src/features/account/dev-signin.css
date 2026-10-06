@@ -20,13 +20,14 @@
   display: flex; align-items: center; gap: 4px; padding: 6px 10px;
   border-bottom: 1px solid var(--divider-soft);
 }
-.eui-logs-tabs button {
+.eui-logs-tabs > button {
   background: none; border: 0; color: var(--text-3); cursor: pointer;
   font: 600 var(--fs-xs)/1 var(--font-family);
   padding: 5px 10px; border-radius: var(--r-control);
 }
-.eui-logs-tabs button.on { background: var(--fill-3); color: var(--text); }
-.eui-logs-tabs button:hover { color: var(--text-2); }
+.eui-logs-tabs > button.on { background: var(--fill-3); color: var(--text); }
+.eui-logs-tabs > button:hover { color: var(--text-2); }
+.eui-logs-search { width: 180px; }
 .eui-logs-spacer { flex: 1; }
 .eui-logs-body {
   flex: 1; margin: 0; padding: 8px 12px; overflow: auto;
