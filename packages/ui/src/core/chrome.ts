@@ -4,7 +4,7 @@
 // nothing of bevy. The scene-health banner stays outside this flag on purpose:
 // a crash must be visible even when the creator is admiring their work.
 import { reactive } from './store'
-import { setStoredFlag, storedFlag } from './persist'
+import { setStoredFlag, storedFlag, whenPersisted } from './persist'
 
 // The right dock is ONE unit — the inspector and the assistant live and hide
 // together, so its visibility is a single flag. It lives here rather than in a
@@ -12,6 +12,7 @@ import { setStoredFlag, storedFlag } from './persist'
 // dock: an "ask the assistant" chip or a jump to an error line has to reach a
 // panel the creator may have hidden.
 export const chrome = reactive({ uiHidden: false, rightOpen: storedFlag('right', true), rightDock: 0 })
+whenPersisted(() => (chrome.rightOpen = storedFlag('right', true)))
 
 export function toggleUiHidden(): void {
   chrome.uiHidden = !chrome.uiHidden

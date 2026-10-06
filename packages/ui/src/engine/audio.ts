@@ -13,7 +13,7 @@
 // setSetting is the same ~system/BevyExplorerApi surface graphics-preset.ts
 // already drives, proxied to the editor scene over the bus (page-ui.ts).
 import { reactive } from '../core/store'
-import { setStoredFlag, storedFlag } from '../core/persist'
+import { setStoredFlag, storedFlag, whenPersisted } from '../core/persist'
 import { BevyApi } from './bevy-api-web'
 import { isHosted } from './hosted'
 
@@ -23,6 +23,7 @@ import { isHosted } from './hosted'
 const MUTED_KEY = 'scene-muted'
 
 export const sceneAudio = reactive({ muted: storedFlag(MUTED_KEY, false) })
+whenPersisted(() => (sceneAudio.muted = storedFlag(MUTED_KEY, false)))
 
 function apply(): void {
   // hosted: the master volume is the host page's own sound setting

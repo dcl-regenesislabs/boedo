@@ -6,7 +6,7 @@
 // `useStore(() => aiStore.x)` re-renders on change (see store.ts).
 import { reactive } from '../core/store'
 import { setRightOpen } from '../core/chrome'
-import { setStoredFlag, storedFlag } from '../core/persist'
+import { setStoredFlag, storedFlag, whenPersisted } from '../core/persist'
 import { ENTRY_FILE } from '../script/project-files'
 import { log } from '../log'
 import { ensureScriptRuntime, shadowedRuntimeProblem } from '../prefabs/generate'
@@ -67,6 +67,7 @@ export const aiStore = reactive<AiStoreShape>({
   codeMove: null,
   onSaved: null
 })
+whenPersisted(() => (aiStore.collapsed = storedFlag('ai-min', false)))
 
 export function setPendingCodeMove(entityId: string, move: CodeMove): void {
   aiStore.codeMove = { entityId, move }

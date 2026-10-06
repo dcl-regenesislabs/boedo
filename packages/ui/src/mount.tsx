@@ -7,6 +7,7 @@ import { focusables } from './ds/focus'
 import { collectCss } from './ds/styles/registry'
 import { EDITOR_UI_HOST_ID, fromEditorUi } from './engine/hosted'
 import { TooltipLayer } from './panels/TooltipLayer'
+import { persistReady } from './core/persist'
 
 export function mountEditorUi(parent: HTMLElement, view: ReactNode, rootClass?: string): () => void {
   const host = document.createElement('div')
@@ -23,13 +24,17 @@ export function mountEditorUi(parent: HTMLElement, view: ReactNode, rootClass?: 
   shadow.appendChild(rootEl)
 
   const root = createRoot(rootEl)
-  // TooltipLayer is app-wide: one delegated listener styles every [data-tip] hover.
-  root.render(
-    <>
-      {view}
-      <TooltipLayer />
-    </>
-  )
+  let mounted = true
+  // after the stored choices load, so the first frame already has them
+  void persistReady.then(() => {
+    // TooltipLayer is app-wide: one delegated listener styles every [data-tip] hover.
+    if (mounted) root.render(
+      <>
+        {view}
+        <TooltipLayer />
+      </>
+    )
+  })
   // The engine's canvas takes Tab as a game key and keeps focus for good: Tab
   // there goes back into this view (first control, or last with Shift).
   const onTab = (e: KeyboardEvent): void => {
@@ -44,6 +49,7 @@ export function mountEditorUi(parent: HTMLElement, view: ReactNode, rootClass?: 
   }
   window.addEventListener('keydown', onTab, true)
   return () => {
+    mounted = false
     window.removeEventListener('keydown', onTab, true)
     root.unmount()
     host.remove()

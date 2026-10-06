@@ -21,6 +21,7 @@ import {
   serializeLock
 } from '@dcl-editor/web-build'
 import { freezePackages } from './packages'
+import { readKey, writeKey } from '@ui/core/persist'
 import { parseSceneJson } from './scene-json'
 import type { WebBuildFiles } from '../workers'
 
@@ -31,18 +32,10 @@ const describe = (error: unknown): string => (error instanceof Error ? error.mes
 
 // Random per browser and never sent: previewMachineId derives the ids that are.
 export function browserSecret(): string {
-  try {
-    const stored = localStorage.getItem(MACHINE_ID_KEY)
-    if (stored !== null && /^[A-Za-z0-9_.]{1,64}$/.test(stored)) return stored
-  } catch {
-    /* storage is blocked: an id for this page load */
-  }
+  const stored = readKey(MACHINE_ID_KEY)
+  if (stored !== null && /^[A-Za-z0-9_.]{1,64}$/.test(stored)) return stored
   const id = 'w' + Array.from(crypto.getRandomValues(new Uint8Array(10)), (byte) => byte.toString(36)).join('')
-  try {
-    localStorage.setItem(MACHINE_ID_KEY, id)
-  } catch {
-    /* as above */
-  }
+  writeKey(MACHINE_ID_KEY, id)
   return id
 }
 

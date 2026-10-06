@@ -27,6 +27,7 @@ import { contentCid } from '@dcl-editor/contract/cid'
 import { LOCK_FILE, PREVIEW_CACHE_NAME, PREVIEW_STORAGE_CACHE_NAME, fetchVerified, lockedKey, parseLock } from '@dcl-editor/web-build'
 import { notify } from '@scene/reactive'
 import { hostV1 } from '@ui/engine/hosted'
+import { persistReady } from '@ui/core/persist'
 import { version } from '../../package.json'
 import { createBrowserAssistant } from '../ai/client'
 import { scriptAttacher } from '../ai/attach'
@@ -104,11 +105,12 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
   // where each project's npm packages stand, for as long as the page lives
   const packages = new Map<string, ProjectPackages>()
   const packageListeners = new Set<(id: string, status: ProjectPackages) => void>()
-  const secret = browserSecret()
+  // stored in IndexedDB: read once it has loaded, or each page load would be another machine
+  const secret = persistReady.then(browserSecret)
   const previews = createPreviews({
     pageDir: host.pageDir,
     urls: webBuild,
-    machineId: (id) => previewMachineId(secret, wallet() ?? 'guest', id),
+    machineId: async (id) => previewMachineId(await secret, wallet() ?? 'guest', id),
     emit,
     log,
     packages: store.packages,

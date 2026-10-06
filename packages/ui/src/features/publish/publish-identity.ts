@@ -15,6 +15,8 @@
 // Losing the memory — a new machine, cleared storage, a folder that published
 // from the CLI — costs exactly one confirmation on the next publish. That is the
 // safe direction: an extra dialog, never a silent replacement.
+import { readKey, writeKey } from '../../core/persist'
+
 const KEY = 'dcl-editor:published-entities'
 // One entry per project/world pair. The cap only exists so a decade of scratch
 // projects can't grow the value without bound; oldest inserted goes first.
@@ -28,7 +30,7 @@ function entryKey(dir: string, world: string): string {
 
 function read(): Memory {
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = readKey(KEY)
     if (raw === null) return {}
     const parsed: unknown = JSON.parse(raw)
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
@@ -52,9 +54,5 @@ export function rememberPublishedEntity(dir: string, world: string, entityId: st
   mem[key] = entityId
   const keys = Object.keys(mem)
   for (const stale of keys.slice(0, Math.max(0, keys.length - MAX))) delete mem[stale]
-  try {
-    localStorage.setItem(KEY, JSON.stringify(mem))
-  } catch {
-    // storage full or unavailable — the next publish just asks once more
-  }
+  writeKey(KEY, JSON.stringify(mem))
 }

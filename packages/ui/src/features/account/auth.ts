@@ -21,7 +21,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { type AuthIdentity } from '@dcl/crypto'
 import * as sso from '@dcl/single-sign-on-client'
-import { readKey, writeKey } from '../../core/persist'
+import { readKey, removeKey, writeKey } from '../../core/persist'
 
 const STORAGE_KEY_ADDRESS = 'auth-server-provider-address'
 
@@ -161,7 +161,7 @@ export function signOut(): void {
       /* bad stored address — removing our key below is the actual sign-out */
     }
   }
-  localStorage.removeItem(STORAGE_KEY_ADDRESS)
+  removeKey(STORAGE_KEY_ADDRESS)
 }
 
 const SIGN_IN_TIMEOUT_MS = 15 * 60 * 1000
