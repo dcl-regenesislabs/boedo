@@ -33,6 +33,9 @@ export const DEFAULT_ASSISTANT_LIMITS: AssistantLimits = { wallets: null, turnsP
 
 const MAX_SOCKETS = 32
 const SOCKETS_PER_WALLET = 3
+// Proxies drop a silent socket (Cloudflare after 100 s), and a model step can be quiet that long;
+// a peer that missed the last ping is gone.
+const KEEPALIVE_MS = 30_000
 
 export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>, options: {
   factory?: AgentFactory
@@ -82,6 +85,13 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
     let connection: ReturnType<typeof createConnection> | null = null
     const deadline = setTimeout(() => socket.terminate(), 5000)
     const idle = setTimeout(() => socket.close(1000, 'Session expired'), 15 * 60_000)
+    let answered = true
+    socket.on('pong', () => { answered = true })
+    const keepalive = setInterval(() => {
+      if (!answered) { socket.terminate(); return }
+      answered = false
+      socket.ping()
+    }, KEEPALIVE_MS)
     const send = (value: unknown) => {
       if (socket.readyState !== WebSocket.OPEN) return
       if (socket.bufferedAmount > 1024 * 1024) { socket.close(1008, 'Client too slow'); return }
@@ -105,6 +115,7 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
     socket.on('close', () => {
       clearTimeout(deadline)
       clearTimeout(idle)
+      clearInterval(keepalive)
       sockets.delete(socket)
       if (connection !== null) {
         const pending = connection.close().catch(() => { logger.error('Assistant cleanup failed') })
