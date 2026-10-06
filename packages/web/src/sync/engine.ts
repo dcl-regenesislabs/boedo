@@ -282,6 +282,20 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     revision++
   }
 
+  // A push the service took but whose answer never came back (the editor was closed mid-request)
+  // leaves the account a version ahead holding exactly these files: agreement, not a conflict.
+  async function agreeIfSame(id: string, t: Tracked, wallet: string, theirs: RemoteManifest): Promise<boolean> {
+    const files = await localFiles(store, options.hash, id, t.record?.base ?? null, [...t.pending])
+    if (!sameFiles(files, theirs.files)) return false
+    t.record = { wallet, baseVersion: theirs.version, base: theirs.files, pending: [], remoteDeleted: false }
+    t.agreedAt = ++clock
+    t.pending.clear()
+    t.conflict = false
+    succeeded(t)
+    await persist(id, t)
+    return true
+  }
+
   function catchUp(id: string, known?: RemoteManifest): Promise<void> {
     return run(id, async (t, session) => {
       if (t.record === null || t.pending.size > 0 || t.conflict) return
@@ -300,7 +314,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   }
 
   async function reconcile(id: string, isTrashed: boolean, theirs: RemoteProject | undefined, asked: number): Promise<void> {
-    await run(id, async (t, { api }) => {
+    await run(id, async (t, { api, wallet }) => {
       const record = t.record
       try {
         if (isTrashed) {
@@ -352,8 +366,11 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         if (theirs.version !== record.baseVersion) {
           if (t.pending.size === 0) t.behind = true
           // the list may be older than a push that has just gone through: ask again
-          else if ((await liveManifest(api, id))?.version !== record.baseVersion) t.conflict = true
-          else schedulePush(id, 0)
+          else {
+            const live = await liveManifest(api, id)
+            if (live?.version === record.baseVersion) schedulePush(id, 0)
+            else if (live === null || !(await agreeIfSame(id, t, wallet, live))) t.conflict = true
+          }
           return
         }
         t.behind = false
@@ -579,7 +596,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
           return
         }
         if (t.record === null || (theirs.version !== t.record.baseVersion && t.pending.size > 0)) {
-          t.conflict = true
+          if (t.record === null || !(await agreeIfSame(id, t, current.wallet, theirs))) t.conflict = true
           return
         }
         if (theirs.version === t.record.baseVersion) return

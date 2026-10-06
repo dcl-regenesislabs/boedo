@@ -132,6 +132,30 @@ describe('project sync', () => {
     expect(a.engine.status().projects[id].state).toBe('synced')
   })
 
+  it('a push the service took whose answer was lost is not a conflict when the scene opens again', async () => {
+    let loseNext = false
+    const lossy: FakeService = {
+      log: service.log,
+      handle: async (request) => {
+        const answer = await service.handle(request)
+        if (loseNext && request.method === 'PUT' && request.path.endsWith('/manifest')) {
+          loseNext = false
+          throw new TypeError('Failed to fetch')
+        }
+        return answer
+      }
+    }
+    const a = device(lossy)
+    const { id } = await a.store.create('Scene', [['src/index.ts', text('v1')]])
+    await a.engine.refresh(true)
+    await after(0, a.engine)
+    loseNext = true
+    await a.edit(id, 'src/index.ts', 'v2')
+    await after(PUSH_DEBOUNCE_MS, a.engine)
+    await a.engine.prepareOpen(id)
+    expect(a.engine.status().projects[id].state).toBe('synced')
+  })
+
   it('on a shared browser, another wallet’s edits and trash never reach the account that synced the scene', async () => {
     const a = device(service)
     const { id } = await a.store.create('Scene', [['src/index.ts', text('v1')]])
