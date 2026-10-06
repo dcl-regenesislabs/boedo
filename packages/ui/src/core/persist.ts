@@ -9,7 +9,8 @@ const storageKey = (name: string): string => `eui:${name}`
 // IndexedDB, not localStorage: a page reading localStorage loads the origin's whole storage area,
 // and the explorer's web shell keeps the sign-in key there, so it forbids the app that read.
 // Everything is read once into memory (persistReady), so reads stay synchronous.
-const DB_NAME = 'dcl-editor'
+// not 'dcl-editor': the engine's web_save.js owns that database, at a version of its own
+const DB_NAME = 'dcl-editor-prefs'
 const STORE = 'prefs'
 // what earlier versions kept in localStorage, copied over once where it is still readable
 const LEGACY_KEYS = /^(eui:|dcl-editor[.:]|dcl-auth-env$|auth-server-provider-address$)/
