@@ -112,7 +112,7 @@ describe('component service', () => {
         providers: async () => [],
         create: async (_params, call) => ({
           prompt: async () => { await call('read_file', { path: 'src/index.ts' }) },
-          abort, dispose
+          abort, dispose, snapshot: () => []
         })
       }
     })

@@ -5,6 +5,8 @@ export interface AssistantAgent {
   prompt(params: AiSendParams): Promise<void>
   abort(): Promise<void>
   dispose(): void
+  /** What the model remembers so far, for `create` to start from again. */
+  snapshot(): unknown[]
 }
 
 export interface AgentFactory {
@@ -12,7 +14,8 @@ export interface AgentFactory {
   create(
     params: AiSendParams,
     call: (tool: BrowserToolName, args: Record<string, unknown>, signal?: AbortSignal) => Promise<string>,
-    emit: (event: Pick<Extract<AiEvent, { kind: 'text' }>, 'text'>) => void
+    emit: (event: Pick<Extract<AiEvent, { kind: 'text' }>, 'text'>) => void,
+    restore?: unknown[]
   ): Promise<AssistantAgent>
 }
 

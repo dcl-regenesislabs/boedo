@@ -1,6 +1,9 @@
+import type { ILoggerComponent } from '@well-known-components/interfaces'
 import { ASSISTANT_ID, ASSISTANT_MAX_IMAGE_BYTES, object } from '../../../contract/src/assistant.ts'
 import type { AssistantServerMessage, BrowserToolName } from '../../../contract/src/assistant.ts'
 import type { AiSendParams } from '../../../contract/src/shell.ts'
+import { MEMORY_ID, MEMORY_KEY } from './memory.ts'
+import type { MemoryRef, WalletMemory } from './memory.ts'
 import type { AgentFactory, AssistantAgent } from './types.ts'
 
 const MAX_TURN_RESULT_CHARS = 2_000_000
@@ -23,10 +26,20 @@ export function parsePrompt(value: unknown): AiSendParams | null {
   return value as unknown as AiSendParams
 }
 
+// null: none sent; undefined: one that isn't valid
+function parseMemory(value: unknown): MemoryRef | null | undefined {
+  if (value === undefined) return null
+  if (!object(value) || typeof value.id !== 'string' || !MEMORY_ID.test(value.id) ||
+    typeof value.key !== 'string' || !MEMORY_KEY.test(value.key)) return undefined
+  return { id: value.id, key: value.key }
+}
+
 export function createConnection(options: {
   factory: AgentFactory
+  logger: Pick<ILoggerComponent.ILogger, 'error'>
   send(message: AssistantServerMessage): void
   allowTurn(): boolean
+  memory?: WalletMemory
   toolTimeoutMs?: number
   turnTimeoutMs?: number
 }) {
@@ -36,6 +49,7 @@ export function createConnection(options: {
   let closed = false
   let running: Promise<void> | undefined
   let stopping: Promise<void> | undefined
+  let saving: Promise<void> = Promise.resolve()
   const pending = new Map<string, Pending>()
   const send = (message: AssistantServerMessage) => { if (!closed) options.send(message) }
 
@@ -74,23 +88,25 @@ export function createConnection(options: {
     })
   }
 
-  async function prompt(turnId: string, projectId: string, params: AiSendParams): Promise<void> {
+  async function prompt(turnId: string, projectId: string, params: AiSendParams, ref: MemoryRef | null): Promise<void> {
     const turn = { id: turnId, controller: new AbortController(), chars: 0, resumable: false }
     active = turn
     send({ kind: 'event', event: { kind: 'started', turnId } })
     let ok = false
     const timer = setTimeout(() => abort('The turn reached its 10-minute limit.', true), options.turnTimeoutMs ?? 10 * 60_000)
     try {
-      const key = JSON.stringify([projectId, params.provider, params.model])
+      const key = JSON.stringify([projectId, params.provider, params.model, ref?.id, ref?.key])
       if (identity !== key) {
         agent?.dispose()
         agent = null
         identity = key
       }
       if (agent === null) {
+        await saving
+        const restore = ref === null ? null : await options.memory?.load(ref) ?? null
         const created = await options.factory.create(params, call, ({ text }) => {
           if (active !== null && !active.controller.signal.aborted) send({ kind: 'event', event: { kind: 'text', turnId: active.id, text } })
-        })
+        }, restore ?? undefined)
         if (closed || turn.controller.signal.aborted) {
           created.dispose()
           return
@@ -109,6 +125,12 @@ export function createConnection(options: {
       clearTimeout(timer)
       turn.controller.abort()
       active = null
+      // a failed turn keeps the last good memory: the next session starts from there
+      const kept = agent
+      if (ok && kept !== null && ref !== null && options.memory !== undefined) {
+        const memory = options.memory
+        saving = saving.then(() => memory.save(ref, kept.snapshot())).catch(() => { options.logger.error('Assistant memory save failed') })
+      }
       if (!ok && (!turn.resumable || closed)) {
         agent?.dispose()
         agent = null
@@ -142,10 +164,22 @@ export function createConnection(options: {
         identity = ''
         return
       }
+      if (message.kind === 'forget') {
+        if (typeof message.id !== 'string' || !MEMORY_ID.test(message.id)) return
+        if (active !== null) abort()
+        agent?.dispose()
+        agent = null
+        identity = ''
+        const memory = options.memory
+        if (memory !== undefined) saving = saving.then(() => memory.forget(message.id as string)).catch(() => { options.logger.error('Assistant memory deletion failed') })
+        return
+      }
       if (message.kind !== 'prompt') return
+      const ref = parseMemory(message.memory)
       const params = parsePrompt(message.params)
       if (typeof message.turnId !== 'string' || !ASSISTANT_ID.test(message.turnId) ||
-        typeof message.projectId !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(message.projectId) || params === null) {
+        typeof message.projectId !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(message.projectId) || params === null ||
+        ref === undefined) {
         send({ kind: 'failure', message: 'Invalid prompt. Use up to four images, at most 2 MB each.' })
         return
       }
@@ -153,7 +187,7 @@ export function createConnection(options: {
         send({ kind: 'failure', message: active !== null ? 'A turn is already running.' : 'Too many requests. Try again shortly.' })
         return
       }
-      running = prompt(message.turnId, message.projectId, params)
+      running = prompt(message.turnId, message.projectId, params, ref)
     },
     async close(): Promise<void> {
       closed = true
@@ -163,6 +197,7 @@ export function createConnection(options: {
         agent = null
       }
       await Promise.all([running, stopping])
+      await saving
     }
   }
 }

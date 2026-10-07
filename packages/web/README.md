@@ -6,6 +6,7 @@ the outer document and loads the editor as one ES module.
 
 ```bash
 npm run build -w @dcl-editor/web      # writes dist/ (gitignored); also builds @dcl-editor/web-build
+npm run validate:assistant -w @dcl-editor/web # Chromium: browser tools, memory restoration and New chat
 npm run validate -w @dcl-editor/web   # build + headless Chromium smoke against a fake host:
                                       # the Create page's scene list (mountHome); a starter scene is
                                       # created, built and published in the page, opened in the docked
@@ -13,6 +14,8 @@ npm run validate -w @dcl-editor/web   # build + headless Chromium smoke against 
                                       # exported and imported as a .zip, and, signed in against an
                                       # in-memory project service, opened in a second browser context;
                                       # the assistant reads, edits and builds through browser tools;
+                                      # encrypted memory survives a service restart, and New chat
+                                      # removes it and its browser key from both assistant layouts;
                                       # a .zip that asks npm for a package is imported against a fixture
                                       # registry and rebuilt with the registry unreachable; a scene is
                                       # published to the fake Worlds server, signed outside the page

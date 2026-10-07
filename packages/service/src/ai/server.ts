@@ -6,6 +6,7 @@ import { WebSocketServer, WebSocket } from 'ws'
 import { ASSISTANT_MAX_MESSAGE_BYTES, ASSISTANT_PROTOCOL, ASSISTANT_TICKET_PREFIX } from '../../../contract/src/assistant.ts'
 import { createRateLimiter } from '../config.ts'
 import { createConnection } from './connection.ts'
+import type { AssistantMemory } from './memory.ts'
 import type { AgentFactory, AssistantService } from './types.ts'
 import type { BaseComponents } from '../types.ts'
 
@@ -42,6 +43,7 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
   allowedOrigins: readonly string[]
   basePath?: string
   limits?: AssistantLimits
+  memory?: AssistantMemory
 }): AssistantComponent {
   const limits = options.limits ?? DEFAULT_ASSISTANT_LIMITS
   const days = new Map<string, { day: number; count: number }>()
@@ -53,6 +55,11 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
   const limiter = createRateLimiter()
   const closing = new Set<Promise<void>>()
   let stopped = false
+  const memory = options.memory
+  const sweep = () => { void memory?.sweep().catch(() => { logger.error('Assistant memory sweep failed') }) }
+  sweep()
+  const sweeper = memory === undefined ? undefined : setInterval(sweep, 60 * 60_000)
+  sweeper?.unref()
   const socketOptions = {
     noServer: true, maxPayload: ASSISTANT_MAX_MESSAGE_BYTES, perMessageDeflate: false,
     maxFragments: 4096, maxBufferedChunks: 16384, closeTimeout: 5000,
@@ -108,7 +115,7 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
     void factory.providers().then((providers) => {
       if (socket.readyState !== WebSocket.OPEN) return
       clearTimeout(deadline)
-      connection = createConnection({ factory, send, allowTurn: () => allowTurn(wallet) })
+      connection = createConnection({ factory, logger, send, allowTurn: () => allowTurn(wallet), memory: memory?.forWallet(wallet) })
       send({ kind: 'ready', providers })
     }).catch(() => socket.close(1011, 'Assistant unavailable'))
     socket.on('error', () => socket.close())
@@ -168,6 +175,7 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
     },
     async [STOP_COMPONENT]() {
       stopped = true
+      clearInterval(sweeper)
       tickets.clear()
       for (const reservation of pending.values()) clearTimeout(reservation.timer)
       pending.clear()

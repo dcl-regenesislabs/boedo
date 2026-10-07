@@ -503,8 +503,11 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
   }
   stopRef.current = stop
   const doWipe = (): void => {
-    void shell.aiStop?.()
-    void shell.aiReset?.()
+    if (shell.aiForget !== undefined) void shell.aiForget()
+    else {
+      void shell.aiStop?.()
+      void shell.aiReset?.()
+    }
     activeTurn.current = null
     setMessages([])
     setBusy(false)

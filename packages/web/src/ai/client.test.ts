@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import type { AiEvent, AssistantClientMessage } from '@dcl-editor/contract'
+import type { AiEvent, AssistantClientMessage, AssistantMemoryRef } from '@dcl-editor/contract'
 import { ASSISTANT_PROTOCOL, ASSISTANT_TICKET_PREFIX } from '@dcl-editor/contract'
 import { createBrowserAssistant } from './client'
 
@@ -36,15 +36,21 @@ function setup(fetch = async () => new Response(JSON.stringify({ token: 'test-ti
   vi.stubGlobal('location', new URL('http://editor.test'))
   let projectId = 'first'
   const scene = vi.fn(async (_request: unknown, _signal: AbortSignal): Promise<unknown> => ({ id: '512' }))
+  const kept = new Map<string, AssistantMemoryRef>()
+  const read = vi.fn(async (id: string, wallet: string) => kept.get(`${id}@${wallet}`) ?? null)
   const assistant = createBrowserAssistant({
     service: 'http://service.test', fetch, wallet: () => 'wallet',
+    memory: {
+      read,
+      write: async (id, wallet, ref) => { if (ref === null) kept.delete(`${id}@${wallet}`); else kept.set(`${id}@${wallet}`, ref) }
+    },
     project: () => ({ id: projectId, tools: {
       files: () => new Map(), write: async () => {}, scene, build: async () => ({ ok: true })
     } })
   })
   const events: AiEvent[] = []
   assistant.shell.onAiEvent((event) => events.push(event))
-  return { assistant, events, scene, switchProject() { projectId = 'second' } }
+  return { assistant, events, scene, kept, read, switchProject() { projectId = 'second' } }
 }
 
 afterEach(() => { Socket.instances = []; vi.unstubAllGlobals() })
@@ -105,4 +111,46 @@ it('does not open a socket when a pending signed connection request is cancelled
   expect(Socket.instances).toHaveLength(0)
   expect(events).toContainEqual({ kind: 'done', turnId, ok: false })
   assistant.dispose()
+})
+
+it('sends the same kept chat after a reconnect, and a new chat forgets it and its key', async () => {
+  const { assistant, kept } = setup()
+  const memoryOf = (socket: Socket) => socket.sent.find((message) => message.kind === 'prompt')?.memory
+  try {
+    const { turnId } = await assistant.shell.aiSend({ provider: 'claude', text: 'Make a door' })
+    await vi.waitFor(() => expect(memoryOf(Socket.instances[0])).toBeDefined())
+    const first = memoryOf(Socket.instances[0])!
+    expect(first.id).toMatch(/^[a-f0-9]{32}$/)
+    expect(first.key).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    Socket.instances[0].receive({ kind: 'event', event: { kind: 'done', turnId, ok: true } })
+    await assistant.reset()
+
+    await assistant.shell.aiSend({ provider: 'claude', text: 'Make it red' })
+    await vi.waitFor(() => expect(memoryOf(Socket.instances[1])).toEqual(first))
+
+    await assistant.shell.aiForget()
+    expect(Socket.instances[1].sent).toContainEqual({ kind: 'forget', id: first.id })
+    expect(kept.size).toBe(0)
+  } finally { assistant.dispose() }
+})
+
+it('cancels a turn immediately while New chat reads the key, then forgets before disconnecting', async () => {
+  const { assistant, events, scene, read } = setup()
+  const { turnId } = await assistant.shell.aiSend({ provider: 'claude', text: 'Make a door' })
+  const socket = Socket.instances[0]
+  const ref = socket.sent.find((message) => message.kind === 'prompt')?.memory ?? null
+  const reading = deferred<AssistantMemoryRef | null>()
+  read.mockReturnValueOnce(reading.promise)
+  const forgetting = assistant.shell.aiForget()
+  try {
+    expect(events).toContainEqual({ kind: 'done', turnId, ok: false })
+    expect(socket.readyState).toBe(Socket.OPEN)
+    socket.receive({ kind: 'call', turnId, callId: 'late-call', tool: 'scene_request', args: { request: { type: 'createEntity', name: 'Door' } } })
+    reading.resolve(ref)
+    await forgetting
+
+    expect(scene).not.toHaveBeenCalled()
+    expect(socket.sent.slice(1)).toEqual([{ kind: 'stop', turnId }, { kind: 'forget', id: ref?.id }, { kind: 'reset' }])
+    expect(socket.readyState).toBe(3)
+  } finally { reading.resolve(ref); await forgetting; assistant.dispose() }
 })

@@ -342,13 +342,14 @@ For Decentraland's deployed environments, publish this image to the chosen servi
 registry and configure the service with:
 
 - One replica and a persistent writable volume at `/data`, owned by UID 1000.
-  Filesystem locks, upload rate limits, connection tickets and conversations are
+  Filesystem locks, upload rate limits, connection tickets and running conversations are
   currently process-local. Use a stop-before-start rollout when sharing this volume.
 - Port `8787`; `/health/ready` for readiness and `/health/live` for liveness.
 - Inject `ALLOWED_ORIGINS`, `PUBLIC_URL`, a stable `TICKET_SECRET`, `WKC_METRICS_BEARER_TOKEN`
   and `STORAGE_WALLETS` from the deployment's configuration/secrets.
 - The assistant is off until `ANTHROPIC_OAUTH_SETUP_TOKEN` (or `AI_AUTH_PATH`) is injected.
-  The default OAuth file lives at `/data/.assistant/.auth.json`, outside project data.
+  The default OAuth file lives at `/data/.assistant/.auth.json`, outside project data;
+  kept conversations, encrypted with keys only the creators' browsers hold, in `/data/.assistant/memory`.
   Back up `/data/projects` separately from credentials. Production rejects an explicit
   `AI_AUTH_PATH` inside `STORAGE_DIR`. With a credential, set `ASSISTANT_WALLETS`: the service
   refuses to start in production without it, because every turn spends the one configured credential.

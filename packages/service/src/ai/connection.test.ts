@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createAgentSession, createExtensionRuntime, ModelRuntime, SessionManager, SettingsManager } from '@earendil-works/pi-coding-agent'
@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AssistantServerMessage } from '../../../contract/src/assistant.ts'
 import type { AiSendParams } from '../../../contract/src/shell.ts'
 import { createConnection, parsePrompt } from './connection.ts'
+import { createAssistantMemory } from './memory.ts'
 import type { AgentFactory } from './types.ts'
 
 const params = { provider: 'claude' as const, model: 'test', text: 'Edit the door' }
@@ -20,10 +21,10 @@ describe('assistant tool bridge', () => {
       providers: async () => [],
       create: vi.fn(async (_params, call, emit) => ({
         prompt: async () => { results.push(await call('read_file', { path: 'src/scripts/Door.ts' })); emit({ text: 'Done' }) },
-        abort: async () => {}, dispose: () => {}
+        abort: async () => {}, dispose: () => {}, snapshot: () => []
       }))
     }
-    const connection = createConnection({ factory, send: (e) => events.push(e), allowTurn: () => true })
+    const connection = createConnection({ factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true })
     connection.receive({ kind: 'prompt', turnId: 'one', projectId: 'scene', params })
     await vi.waitFor(() => expect(events.some((e) => e.kind === 'call')).toBe(true))
     const call = events.find((e) => e.kind === 'call')
@@ -45,10 +46,10 @@ describe('assistant tool bridge', () => {
     const factory: AgentFactory = {
       providers: async () => [],
       create: async (_params, call) => ({
-        prompt: async () => { await call('write_file', { path: 'src/scripts/Door.ts' }) }, abort, dispose
+        prompt: async () => { await call('write_file', { path: 'src/scripts/Door.ts' }) }, abort, dispose, snapshot: () => []
       })
     }
-    const connection = createConnection({ factory, send: (e) => events.push(e), allowTurn: () => true })
+    const connection = createConnection({ factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true })
     connection.receive({ kind: 'prompt', turnId: 'one', projectId: 'scene', params })
     await vi.waitFor(() => expect(events.some((e) => e.kind === 'call')).toBe(true))
     connection.close()
@@ -61,7 +62,7 @@ describe('assistant tool bridge', () => {
     const events: AssistantServerMessage[] = []
     let toolError = ''
     const connection = createConnection({
-      send: (e) => events.push(e), allowTurn: () => true, toolTimeoutMs: 5,
+      logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true, toolTimeoutMs: 5,
       factory: {
         providers: async () => [],
         create: async (_params, call) => ({
@@ -70,7 +71,7 @@ describe('assistant tool bridge', () => {
             await expect(call('build', {})).rejects.toThrow('cancelled')
             throw new Error('a provider credential must not appear')
           },
-          abort: async () => {}, dispose: () => {}
+          abort: async () => {}, dispose: () => {}, snapshot: () => []
         })
       }
     })
@@ -109,11 +110,11 @@ describe('assistant tool bridge', () => {
           }]
         })
         sessions.push(session)
-        return { prompt: async (next: AiSendParams) => { await session.prompt(next.text) }, abort: () => session.abort(), dispose: () => session.dispose() }
+        return { prompt: async (next: AiSendParams) => { await session.prompt(next.text) }, abort: () => session.abort(), dispose: () => session.dispose(), snapshot: () => [] }
       })
     }
     const events: AssistantServerMessage[] = []
-    const connection = createConnection({ factory, send: (e) => events.push(e), allowTurn: () => true, turnTimeoutMs: 50 })
+    const connection = createConnection({ factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true, turnTimeoutMs: 50 })
     faux.setResponses([fauxAssistantMessage(fauxToolCall('build', {}), { stopReason: 'toolUse' })])
     connection.receive({ kind: 'prompt', turnId: 'one', projectId: 'scene', params: { ...params, text: 'Build a door' } })
     await vi.waitFor(() => expect(events).toContainEqual({ kind: 'event', event: { kind: 'done', turnId: 'one', ok: false } }))
@@ -134,5 +135,109 @@ describe('assistant tool bridge', () => {
     expect(parsePrompt({ ...params, text: ' ' })).toBeNull()
     expect(parsePrompt({ ...params, provider: 'arbitrary-provider' })).toBeNull()
     expect(parsePrompt({ ...params, images: [{ name: 'large', dataUrl: 'a'.repeat(2_800_001) }] })).toBeNull()
+  })
+
+  it('restores what the model remembered after a restart, only with the browser key, and forgets it', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'assistant-memory-'))
+    const wallet = '0x' + 'a'.repeat(40)
+    const ref = { id: 'b'.repeat(32), key: Buffer.alloc(32, 7).toString('base64url') }
+    const restored: unknown[] = []
+    const factory: AgentFactory = {
+      providers: async () => [],
+      create: async (_params, _call, _emit, restore) => {
+        restored.push(restore)
+        const said: unknown[] = [...(restore ?? [])]
+        return { prompt: async (next: AiSendParams) => { said.push(next.text) }, abort: async () => {}, dispose: () => {}, snapshot: () => said }
+      }
+    }
+    // each connection on a fresh store over the same folder: a service that restarted in between
+    async function turn(memoryKey: string, text: string) {
+      const events: AssistantServerMessage[] = []
+      const connection = createConnection({ factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true, memory: createAssistantMemory(dir).forWallet(wallet) })
+      connection.receive({ kind: 'prompt', turnId: text.replace(/\W/g, '-'), projectId: 'scene', params: { ...params, text }, memory: { id: ref.id, key: memoryKey } })
+      await vi.waitFor(() => expect(events.some((e) => e.kind === 'event' && e.event.kind === 'done')).toBe(true))
+      await connection.close()
+      return connection
+    }
+    try {
+      await turn(ref.key, 'Make a door')
+      await turn(ref.key, 'Make it red')
+      expect(restored[1]).toEqual(['Make a door'])
+      await turn(Buffer.alloc(32, 9).toString('base64url'), 'Someone else')
+      expect(restored[2]).toBeUndefined()
+      await turn(ref.key, 'Make it big')
+      expect(restored[3]).toEqual(['Make a door', 'Make it red'])
+      const [stored] = await readdir(join(dir, wallet))
+      expect((await readFile(join(dir, wallet, stored))).includes('Make a door')).toBe(false)
+
+      const connection = createConnection({ factory, logger: { error: vi.fn() }, send: () => {}, allowTurn: () => true, memory: createAssistantMemory(dir).forWallet(wallet) })
+      connection.receive({ kind: 'forget', id: ref.id })
+      await connection.close()
+      expect(await readdir(join(dir, wallet))).toEqual([])
+    } finally { await rm(dir, { recursive: true, force: true }) }
+  })
+
+  it('authenticates a changed key on the same connection and resumes saving with the right key', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'assistant-memory-key-change-'))
+    const wallet = '0x' + 'a'.repeat(40)
+    const ref = { id: 'b'.repeat(32), key: Buffer.alloc(32, 7).toString('base64url') }
+    const memory = createAssistantMemory(dir)
+    const events: AssistantServerMessage[] = []
+    const restored: unknown[] = []
+    const factory: AgentFactory = {
+      providers: async () => [],
+      create: async (_params, _call, _emit, restore) => {
+        restored.push(restore)
+        const said: unknown[] = [...(restore ?? [])]
+        return { prompt: async (next) => { said.push(next.text) }, abort: async () => {}, dispose: () => {}, snapshot: () => [...said] }
+      }
+    }
+    const connection = createConnection({ factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true, memory: memory.forWallet(wallet) })
+    async function turn(turnId: string, key: string) {
+      connection.receive({ kind: 'prompt', turnId, projectId: 'scene', params: { ...params, text: turnId }, memory: { ...ref, key } })
+      await vi.waitFor(() => expect(events).toContainEqual({ kind: 'event', event: { kind: 'done', turnId, ok: true } }))
+    }
+    try {
+      await turn('original', ref.key)
+      await turn('wrong-key', Buffer.alloc(32, 9).toString('base64url'))
+      await turn('continued', ref.key)
+      await connection.close()
+
+      expect(restored).toEqual([undefined, undefined, ['original']])
+      expect(await memory.forWallet(wallet).load(ref)).toEqual(['original', 'continued'])
+    } finally { await connection.close(); await rm(dir, { recursive: true, force: true }) }
+  })
+
+  it('logs memory failures without secrets and keeps later saves and deletions working', async () => {
+    const events: AssistantServerMessage[] = []
+    const logger = { error: vi.fn() }
+    const ref = { id: 'b'.repeat(32), key: Buffer.alloc(32, 7).toString('base64url') }
+    const failure = new Error(`Private conversation and key: ${ref.key}`)
+    const memory = {
+      load: vi.fn(async () => null),
+      save: vi.fn().mockRejectedValueOnce(failure).mockResolvedValue(undefined),
+      forget: vi.fn().mockRejectedValueOnce(failure).mockResolvedValue(undefined)
+    }
+    const connection = createConnection({
+      logger, memory, send: (e) => events.push(e), allowTurn: () => true,
+      factory: {
+        providers: async () => [],
+        create: async () => ({ prompt: async () => {}, abort: async () => {}, dispose: () => {}, snapshot: () => [] })
+      }
+    })
+    try {
+      for (const turnId of ['one', 'two']) {
+        connection.receive({ kind: 'prompt', turnId, projectId: 'scene', params, memory: ref })
+        await vi.waitFor(() => expect(events).toContainEqual({ kind: 'event', event: { kind: 'done', turnId, ok: true } }))
+      }
+      connection.receive({ kind: 'forget', id: ref.id })
+      connection.receive({ kind: 'forget', id: ref.id })
+      await connection.close()
+
+      expect(memory.save).toHaveBeenCalledTimes(2)
+      expect(memory.forget).toHaveBeenCalledTimes(2)
+      expect(logger.error.mock.calls).toEqual([['Assistant memory save failed'], ['Assistant memory deletion failed']])
+      expect(events.some((e) => e.kind === 'failure' || (e.kind === 'event' && e.event.kind === 'error'))).toBe(false)
+    } finally { await connection.close() }
   })
 })

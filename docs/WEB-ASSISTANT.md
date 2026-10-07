@@ -142,8 +142,18 @@ components; see the [service README](../packages/service/README.md).
   at most 16,000 characters per page or 20 search matches. This never requests a
   browser file and cannot read credentials or private project storage.
 
-A conversation lives in memory on one connection and stays with that browser's
-project, provider and model. Stop, New chat, project changes, account changes and
+A conversation runs in memory on one connection and stays with that browser's
+project, provider and model. After each completed turn the service also keeps what
+the model remembers, encrypted (AES-256-GCM) with a key only that browser holds, in
+`<data>/../.assistant/memory/<wallet>/<id>.bin`. The browser sends the id and key with
+each prompt; when a new connection (a reload, a reconnect, a service restart) starts the
+conversation again, the service opens that file with the key and the model carries on
+where it was. The key is never written on the service. A file unused for 14 days is
+deleted, as is one over 8 MB; New chat deletes it while connected and always drops the key. A wallet keeps at most
+20 (the least recently used goes), all of them together at most 2 GB (past that, nothing new
+is kept). A save rejected by that cap preserves existing conversations, and a copy a connection
+couldn't open is never written over. Save and deletion failures are logged under `assistant`
+without conversation content or keys. Stop, New chat, project changes, account changes and
 disconnects cancel outstanding requests. Project transitions drain any in-flight
 browser action before opening another scene. Completed edits remain saved; an
 interrupted request is never replayed automatically. When a turn reaches its time or
@@ -153,8 +163,8 @@ closed meanwhile, Continue starts the original request over and says so.
 
 The chat itself is kept in the browser per wallet and project (OPFS
 `dcl-editor/assistant/<project>@<wallet>.json`, the last 100 messages up to 256 KB,
-without images) and comes back on reload under "Earlier conversation". It is only
-shown: the assistant starts each session without it, and nothing in it is re-sent.
+without images) and comes back on reload under "Earlier conversation". Nothing in it is re-sent:
+what the model remembers comes back from the service's encrypted copy instead.
 Another wallet on the same browser never sees it; purging the project deletes it.
 New chat (the assistant or Studio header) stops any turn and empties it.
 
@@ -178,6 +188,7 @@ Idle connections expire after 15 minutes. These limits live in one process. Prom
 ```bash
 npm run validate
 npm run validate -w @dcl-editor/web
+npm run validate:assistant -w @dcl-editor/web # just the assistant browser checks
 
 # Optional real model test: uses a synthetic project and the supplied OAuth session.
 ASSISTANT_LIVE_AUTH=/absolute/path/.auth.json node packages/web/validate/smoke.mjs
@@ -189,8 +200,10 @@ timeouts, editor-only authentication and single-use tickets. Component integrati
 tests also cover storage responses, CORS, metrics and shutdown during a tool call.
 The browser smoke test uses a deterministic agent behind the real component
 lifecycle and signed HTTP/WebSocket transport, with a separate browser origin. It
-reads and edits `src/index.ts`, builds in the browser, verifies the saved OPFS file
-and chat response, then verifies account sync and publishing still work. It uses a
+reads and edits `src/index.ts`, builds in the browser, and verifies the saved OPFS file
+and chat response. It restarts the service and reopens the project to check memory restoration,
+then clicks New chat in the assistant and Script Studio to verify the encrypted file and
+browser key are deleted. It also verifies account sync and publishing still work. It uses a
 fake engine host; real-engine gates remain in bevy-web's `react-web/e2e/`.
 
 Implementation: `packages/service/src/ai/` runs the agent and transport;

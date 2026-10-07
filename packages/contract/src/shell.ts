@@ -486,6 +486,8 @@ export interface EditorShell {
   aiSend?: (params: AiSendParams) => Promise<{ turnId: string }>
   aiStop?: () => Promise<void>
   aiReset?: () => Promise<void>
+  // a new chat: also drops what the assistant remembers of this project's conversation
+  aiForget?: () => Promise<void>
   // true while the conversation a limit paused is still held, so a continue prompt reaches it
   aiCanResume?: () => boolean
   // the signed-in wallet's kept chat for the open project; null when there is no one to keep it for

@@ -1,7 +1,7 @@
 import {
   createAgentSession, createExtensionRuntime, ModelRuntime, SessionManager, SettingsManager
 } from '@earendil-works/pi-coding-agent'
-import type { ResourceLoader, ToolDefinition } from '@earendil-works/pi-coding-agent'
+import type { FileEntry, ResourceLoader, ToolDefinition } from '@earendil-works/pi-coding-agent'
 import { Type } from '@earendil-works/pi-ai'
 import { object } from '../../../contract/src/assistant.ts'
 import type { AiProvider, AiSendParams } from '../../../contract/src/shell.ts'
@@ -70,7 +70,7 @@ export async function createPiFactory(authPath: string, preferredModel?: string,
   }
   return {
     providers,
-    async create(params, call, emit) {
+    async create(params, call, emit, restore) {
       const info = (await providers()).find((p) => p.id === params.provider)
       if (info === undefined || !info.available) throw new Error('Provider unavailable')
       const chosen = params.model ?? info.defaultModel
@@ -109,9 +109,10 @@ export async function createPiFactory(authPath: string, preferredModel?: string,
           return { content: [{ type: 'text', text: skillLibrary.read(args.path, args.offset, args.query) }], details: {} }
         }
       })
+      const sessionManager = SessionManager.inMemory(undefined, undefined, restore as FileEntry[] | undefined)
       const { session } = await createAgentSession({
         modelRuntime: runtime, model, resourceLoader: resources(skillLibrary),
-        sessionManager: SessionManager.inMemory(), settingsManager: SettingsManager.inMemory({ retry: { enabled: false } }),
+        sessionManager, settingsManager: SettingsManager.inMemory({ retry: { enabled: false } }),
         tools: tools.map((tool) => tool.name), customTools: tools
       })
       if (session.getActiveToolNames().some((name) => !tools.some((tool) => tool.name === name))) {
@@ -146,7 +147,11 @@ export async function createPiFactory(authPath: string, preferredModel?: string,
           }
         },
         abort: () => session.abort(),
-        dispose: () => session.dispose()
+        dispose: () => session.dispose(),
+        snapshot: () => {
+          const header = sessionManager.getHeader()
+          return header === null ? sessionManager.getEntries() : [header, ...sessionManager.getEntries()]
+        }
       }
     }
   }

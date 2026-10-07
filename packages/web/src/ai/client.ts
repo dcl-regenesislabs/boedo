@@ -1,16 +1,21 @@
 import { ASSISTANT_ID, ASSISTANT_PROTOCOL, ASSISTANT_TICKET_PREFIX, object } from '@dcl-editor/contract'
-import type { AiEvent, AiProviderInfo, AiSendParams, AssistantClientMessage, BrowserToolCall, EditorShell } from '@dcl-editor/contract'
+import type { AiEvent, AiProviderInfo, AiSendParams, AssistantClientMessage, AssistantMemoryRef, BrowserToolCall, EditorShell } from '@dcl-editor/contract'
 import type { HostFetchInit } from '@ui/engine/hosted'
 import { createBrowserTools } from './tools'
 import type { BrowserProject } from './tools'
 
-type AssistantShell = Required<Pick<EditorShell, 'aiProviders' | 'aiSend' | 'aiStop' | 'aiReset' | 'aiCanResume' | 'onAiEvent'>>
+type AssistantShell = Required<Pick<EditorShell, 'aiProviders' | 'aiSend' | 'aiStop' | 'aiReset' | 'aiForget' | 'aiCanResume' | 'onAiEvent'>>
 
 export function createBrowserAssistant(options: {
   service: string | null
   fetch(url: string, init?: HostFetchInit): Promise<Response>
   wallet(): string | null
   project(): { id: string; tools: BrowserProject }
+  // this browser's key to what the service remembers of a project's chat
+  memory: {
+    read(projectId: string, wallet: string): Promise<AssistantMemoryRef | null>
+    write(projectId: string, wallet: string, ref: AssistantMemoryRef | null): Promise<void>
+  }
 }) {
   const listeners = new Set<(event: AiEvent) => void>()
   let socket: WebSocket | null = null
@@ -161,6 +166,27 @@ export function createBrowserAssistant(options: {
     try { return await attempt } finally { if (connecting === attempt) connecting = null }
   }
 
+  function currentProject(): string | null {
+    try {
+      return options.project().id
+    } catch {
+      return null
+    }
+  }
+
+  async function rememberedChat(projectId: string, wallet: string): Promise<AssistantMemoryRef | undefined> {
+    try {
+      const kept = await options.memory.read(projectId, wallet)
+      if (kept !== null) return kept
+      const ref = { id: hex(crypto.getRandomValues(new Uint8Array(16))), key: base64url(crypto.getRandomValues(new Uint8Array(32))) }
+      await options.memory.write(projectId, wallet, ref)
+      return ref
+    } catch {
+      // without a place to keep the key the conversation is simply not kept
+      return undefined
+    }
+  }
+
   function reset(): Promise<void> {
     connectionGeneration++
     send({ kind: 'reset' })
@@ -199,7 +225,9 @@ export function createBrowserAssistant(options: {
         await connect()
         turn.controller.signal.throwIfAborted()
         if (options.wallet() !== wallet || options.project().id !== project.id) throw new Error('The open project or account changed.')
-        send({ kind: 'prompt', turnId: turn.id, projectId: project.id, params })
+        const memory = await rememberedChat(project.id, wallet)
+        turn.controller.signal.throwIfAborted()
+        send({ kind: 'prompt', turnId: turn.id, projectId: project.id, params, memory })
       } catch (error) {
         if (active === turn) finish(false, error instanceof Error ? error.message : 'Could not start the assistant.')
       }
@@ -210,8 +238,29 @@ export function createBrowserAssistant(options: {
       await reset()
     },
     async aiReset() { await reset() },
+    async aiForget() {
+      const wallet = options.wallet()
+      const projectId = active?.projectId ?? currentProject()
+      if (active !== null) send({ kind: 'stop', turnId: active.id })
+      finish(false)
+      const ref = wallet === null || projectId === null ? null : await options.memory.read(projectId, wallet).catch(() => null)
+      // the key goes too, so a copy the service couldn't delete now is unreadable
+      if (ref !== null && wallet !== null && projectId !== null) {
+        send({ kind: 'forget', id: ref.id })
+        await options.memory.write(projectId, wallet, null).catch(() => {})
+      }
+      await reset()
+    },
     aiCanResume: () => paused !== null && paused === socket && socket.readyState === WebSocket.OPEN,
     onAiEvent(listener) { listeners.add(listener); return () => { listeners.delete(listener) } }
   }
   return { shell, reset, dispose() { reset(); listeners.clear() } }
+}
+
+function hex(bytes: Uint8Array): string {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function base64url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }

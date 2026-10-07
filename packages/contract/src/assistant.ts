@@ -15,11 +15,17 @@ export interface BrowserToolCall {
   tool: BrowserToolName
   args: Record<string, unknown>
 }
+/** A conversation the service keeps encrypted between sessions; only the browser holds `key`. */
+export interface AssistantMemoryRef {
+  id: string
+  key: string
+}
 export type AssistantClientMessage =
-  | { kind: 'prompt'; turnId: string; projectId: string; params: AiSendParams }
+  | { kind: 'prompt'; turnId: string; projectId: string; params: AiSendParams; memory?: AssistantMemoryRef }
   | { kind: 'result'; turnId: string; callId: string; ok: boolean; text: string }
   | { kind: 'stop'; turnId: string }
   | { kind: 'reset' }
+  | { kind: 'forget'; id: string }
 
 export type AssistantServerMessage =
   | { kind: 'ready'; providers: AiProviderInfo[] }

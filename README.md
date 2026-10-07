@@ -205,6 +205,9 @@ in your browser, including imported projects, and builds there. Sign in to
 Decentraland and use the assistant when the hosting service has enabled it.
 If another edit changes a file while it is working, it must read the new version
 before saving. Service setup: [Web assistant](./docs/WEB-ASSISTANT.md).
+Completed turns resume after reloads and service restarts using encrypted memory
+linked to this browser. **New chat** clears the browser's key and, while connected,
+deletes the service's copy.
 For self-hosting, use the [service Docker deployment](./packages/service/README.md#container-deployment).
 The web assistant includes [Decentraland SDK skills](./packages/service/skills/README.md)
 for scene scripting, interactions, UI, animation and other SDK features, loaded on demand.

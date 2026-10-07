@@ -7,7 +7,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
-    "validate": "npm run build && node validate/smoke.mjs"
+    "validate": "npm run build && node validate/smoke.mjs",
+    "validate:assistant": "npm run build && node validate/smoke.mjs --assistant-only"
   },
   "dependencies": {
     "@dcl-editor/contract": "*",

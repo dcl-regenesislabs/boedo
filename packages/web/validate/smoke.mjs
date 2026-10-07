@@ -36,6 +36,7 @@ import { createMemoryStore } from '../../service/src/store.ts'
 
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist')
 const shots = process.env.SMOKE_SCREENSHOTS
+const assistantOnly = process.argv.includes('--assistant-only')
 const TYPES = {
   '.js': 'text/javascript',
   '.css': 'text/css',
@@ -216,13 +217,22 @@ const aiFactory = process.env.ASSISTANT_LIVE_AUTH
   ? await createPiFactory(process.env.ASSISTANT_LIVE_AUTH, process.env.ASSISTANT_LIVE_MODEL)
   : assistantFixture
 assert.ok((await aiFactory.providers()).some((provider) => provider.available), 'the assistant needs an OAuth session; run packages/service/scripts/assistant-login.ts first')
-const serviceProgram = await Lifecycle.run({
+const assistantData = fs.mkdtempSync(path.join(os.tmpdir(), 'dcl-assistant-smoke-'))
+const restoredConversations = []
+const startService = (port = '0') => Lifecycle.run({
   initComponents: () => initComponents({
     config: createConfigComponent({
-      HTTP_SERVER_HOST: '127.0.0.1', HTTP_SERVER_PORT: '0', ALLOWED_ORIGINS: origin,
+      HTTP_SERVER_HOST: '127.0.0.1', HTTP_SERVER_PORT: port, ALLOWED_ORIGINS: origin,
+      AI_AUTH_PATH: path.join(assistantData, '.auth.json'),
       BASE_PATH: '/svc', TICKET_SECRET: 'smoke-secret-smoke-secret-smoke-secret', LOG_LEVEL: 'OFF'
     }),
-    store: createMemoryStore(), agentFactory: aiFactory
+    store: createMemoryStore(), agentFactory: {
+      ...aiFactory,
+      create: (...args) => {
+        restoredConversations.push(args[3])
+        return aiFactory.create(...args)
+      }
+    }
   }),
   main: async (program) => {
     program.components.server.use(async ({ request, url }, next) => {
@@ -246,6 +256,7 @@ const serviceProgram = await Lifecycle.run({
     await serviceMain(program)
   }
 })
+let serviceProgram = await startService()
 const serviceServer = await getUnderlyingServer(serviceProgram.components.server)
 const serviceOrigin = `http://127.0.0.1:${serviceServer.address().port}`
 service = createFakeService({ hash: contentCid, baseUrl: `${serviceOrigin}/svc` })
@@ -501,8 +512,7 @@ const saveCode = async (of, text) => {
 }
 const reloads = () => page.evaluate(() => window.__smoke.console.filter((line) => line.startsWith('reload')).length)
 
-try {
-
+async function checkGuestEditor() {
   // 1. the scene list, in the HUD's Create page, in the HUD's look and with no sign-in of its own
   await home.locator('.eui-create').waitFor()
   await home.getByRole('tab', { name: 'Your scenes' }).waitFor()
@@ -858,7 +868,9 @@ try {
   ok('a scene whose first build fails stays open: “Open the code” shows the failing file, and the error screen is still there to leave from')
 
   assert.equal(service.log.length, 0, 'a guest on a v0 host asked the project service for nothing')
+}
 
+async function checkSignedEditor() {
   // signed in, a scene made in one browser is on the account and opens in another
   const first = await openEditor(await browser.newContext(size), { signedIn: true })
   const one = uiOf(first)
@@ -888,6 +900,58 @@ try {
   await one.locator('.eui-topbar .eui-autosave', { hasText: 'Synced' }).waitFor()
   await shot('5-assistant', first)
   ok('assistant: signed connection → WebSocket → browser read/write/build → streamed chat, with no server workspace')
+
+  if (!process.env.ASSISTANT_LIVE_AUTH) {
+    const walletMemory = path.join(assistantData, 'memory', WALLET.toLowerCase())
+    const memoryFiles = () => fs.existsSync(walletMemory) ? fs.readdirSync(walletMemory).filter((name) => name.endsWith('.bin')) : []
+    const answer = 'Updated the browser project and verified its build.'
+    const send = async (text) => {
+      const replies = one.locator('.eui-ai-msg.assistant .eui-ai-text').filter({ hasText: answer })
+      const count = await replies.count()
+      await one.locator('.eui-ai-input').fill(text)
+      await one.locator('.eui-ai-input').press('Enter')
+      await replies.nth(count).waitFor({ timeout: 120_000 })
+      await one.getByRole('button', { name: 'Stop', exact: true }).waitFor({ state: 'hidden' })
+      await until('the encrypted conversation', () => memoryFiles().length === 1)
+    }
+    await until('the first encrypted conversation', () => memoryFiles().length === 1)
+    const [originalMemory] = memoryFiles()
+    assert.ok(!fs.readFileSync(path.join(walletMemory, originalMemory)).includes('assistant browser round trip'), 'the saved conversation contains no plaintext prompt')
+    await backToScenes(first)
+    await serviceProgram.stop()
+    serviceProgram = await startService(new URL(serviceOrigin).port)
+    await oneHome.locator('.eui-create-card', { hasText: 'Shared scene' }).click()
+    await one.locator('.eui-toolbar').waitFor({ timeout: 120_000 })
+    await send('Continue the browser smoke test.')
+    assert.equal(restoredConversations.at(-1)?.length, 1, 'the restarted service received the previous turn')
+    assert.match(restoredConversations.at(-1)[0], /Read src\/index\.ts, prepend exactly/)
+    assert.deepEqual(memoryFiles(), [originalMemory], 'reopening reused the same browser key and conversation')
+    await shot('5a-assistant-restored', first)
+    ok('assistant memory survives a service restart and reopening the browser project')
+
+    for (const studio of [false, true]) {
+      if (studio) await one.getByRole('button', { name: 'Code', exact: true }).click()
+      await one.getByRole('button', { name: 'New chat', exact: true }).click()
+      await one.locator('.eui-ai-confirm').getByRole('button', { name: 'Yes', exact: true }).click()
+      await until('New chat deleting the encrypted conversation', () => memoryFiles().length === 0)
+      assert.equal(await first.evaluate(async ({ project, wallet }) => {
+        const root = await navigator.storage.getDirectory()
+        const dir = await (await root.getDirectoryHandle('dcl-editor')).getDirectoryHandle('assistant')
+        return (await Array.fromAsync(dir.keys())).includes(`${project}@${wallet.toLowerCase()}.memory.json`)
+      }, { project: sharedId, wallet: WALLET }), false, 'New chat removes the browser key')
+      await shot(studio ? '5c-studio-new-chat' : '5b-assistant-new-chat', first)
+      await send('Start a new browser smoke conversation.')
+      assert.equal(restoredConversations.at(-1), undefined, 'the new chat starts without the forgotten conversation')
+      assert.notEqual(memoryFiles()[0], originalMemory, 'the new chat has a different memory ID')
+      if (studio) await one.locator('.eui-studio-hbtn').click()
+    }
+    ok('New chat in the assistant and Script Studio deletes server memory and the browser key, then starts fresh')
+  }
+
+  if (assistantOnly) {
+    assert.deepEqual(problems, [], 'no page errors, no failed requests')
+    return
+  }
 
   const second = await openEditor(await browser.newContext(size), { signedIn: true, openProject: 'no-such-scene' })
   const two = uiOf(second)
@@ -987,7 +1051,12 @@ try {
   assert.deepEqual(await altered.evaluate(() => window.__smoke.openPreview), [], 'nothing built by the altered worker reaches the engine')
   await shot('10-tampered-worker', altered)
   ok('a build worker changed by one byte is refused: the editor says its hash does not match and builds nothing')
-  console.log('smoke: PASS')
+}
+
+try {
+  if (!assistantOnly) await checkGuestEditor()
+  await checkSignedEditor()
+  console.log(assistantOnly ? 'assistant smoke: PASS' : 'smoke: PASS')
 } catch (error) {
   await shot('failure').catch(() => {})
   console.error(error)
@@ -1004,5 +1073,6 @@ try {
 } finally {
   await browser.close()
   await serviceProgram.stop()
+  fs.rmSync(assistantData, { recursive: true, force: true })
   server.close()
 }

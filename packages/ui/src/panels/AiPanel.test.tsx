@@ -96,10 +96,12 @@ describe('AiPanel turn end', () => {
 })
 
 describe('AiPanel new chat', () => {
-  it('clears the chat kept for this wallet and project', async () => {
+  it.each([false, true])('clears the chat kept for this wallet and project (hosted: %s)', async (hosted) => {
     const save = vi.fn(async (_messages: unknown) => {})
+    const stop = vi.fn(async () => {})
+    const forget = vi.fn(async () => {})
     const transcript = { owner: 'p1@0xabc', load: async () => [{ role: 'user', text: 'Make a door' }], save }
-    Object.assign(shellHost.editorShell ?? {}, { aiTranscript: () => transcript })
+    Object.assign(shellHost.editorShell ?? {}, { aiTranscript: () => transcript, aiStop: stop, aiForget: hosted ? forget : undefined })
     const view = mount(<AiPanel shown fill={false} height={300} />)
     await view.settle()
     expect(view.text()).toContain('Make a door')
@@ -110,6 +112,8 @@ describe('AiPanel new chat', () => {
 
     expect(view.text()).not.toContain('Make a door')
     expect(save).toHaveBeenLastCalledWith([])
+    expect(forget).toHaveBeenCalledTimes(hosted ? 1 : 0)
+    expect(stop).toHaveBeenCalledTimes(hosted ? 0 : 1)
     view.unmount()
   })
 })

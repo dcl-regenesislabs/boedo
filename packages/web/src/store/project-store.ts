@@ -258,6 +258,15 @@ export class ProjectStore {
     return this.writeJson('assistant', `${id}@${wallet.toLowerCase()}`, value)
   }
 
+  // the key that opens what the service keeps of this chat; removed with the transcripts
+  assistantMemory(id: string, wallet: string): Promise<unknown> {
+    return this.readJson('assistant', `${id}@${wallet.toLowerCase()}.memory`)
+  }
+
+  setAssistantMemory(id: string, wallet: string, value: unknown): Promise<void> {
+    return this.writeJson('assistant', `${id}@${wallet.toLowerCase()}.memory`, value)
+  }
+
   private async removeTranscripts(id: string): Promise<void> {
     let dir: DirEntry
     try {

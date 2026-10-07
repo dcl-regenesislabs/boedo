@@ -1,4 +1,4 @@
-import { join, resolve, sep } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import { createServerComponent, createStatusCheckComponent, instrumentHttpServerWithPromClientRegistry } from '@dcl/http-server'
 import { createMetricsComponent } from '@dcl/metrics'
 import { createLogComponent } from '@well-known-components/logger'
@@ -9,6 +9,7 @@ import { createPurgeJobComponent } from './adapters/purge-job.ts'
 import { createSkillsComponent } from './adapters/skills.ts'
 import { createAssistantComponent, DEFAULT_ASSISTANT_LIMITS } from './ai/server.ts'
 import type { AssistantLimits } from './ai/server.ts'
+import { createAssistantMemory } from './ai/memory.ts'
 import { ASSISTANT_MODEL, createPiFactory } from './ai/pi.ts'
 import type { AgentFactory } from './ai/types.ts'
 import { createRateLimiter, createUploadGate, envFromConfig, DEFAULT_LIMITS, walletAllowlist } from './config.ts'
@@ -80,7 +81,9 @@ export async function initComponents(options: ComponentOptions = {}): Promise<Ap
   }
   const assistant = createAssistantComponent({ logs }, {
     factory, allowedOrigins: env.allowedOrigins, basePath: env.basePath,
-    limits
+    limits,
+    // beside the credential, outside STORAGE_DIR and its project backups
+    memory: authPath === undefined ? undefined : createAssistantMemory(join(dirname(authPath), 'memory'))
   })
   const server = await createServerComponent<GlobalContext>({ config, logs, ws: assistant.ws }, {})
   if (!metrics.registry) throw new Error('Metrics registry is not initialized')

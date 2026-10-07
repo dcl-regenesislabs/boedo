@@ -22,7 +22,7 @@ import type {
   SceneSettings,
   ServersReady
 } from '@dcl-editor/contract'
-import { TRASH_DAYS, copySuffix } from '@dcl-editor/contract'
+import { TRASH_DAYS, copySuffix, object } from '@dcl-editor/contract'
 import { contentCid } from '@dcl-editor/contract/cid'
 import { LOCK_FILE, PREVIEW_CACHE_NAME, PREVIEW_STORAGE_CACHE_NAME, fetchVerified, lockedKey, parseLock } from '@dcl-editor/web-build'
 import { notify } from '@scene/reactive'
@@ -164,6 +164,13 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
       return services.signedFetch(url, init)
     },
     wallet,
+    memory: {
+      read: async (projectId, account) => {
+        const kept = await store.assistantMemory(projectId, account)
+        return object(kept) && typeof kept.id === 'string' && typeof kept.key === 'string' ? { id: kept.id, key: kept.key } : null
+      },
+      write: (projectId, account, ref) => store.setAssistantMemory(projectId, account, ref)
+    },
     project: () => {
       const open = project()
       return {
