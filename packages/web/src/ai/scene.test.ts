@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { browserSceneRequest } from './scene'
+import { state } from '@scene/state'
 
 const { setValue, status } = vi.hoisted(() => {
   const status = new Map<string, string>()
-  const setValue = vi.fn(async () => {
-    status.set('512:Material', '✓ set')
+  const setValue = vi.fn(async (key: string) => {
+    status.set(key, '✓ set')
   })
   return { setValue, status }
 })
@@ -38,6 +39,22 @@ describe('assistant scene requests', () => {
     expect(await browserSceneRequest({ type: 'check' }, new AbortController().signal)).toEqual({
       findings: [{ level: 'blocker', title: 'Nothing picked', detail: 'Pick a prefab', entity: 'Box' }]
     })
+  })
+
+  it('applies a patch over the current value without an inspect, and keeps the rest', async () => {
+    setValue.mockClear()
+    state.snapshot['512'] = { Transform: { position: { x: 1, y: 0.5, z: 1 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 }, parent: 0 } }
+    await browserSceneRequest(
+      { type: 'setComponent', to: '512', component: 'Transform', patch: { position: { y: 3.5 } } },
+      new AbortController().signal
+    )
+    expect(JSON.parse(String((setValue.mock.calls as unknown[][]).at(-1)?.[3]))).toMatchObject({ position: { x: 1, y: 3.5, z: 1 }, scale: { x: 1, y: 1, z: 1 } })
+  })
+
+  it('moves an entity by an offset in one request', async () => {
+    state.snapshot['512'] = { Transform: { position: { x: 1, y: 0.5, z: 1 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 }, parent: 0 } }
+    expect(await browserSceneRequest({ type: 'move', to: '512', by: { y: 2 } }, new AbortController().signal)).toEqual({ id: '512', position: { x: 1, y: 2.5, z: 1 } })
+    await expect(browserSceneRequest({ type: 'move', to: '512', by: {} }, new AbortController().signal)).rejects.toThrow('move needs')
   })
 })
 

@@ -60,8 +60,14 @@ scene_request accepts one request:
   scale:{x:2,y:0.3,z:2}},MeshRenderer:{mesh:{box:{}}},MeshCollider:{mesh:{box:{}}},
   Material:{material:{pbr:{albedoColor:{r:0.2,g:0.5,b:1,a:1},metallic:0,roughness:1}}}}}
   Rotation is a quaternion. Other shapes: {sphere:{}}, {cylinder:{radiusTop:0.5,radiusBottom:0.5}}, {plane:{}}.
-- {type:"setComponent",to:"entity id or unique name",component:"Transform",value:{...},expected:{...}}
-  replaces an authorable component. expected is its last inspected value, or null if absent.
+- {type:"move",to:"entity id or unique name",by:{x:0,y:1,z:0}} moves an entity by that much, in metres, and
+  answers its new position; nothing to look up first. +x is east, +y up, +z north.
+- {type:"setComponent",to:"entity id or unique name",component:"Transform",patch:{position:{y:3.5}}} changes
+  only the fields given, laid over the component's current value, and answers the whole value after: the way to
+  move, resize, recolour or retune something you have not inspected. outline's positions and sizes are enough
+  to compute a patch; no inspect first.
+- {type:"setComponent",to:"...",component:"Transform",value:{...},expected:{...}} replaces a component whole.
+  expected is its last inspected value, or null if absent; inspect first.
   Write values in the form inspect returns: a oneof is {pbr:{...}}, never {$case:"pbr",...}.
   To recolor, replace the Material with a plain matte one rather than patching it: {material:{pbr:{albedoColor,
   metallic:0,roughness:1}}}, no emissive, reflectivity or texture fields. Unset metallic renders as 0.5.
@@ -77,8 +83,10 @@ scene_request accepts one request:
   scene relaunches with the new parcels when your turn ends. It cannot change the title.
 - {type:"check"} runs the editor's scene checks (wrong prefab wiring, unanswered game events, things outside the
   parcels, …) and returns its findings; a blocker is something the creator would be shown as broken.
-- {type:"batch",requests:[...]} runs up to 200 of the requests above in order and returns one {ok,result|error}
-  per request; a failure does not stop the rest. Later requests can name entities created earlier in the batch.
+- {type:"batch",requests:[...]} runs up to 200 of the requests above in order, reads and writes together, and
+  returns one {ok,result|error} per request; a failure does not stop the rest. Later requests can name entities
+  created earlier in the batch. One batch per change, not one request per call: outline the entities you need,
+  then every edit in one batch, then view.
 Requests require edit mode. Do not claim an action worked unless its result confirms it.
 You cannot see the scene: a saved change is not a visual check, so say so. If a visual change did not work,
 ask for a screenshot before trying again.

@@ -40,12 +40,21 @@ function schemaOf(name: string): Promise<ComponentSchema | null> {
   return pending
 }
 
-async function setComponent(id: string, name: unknown, value: unknown, expected: unknown): Promise<void> {
+// a patch lays its fields over the current value, object by object: {position:{y:3}} moves one axis
+function merged(current: unknown, patch: unknown): unknown {
+  if (!object(current) || !object(patch)) return patch
+  const out: Record<string, unknown> = { ...current }
+  for (const [key, value] of Object.entries(patch)) out[key] = merged(current[key], value)
+  return out
+}
+
+async function setComponent(id: string, name: unknown, value: unknown, expected: unknown, patch = false): Promise<void> {
   if (typeof name !== 'string' || !isAllowedComponent(name) || !object(value)) throw new Error('Invalid component update.')
   const previous = state.snapshot[id]?.[name] ?? null
-  if (JSON.stringify(previous) !== JSON.stringify(expected)) throw new Error('This component changed. Inspect the scene and retry.')
+  // a patch needs no inspect first: it is applied to whatever the component holds now
+  if (!patch && JSON.stringify(previous) !== JSON.stringify(expected)) throw new Error('This component changed. Inspect the scene and retry.')
   const key = componentKey(id, name)
-  let engineValue = toEngineValue(value)
+  let engineValue = toEngineValue(patch ? merged(previous, value) : value)
   // Transform has no engine schema to fill from; every entity already has a whole one
   if (name === 'Transform' && object(engineValue) && object(previous)) engineValue = { ...previous, ...engineValue }
   // the engine refuses a value missing any field, as the inspector's own writes never are
@@ -132,10 +141,24 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     }
     return { id, components: state.snapshot[id], ...(failed.length > 0 ? { failed } : {}) }
   }
+  if (request.type === 'move') {
+    // a relative move needs no lookup: "raise it a metre" is one request
+    const id = entity(request.to)
+    const by = request.by
+    if (!object(by) || !['x', 'y', 'z'].some((k) => typeof by[k] === 'number')) throw new Error('move needs by: {x, y, z} in metres.')
+    const current = state.snapshot[id]?.Transform
+    const position = object(current) && object(current.position) ? current.position : { x: 0, y: 0, z: 0 }
+    const next = Object.fromEntries((['x', 'y', 'z'] as const).map((k) => [k, Number(position[k] ?? 0) + (typeof by[k] === 'number' ? by[k] : 0)]))
+    await setComponent(id, 'Transform', { position: next }, null, true)
+    return { id, position: next }
+  }
   if (request.type === 'setComponent') {
     const id = entity(request.to)
-    if (!('expected' in request)) throw new Error('Invalid component update.')
-    await setComponent(id, request.component, request.value, request.expected)
+    if ('patch' in request) await setComponent(id, request.component, request.patch, null, true)
+    else {
+      if (!('expected' in request)) throw new Error('Invalid component update.')
+      await setComponent(id, request.component, request.value, request.expected)
+    }
     return { id, component: request.component, value: state.snapshot[id]?.[String(request.component)] }
   }
   if (!['attachScript', 'setParams', 'placePrefab'].includes(String(request.type))) throw new Error('Unsupported scene request.')
