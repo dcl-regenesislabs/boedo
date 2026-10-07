@@ -18,6 +18,10 @@ import { errorLocation, stripAnsi, useSceneHealth } from './scene-health'
 export function SceneLoader(props: { project: string }): JSX.Element {
   const shell = window.editorShell
   const [ready, setReady] = useState<ServersReady | null>(null)
+  // each push is a new preview of the project (a relaunch after its parcels changed), which the editor
+  // puts the engine on; the pull only stands in for a push this page missed
+  const [session, setSession] = useState(0)
+  const applied = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [logs, setLogs] = useState<string[]>([])
   // hosted the id is a slug the creator never typed: name the scene by its title
@@ -37,6 +41,8 @@ export function SceneLoader(props: { project: string }): JSX.Element {
       // import/upload (which write files over the data-layer) can connect.
       // Hosted, the project store is handed in and there is nothing to dial.
       if (!isHosted()) setDataLayerRealm(info.realm)
+      applied.current = true
+      setSession((n) => n + 1)
       setReady(info)
     }
     void shell.getState().then((s) => {
@@ -49,7 +55,7 @@ export function SceneLoader(props: { project: string }): JSX.Element {
     // On a reload the servers are already up but the push won't re-fire — pull
     // the cached payload. Null on first load; the push above delivers it then.
     void shell.requestReady?.().then((info) => {
-      if (info !== null && info !== undefined) apply(info)
+      if (info !== null && info !== undefined && !applied.current) apply(info)
     })
   }, [])
   useEffect(() => {
@@ -64,7 +70,7 @@ export function SceneLoader(props: { project: string }): JSX.Element {
     if (ready.spawn !== '') p.set('spawn', ready.spawn)
     if (ready.spawnPoints !== '[]') p.set('spawnPoints', ready.spawnPoints)
     p.set('project', props.project)
-    return <Editor params={p} />
+    return <Editor params={p} preview={session} />
   }
   // the creator's own code stopped the server — lead with their error, not ours
   const codeError = error !== null && health !== null

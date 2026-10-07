@@ -7,6 +7,6 @@ import { SceneLoader } from '@ui/features/editor/SceneLoader'
 export function Root(): JSX.Element | null {
   const project = useStore(() => hostedRoute.project)
   const opens = useStore(() => hostedRoute.opens)
-  // a re-open (Try again, a changed parcel layout) starts the project over, as desktop's page load does
+  // a re-open (Try again) starts the project over, as desktop's page load does
   return project === null ? null : <SceneLoader key={`${project}#${opens}`} project={project} />
 }

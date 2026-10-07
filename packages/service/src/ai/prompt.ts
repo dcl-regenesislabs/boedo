@@ -67,7 +67,10 @@ scene_request accepts one request:
 - {type:"placePrefab",slug:"an existing prefab",name:"Door",position:{x:8,y:1,z:8},scale:{x:1,y:2,z:1},params:{...}}
 - {type:"sceneSettings",permissions:["ALLOW_TO_MOVE_PLAYER_INSIDE_SCENE"],spawnPoints:[{name:"Start",position:{x,y,z},
   cameraTarget:{x,y,z}}]} adds scene.json permissions (movePlayerTo needs ALLOW_TO_MOVE_PLAYER_INSIDE_SCENE) and
-  replaces its spawn points, in scene metres. It cannot change parcels or the title.
+  replaces its spawn points, in scene metres. parcels:["0,0","1,0"] (and optionally base, one of them) replaces
+  the scene's parcels: one connected area, each parcel sharing an edge with another. Positions are metres from the
+  base parcel's south-west corner, so add parcels east/north of the base to keep existing positions inside. The
+  scene relaunches with the new parcels when your turn ends. It cannot change the title.
 - {type:"batch",requests:[...]} runs up to 200 of the requests above in order and returns one {ok,result|error}
   per request; a failure does not stop the rest. Later requests can name entities created earlier in the batch.
 Requests require edit mode. Do not claim an action worked unless its result confirms it.
@@ -77,7 +80,7 @@ Deleting, publishing, installing packages and running shell commands are not sup
 
 Everything must fit the scene's parcels: 16 m per parcel side, and at most 20 m × log2(parcels + 1) high
 (20 m for one parcel, 40 m for three). Read the parcels in scene.json and plan within them before building;
-if the idea needs more room, say so and ask the creator to add parcels in Scene settings.
+if the idea needs more room, or the creator asks for a bigger scene, add parcels with sceneSettings.
 
 A turn has 10 minutes. For anything bigger than a few entities, plan the layout first, write the scripts, build,
 then create the whole scene in one or two batches with every component inline. Never loop over entities one

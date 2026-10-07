@@ -46,7 +46,7 @@ function previewRealmId(params: URLSearchParams): string {
   return id ?? params.get('project') ?? ''
 }
 
-export function Editor(props: { params: URLSearchParams }): JSX.Element {
+export function Editor(props: { params: URLSearchParams; preview?: number }): JSX.Element {
   const status = useStore(() => state.status)
   const scene = useStore(() => state.scene)
   const booted = useRef(false)
@@ -109,6 +109,25 @@ export function Editor(props: { params: URLSearchParams }): JSX.Element {
       clearLaunchParams()
     }
   }, [])
+
+  // A relaunched preview (new parcels) on the same realm: the same steps as opening the project,
+  // without rebuilding the editor around them.
+  const preview = useRef(props.preview)
+  useEffect(() => {
+    if (host === null || props.preview === preview.current) return
+    preview.current = props.preview
+    setLaunchParams(props.params)
+    void (async () => {
+      try {
+        await host.openPreview(previewRealmId(props.params), props.params.get('position') ?? '0,0')
+        await startEditorScene(cmd.reload)
+      } catch (e) {
+        log.error('the host could not relaunch the project', e)
+        return
+      }
+      void boot()
+    })()
+  }, [props.preview])
 
   // Engine boot watchdog. A corrupt IndexedDB makes the engine's indexedDB.open
   // fail, so it never registers its console command and boot() spins forever at

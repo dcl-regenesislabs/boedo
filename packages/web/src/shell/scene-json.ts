@@ -158,7 +158,7 @@ export function compositeEntityIds(text: string): number[] {
   return [...ids].sort((a, b) => a - b)
 }
 
-// what the assistant may change in scene.json: never parcels, title or anything published as identity
+// what the assistant may change in scene.json: never the title or anything published as identity
 export const ASSISTANT_PERMISSIONS = [
   'ALLOW_TO_MOVE_PLAYER_INSIDE_SCENE',
   'ALLOW_TO_TRIGGER_AVATAR_EMOTE',
@@ -171,6 +171,24 @@ export const ASSISTANT_PERMISSIONS = [
 export interface AssistantSceneSettings {
   permissions?: unknown
   spawnPoints?: unknown
+  parcels?: unknown
+  base?: unknown
+}
+
+const MAX_ASSISTANT_PARCELS = 100
+
+// one piece: every parcel reachable from the first through shared edges
+function connected(parcels: string[]): boolean {
+  const all = new Set(parcels)
+  const seen = new Set([parcels[0]])
+  const queue = [parcels[0]]
+  while (queue.length > 0) {
+    const [x, y] = queue.pop()!.split(',').map(Number)
+    for (const next of [`${x + 1},${y}`, `${x - 1},${y}`, `${x},${y + 1}`, `${x},${y - 1}`]) {
+      if (all.has(next) && !seen.has(next)) { seen.add(next); queue.push(next) }
+    }
+  }
+  return seen.size === all.size
 }
 
 function point(v: unknown): { x: number; y: number; z: number } | null {
@@ -179,7 +197,7 @@ function point(v: unknown): { x: number; y: number; z: number } | null {
   return [x, y, z].every((n) => typeof n === 'number' && Number.isFinite(n)) ? { x: x as number, y: y as number, z: z as number } : null
 }
 
-// Adds permissions and replaces the spawn points; throws on anything it would not write.
+// Adds permissions, replaces the spawn points and the parcels; throws on anything it would not write.
 export function applyAssistantSettings(raw: RawSceneJson, s: AssistantSceneSettings): RawSceneJson {
   const next: RawSceneJson = { ...raw }
   if (s.permissions !== undefined) {
@@ -188,6 +206,20 @@ export function applyAssistantSettings(raw: RawSceneJson, s: AssistantSceneSetti
     }
     const current = Array.isArray(raw.requiredPermissions) ? (raw.requiredPermissions as unknown[]).filter((p) => typeof p === 'string') : []
     next.requiredPermissions = [...new Set([...current, ...(s.permissions as string[])])]
+  }
+  if (s.parcels !== undefined || s.base !== undefined) {
+    const current = raw.scene ?? {}
+    const parcels = s.parcels ?? current.parcels
+    if (!Array.isArray(parcels) || parcels.length === 0 || parcels.length > MAX_ASSISTANT_PARCELS ||
+      parcels.some((p) => typeof p !== 'string' || !PARCEL_RE.test(p))) {
+      throw new Error(`parcels must be a list of 1–${MAX_ASSISTANT_PARCELS} "x,y" coordinates`)
+    }
+    const list = (parcels as string[]).map((p) => p.split(',').map(Number).join(','))
+    if (new Set(list).size !== list.length) throw new Error('parcels has duplicates')
+    if (!connected(list)) throw new Error('parcels must form one connected area: each one shares an edge with another')
+    const base = s.base ?? (typeof current.base === 'string' && list.includes(current.base) ? current.base : list[0])
+    if (typeof base !== 'string' || !list.includes(base)) throw new Error('base must be one of the parcels')
+    next.scene = { ...current, parcels: list, base }
   }
   if (s.spawnPoints !== undefined) {
     if (!Array.isArray(s.spawnPoints) || s.spawnPoints.length > 16) throw new Error('spawnPoints must be a list of up to 16 points')

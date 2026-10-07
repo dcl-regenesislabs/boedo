@@ -341,6 +341,9 @@ export const RELAY_HOSTS: readonly string[] = [
 export interface EditorShell {
   pickProject: () => Promise<void>
   openProject: (dir: string) => Promise<void>
+  // the open project again on its current files (its parcels changed), staying in the editor;
+  // absent means openProject
+  relaunchProject?: (dir: string) => Promise<void>
   // stop the current project's dev server when returning to the picker
   closeProject?: () => Promise<void>
   getState: () => Promise<HostState>

@@ -180,9 +180,17 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
           write: (path, bytes, expected, signal) => writeFile(open.id, path, bytes, { expected, signal }),
           scene: (request, signal) =>
             browserSceneRequest(request, signal, async (settings) => {
+              const layout = (raw: ReturnType<typeof parseSceneJson>) => JSON.stringify([raw?.scene?.parcels, raw?.scene?.base])
+              const before = layout(parseSceneJson(await readFile(open.id, 'scene.json')))
               await editSceneJson(open.id, (raw) => applyAssistantSettings(raw, settings))
               const raw = parseSceneJson(await readFile(open.id, 'scene.json'))
-              return { requiredPermissions: raw?.requiredPermissions ?? [], spawnPoints: raw?.spawnPoints ?? [] }
+              const moved = layout(raw) !== before
+              if (moved) relaunch = { id: open.id, done: false, timer: undefined }
+              return {
+                requiredPermissions: raw?.requiredPermissions ?? [], spawnPoints: raw?.spawnPoints ?? [],
+                parcels: raw?.scene?.parcels ?? [], base: raw?.scene?.base ?? null,
+                ...(moved ? { note: 'The scene relaunches with these parcels when this turn ends; until then the running scene keeps the old ones.' } : {})
+              }
             }),
           written: scriptAttacher(),
           build: async (signal) => {
@@ -304,6 +312,24 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
     notify()
   }
   void probeAssistant()
+  // new parcels feed the engine's launch: relaunch once the turn is over and its chat is kept,
+  // since relaunching mid-turn cuts the assistant off and before the save loses what it said
+  let relaunch: { id: string; done: boolean; timer: ReturnType<typeof setTimeout> | undefined } | null = null
+  function relaunchNow(): void {
+    if (relaunch === null) return
+    const { id, timer } = relaunch
+    clearTimeout(timer)
+    relaunch = null
+    let still = false
+    try { still = project().id === id } catch { still = false }
+    if (still) void transition((mine) => open(id, mine))
+  }
+  assistant.shell.onAiEvent((event) => {
+    if (event.kind !== 'done' || relaunch === null) return
+    relaunch.done = true
+    // no chat to keep (no account, or it failed to save): relaunch anyway
+    relaunch.timer = setTimeout(relaunchNow, 3000)
+  })
   // signing in or out changes whose copy the projects are compared with
   let signedInAs = wallet()
   const accountPoll = setInterval(() => {
@@ -514,13 +540,17 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
         return {
           owner: `${id}@${signedIn.toLowerCase()}`,
           load: () => store.transcript(id, signedIn),
-          save: (messages) => store.setTranscript(id, signedIn, messages)
+          save: async (messages) => {
+            await store.setTranscript(id, signedIn, messages)
+            if (relaunch?.done === true && relaunch.id === id) relaunchNow()
+          }
         }
       }
     }),
     // a folder or a zip comes in through importProject
     pickProject: async () => {},
     openProject: (id) => transition((mine) => open(id, mine)),
+    relaunchProject: (id) => transition((mine) => open(id, mine)),
     closeProject: () =>
       transition(async () => {
         leave()

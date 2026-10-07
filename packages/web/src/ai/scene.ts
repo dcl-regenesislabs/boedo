@@ -79,7 +79,7 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
   }
   if (request.type === 'sceneSettings') {
     if (settings === undefined) throw new Error('Scene settings cannot be changed here.')
-    return settings({ permissions: request.permissions, spawnPoints: request.spawnPoints })
+    return settings({ permissions: request.permissions, spawnPoints: request.spawnPoints, parcels: request.parcels, base: request.base })
   }
   if (request.type === 'inspect') {
     const entries = Object.entries(state.snapshot).filter(([id]) => Number(id) >= 512 && !isUiEntity(state.snapshot, id))

@@ -240,7 +240,8 @@ export function SceneTopbar(props: { logsOpen: boolean; onToggleLogs: () => void
           // parcels/base/spawn feed the engine's launch params — relaunch the
           // scene so the preview actually reflects the new layout
           onSaved={(layoutChanged) => {
-            if (layoutChanged) void window.editorShell?.openProject(project)
+            const shell = window.editorShell
+            if (layoutChanged) void (shell?.relaunchProject ?? shell?.openProject)?.(project)
           }}
         />
       )}
