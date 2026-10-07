@@ -10,7 +10,7 @@ import type { AgentFactory, AssistantAgent } from './types.ts'
 const MAX_TURN_RESULT_CHARS = 2_000_000
 const TOOL_LABELS: Record<BrowserToolName, string> = {
   build: 'Building the scene', scene_request: 'Editing the scene', write_file: 'Saving a file',
-  read_file: 'Reading a file', list_files: 'Listing files'
+  read_file: 'Reading a file', list_files: 'Listing files', view: 'Looking at the scene'
 }
 
 interface Pending {

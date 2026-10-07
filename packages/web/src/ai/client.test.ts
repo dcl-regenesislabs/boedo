@@ -45,7 +45,7 @@ function setup(fetch = async () => new Response(JSON.stringify({ token: 'test-ti
       write: async (id, wallet, ref) => { if (ref === null) kept.delete(`${id}@${wallet}`); else kept.set(`${id}@${wallet}`, ref) }
     },
     project: () => ({ id: projectId, tools: {
-      files: () => new Map(), write: async () => {}, scene, build: async () => ({ ok: true })
+      files: () => new Map(), write: async () => {}, scene, build: async () => ({ ok: true }), view: async () => ({})
     } })
   })
   const events: AiEvent[] = []

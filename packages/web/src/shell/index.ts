@@ -33,6 +33,7 @@ import { createBrowserAssistant } from '../ai/client'
 import { scriptAttacher } from '../ai/attach'
 import { browserSceneRequest } from '../ai/scene'
 import { sameBytes } from '../ai/tools'
+import { captureView } from '../ai/view'
 import { externalDependencies } from '../archive/dependencies'
 import { createPublisher } from '../publish/publish'
 import { publishWorlds } from '../publish/worlds'
@@ -193,6 +194,7 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
               }
             }),
           written: scriptAttacher(),
+          view: (request, signal) => captureView(request, signal),
           build: async (signal) => {
             signal.throwIfAborted()
             await fileWrites

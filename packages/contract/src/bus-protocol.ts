@@ -69,6 +69,8 @@ export type PageToSceneMessage =
   | { type: 'spawn-points'; points: unknown[] }
   | { type: 'set-selection'; selected: string[]; active: string | null }
   | { type: 'set-camera'; mode: CameraMode; axis?: string }
+  // the free camera placed at a world position, aimed at a point when given (the assistant's viewpoints)
+  | { type: 'camera-pose'; position: { x: number; y: number; z: number }; lookAt?: { x: number; y: number; z: number } }
   // the page owns the transport; the scene's own frozen flag gates avatar input
   // and the free camera, and it samples the engine only once at boot
   | { type: 'set-frozen'; frozen: boolean }
@@ -161,6 +163,7 @@ export const PROTOCOL_KINDS = [
   'spawn-points',
   'set-selection',
   'set-camera',
+  'camera-pose',
   'set-frozen',
   'focus',
   'frame',

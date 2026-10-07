@@ -1,11 +1,14 @@
 import { ASSET_KINDS, ASSISTANT_MAX_FILE_BYTES, assetKind, assistantReadable, assistantWritable } from '@dcl-editor/contract'
 import type { BrowserToolCall } from '@dcl-editor/contract'
+import type { Point, ViewRequest } from './view'
 
 export interface BrowserProject {
   files(): ReadonlyMap<string, Uint8Array>
   write(path: string, bytes: Uint8Array, expected: Uint8Array | null, signal: AbortSignal): Promise<void>
   scene(request: unknown, signal: AbortSignal): Promise<unknown>
   build(signal: AbortSignal): Promise<unknown>
+  // a picture of the viewport: from the free camera placed at `from`, or framed on an entity, or as is
+  view(request: ViewRequest, signal: AbortSignal): Promise<unknown>
   // after a successful write; answers the entity a new script was attached to
   written?(path: string, content: string, created: boolean): Promise<{ id: string; name: string } | null>
 }
@@ -25,6 +28,12 @@ function parseRequest(text: string): unknown {
   }
 }
 
+function point(value: unknown): Point | null {
+  if (typeof value !== 'object' || value === null) return null
+  const { x, y, z } = value as Record<string, unknown>
+  return [x, y, z].every((n) => typeof n === 'number' && Number.isFinite(n)) ? { x: x as number, y: y as number, z: z as number } : null
+}
+
 export function createBrowserTools(project: BrowserProject) {
   const reads = new Map<string, { revision: string; bytes: Uint8Array }>()
   return async (call: BrowserToolCall, signal: AbortSignal): Promise<string> => {
@@ -41,6 +50,13 @@ export function createBrowserTools(project: BrowserProject) {
       }).sort().slice(0, 2000))
     }
     if (tool === 'build') return JSON.stringify(await project.build(signal))
+    if (tool === 'view') {
+      return JSON.stringify(await project.view({
+        entity: typeof args.entity === 'string' && args.entity.trim() !== '' ? args.entity : null,
+        from: point(args.from),
+        lookAt: point(args.lookAt)
+      }, signal))
+    }
     if (tool === 'scene_request') {
       // some models send the request object as JSON text
       return JSON.stringify(await project.scene(typeof args.request === 'string' ? parseRequest(args.request) : args.request, signal))

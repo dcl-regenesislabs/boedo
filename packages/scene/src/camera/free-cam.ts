@@ -189,6 +189,17 @@ export function setCamMode(mode: 'none' | 'free' | 'target'): void {
   else if (mode === 'target') initTarget()
 }
 
+// The free camera at an absolute pose: where the assistant asks to look from, aimed at a point.
+export function setCameraPose(position: Vector3, lookAt: Vector3 | null): void {
+  if (camEntity === null) return
+  setCamMode('free')
+  tween = null
+  const t = Transform.getMutable(camEntity)
+  t.position = { ...position }
+  if (lookAt !== null) aimAlong(Vector3.subtract(lookAt, position))
+  t.rotation = lookRotation()
+}
+
 // Bring an entity into view and then get out of the way. Two things this does
 // NOT do, both deliberate:
 //

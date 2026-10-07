@@ -85,20 +85,38 @@ export async function createPiFactory(authPath: string, preferredModel?: string,
         read_file: Type.Object({ path: Type.String() }),
         write_file: Type.Object({ path: Type.String(), content: Type.String(), revision: Type.Union([Type.String(), Type.Null()]) }),
         scene_request: Type.Object({ request: Type.Object({ type: Type.String() }, { additionalProperties: true }) }),
-        build: Type.Object({})
+        build: Type.Object({}),
+        view: Type.Object({
+          entity: Type.Optional(Type.String()),
+          from: Type.Optional(Type.Object({ x: Type.Number(), y: Type.Number(), z: Type.Number() })),
+          lookAt: Type.Optional(Type.Object({ x: Type.Number(), y: Type.Number(), z: Type.Number() }))
+        })
       }
       const descriptions: Record<BrowserToolName, string> = {
         list_files: 'List the open browser project\'s files, optionally only one kind (models, images, sounds, videos, data, code) and those whose path contains match. read_file opens code and data; models, images, sounds and videos are referenced by path.',
         read_file: 'Read a browser project file and its revision. Missing files have a null revision.',
         write_file: 'Create or replace source code, only if its revision still matches.',
         scene_request: 'Inspect or change the live scene using the editor actions documented in the system prompt.',
-        build: 'Compile the current browser project and return diagnostics. Does not publish or run it.'
+        build: 'Compile the current browser project and return diagnostics. Does not publish or run it.',
+        view: 'A picture of the scene. As is; or framed on entity (an id or unique name); or from a world position `from` looking at `lookAt`, in metres (16 per parcel), for a plan view from above, a facade or a close-up. Use it to check what you placed, moved or built.'
       }
       const tools: ToolDefinition[] = (Object.keys(schema) as BrowserToolName[]).map((name) => ({
         name, label: name, description: descriptions[name], parameters: schema[name],
         execute: async (_id, args, signal) => {
           if (!object(args)) throw new Error('Invalid tool arguments')
-          return { content: [{ type: 'text' as const, text: await call(name, args, signal) }], details: {} }
+          const text = await call(name, args, signal)
+          if (name !== 'view') return { content: [{ type: 'text' as const, text }], details: {} }
+          // the browser answers a picture; the model reads it as an image, not as base64 text
+          const view: unknown = JSON.parse(text)
+          if (!object(view) || typeof view.image !== 'string' || view.mimeType !== 'image/jpeg') throw new Error('The browser sent no picture.')
+          const framed = typeof view.framed === 'string' ? ` framed on "${view.framed}"` : ''
+          return {
+            content: [
+              { type: 'image' as const, mimeType: 'image/jpeg', data: view.image },
+              { type: 'text' as const, text: `The scene from the creator's camera${framed}, ${String(view.width)}×${String(view.height)}.` }
+            ],
+            details: {}
+          }
         }
       }))
       tools.push({

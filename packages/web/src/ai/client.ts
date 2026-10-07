@@ -102,7 +102,7 @@ export function createBrowserAssistant(options: {
     if (!object(message)) return
     if (message.kind === 'failure' && typeof message.message === 'string') { finish(false, message.message); return }
     if (message.kind === 'call' && typeof message.turnId === 'string' && typeof message.callId === 'string' &&
-      ASSISTANT_ID.test(message.callId) && ['list_files', 'read_file', 'write_file', 'scene_request', 'build'].includes(String(message.tool)) && object(message.args)) {
+      ASSISTANT_ID.test(message.callId) && ['list_files', 'read_file', 'write_file', 'scene_request', 'build', 'view'].includes(String(message.tool)) && object(message.args)) {
       const call = message as unknown as BrowserToolCall
       if (active === null || active.id !== call.turnId || active.calls.has(call.callId)) return
       active.calls.add(call.callId)

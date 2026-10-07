@@ -6,6 +6,7 @@ function setup() {
   const encoder = new TextEncoder()
   const files = new Map<string, Uint8Array>([['src/scripts/Door.ts', encoder.encode('original')], ['.env.local', encoder.encode('secret')]])
   const scene = vi.fn(async () => ({ attached: ['src/scripts/Door.ts'] }))
+  const view = vi.fn(async (request: { entity: string | null }) => ({ mimeType: 'image/jpeg', image: 'AAAA', width: 2, height: 1, framed: request.entity }))
   const written = vi.fn(async (_path: string, _content: string, created: boolean) => (created ? { id: '512', name: 'Door' } : null))
   const execute = createBrowserTools({
     files: () => files,
@@ -15,12 +16,13 @@ function setup() {
       files.set(path, bytes)
     },
     scene,
+    view,
     written,
     build: async () => ({ ok: true, diagnostics: [] })
   })
   const run = (tool: BrowserToolName, args: Record<string, unknown> = {}, signal = new AbortController().signal) =>
     execute({ kind: 'call', turnId: 'turn', callId: crypto.randomUUID(), tool, args }, signal)
-  return { files, run, encoder, scene, written }
+  return { files, run, encoder, scene, view, written }
 }
 
 describe('assistant browser tools', () => {
@@ -85,6 +87,13 @@ describe('assistant browser tools', () => {
     expect(JSON.parse(await run('list_files'))).toEqual([
       'assets/data/manifest.json', 'assets/images/brick.png', 'models/gate.glb', 'models/tower.glb', 'src/scripts/Door.ts'
     ])
+  })
+
+  it('answers a view with the picture, framed on the named entity', async () => {
+    const { run, view } = setup()
+    expect(JSON.parse(await run('view', { entity: 'Door' }))).toEqual({ mimeType: 'image/jpeg', image: 'AAAA', width: 2, height: 1, framed: 'Door' })
+    expect(JSON.parse(await run('view', { entity: '  ', from: { x: 8, y: 20, z: 8 }, lookAt: { x: 8, y: 'up', z: 8 } }))).toMatchObject({ framed: null })
+    expect(view).toHaveBeenLastCalledWith({ entity: null, from: { x: 8, y: 20, z: 8 }, lookAt: null }, expect.any(AbortSignal))
   })
 })
 
