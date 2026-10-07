@@ -3,7 +3,7 @@ import {
 } from '@earendil-works/pi-coding-agent'
 import type { FileEntry, ResourceLoader, ToolDefinition } from '@earendil-works/pi-coding-agent'
 import { Type } from '@earendil-works/pi-ai'
-import { object } from '../../../contract/src/assistant.ts'
+import { ASSET_KINDS, object } from '../../../contract/src/assistant.ts'
 import type { AiProvider, AiSendParams } from '../../../contract/src/shell.ts'
 import type { BrowserToolName } from '../../../contract/src/assistant.ts'
 import type { AgentFactory } from './types.ts'
@@ -78,14 +78,17 @@ export async function createPiFactory(authPath: string, preferredModel?: string,
       const model = runtime.getModel(PROVIDERS[info.id], chosen)
       if (model === undefined) throw new Error('Unknown model')
       const schema = {
-        list_files: Type.Object({}),
+        list_files: Type.Object({
+          kind: Type.Optional(Type.Union([...ASSET_KINDS].map((kind) => Type.Literal(kind)))),
+          match: Type.Optional(Type.String())
+        }),
         read_file: Type.Object({ path: Type.String() }),
         write_file: Type.Object({ path: Type.String(), content: Type.String(), revision: Type.Union([Type.String(), Type.Null()]) }),
         scene_request: Type.Object({ request: Type.Object({ type: Type.String() }, { additionalProperties: true }) }),
         build: Type.Object({})
       }
       const descriptions: Record<BrowserToolName, string> = {
-        list_files: 'List the open browser project\'s files: code and data files (read_file opens them) and models, images and sounds, which scenes reference by path.',
+        list_files: 'List the open browser project\'s files, optionally only one kind (models, images, sounds, videos, data, code) and those whose path contains match. read_file opens code and data; models, images, sounds and videos are referenced by path.',
         read_file: 'Read a browser project file and its revision. Missing files have a null revision.',
         write_file: 'Create or replace source code, only if its revision still matches.',
         scene_request: 'Inspect or change the live scene using the editor actions documented in the system prompt.',

@@ -48,3 +48,19 @@ export function assistantWritable(path: string): boolean {
   return assistantReadable(path) && /^src\//.test(path) && /\.(ts|tsx|js|jsx)$/.test(path) &&
     !path.split('/').includes('runtime')
 }
+
+// What a project file is to the assistant, by path: what list_files filters by and the per-turn summary counts
+export const ASSET_KINDS = ['models', 'images', 'sounds', 'videos', 'data', 'code'] as const
+export type AssetKind = (typeof ASSET_KINDS)[number]
+const KIND_TESTS: Array<[AssetKind, RegExp]> = [
+  ['models', /\.(glb|gltf)$/i],
+  ['images', /\.(png|jpe?g|webp|ktx2)$/i],
+  ['sounds', /\.(mp3|ogg|wav)$/i],
+  ['videos', /\.mp4$/i],
+  ['data', /^assets\/data\/.+\.(json|txt|md)$/i],
+  ['code', /\.(ts|tsx|js|jsx|json|md|txt)$/i]
+]
+export function assetKind(path: string): AssetKind | null {
+  if (path.startsWith('node_modules/') || path.startsWith('bin/')) return null
+  return KIND_TESTS.find(([, test]) => test.test(path))?.[0] ?? null
+}

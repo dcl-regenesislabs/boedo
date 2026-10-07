@@ -36,6 +36,7 @@ import { buildContext, entityScriptFiles, selectedEntities } from '../ai/context
 import { clearEditorRequests, runEditorRequests } from '../ai/requests'
 import { ensurePrefabsLoaded } from './prefab-store'
 import { isPrimaryMod } from '../lib/keys'
+import { projectFiles } from '../assets'
 
 export function AiPanel(props: { shown: boolean; fill: boolean; height: number }): JSX.Element | null {
   const shell = window.editorShell
@@ -452,7 +453,10 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
         setAttachments([])
       }
       setBusy(true)
-      void shell.aiSend?.({ provider, model, text: asked, context: buildContext(sel, aiStore.file), images: imgs.length > 0 ? imgs : undefined }).catch((err: unknown) => {
+      void (async () => {
+        const files = await projectFiles().catch((): string[] => [])
+        return await shell.aiSend?.({ provider, model, text: asked, context: buildContext(sel, aiStore.file, files), images: imgs.length > 0 ? imgs : undefined })
+      })().catch((err: unknown) => {
         setMessages((prev) => {
           const next = [...prev]
           for (let i = next.length - 1; i >= 0; i--) {

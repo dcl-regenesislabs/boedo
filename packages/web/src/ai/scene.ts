@@ -8,6 +8,7 @@ import { uiAddEntity } from '@ui/actions/entities'
 import { uiSetComponentValue } from '@ui/actions/components'
 import { runRequestText } from '@ui/ai/requests'
 import { resolveEntityRef } from '@ui/ai/request-format'
+import { sceneOutline } from '@ui/ai/roster'
 import type { AssistantSceneSettings } from '../shell/scene-json'
 
 function entity(ref: unknown): string {
@@ -81,11 +82,21 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     if (settings === undefined) throw new Error('Scene settings cannot be changed here.')
     return settings({ permissions: request.permissions, spawnPoints: request.spawnPoints, parcels: request.parcels, base: request.base })
   }
+  if (request.type === 'outline') {
+    return sceneOutline(state.snapshot, {
+      match: typeof request.match === 'string' ? request.match : undefined,
+      offset: typeof request.offset === 'number' ? request.offset : undefined
+    })
+  }
   if (request.type === 'inspect') {
-    const entries = Object.entries(state.snapshot).filter(([id]) => Number(id) >= 512 && !isUiEntity(state.snapshot, id))
+    // a big scene doesn't fit one answer: match narrows by name, offset pages through the rest
+    const match = typeof request.match === 'string' ? request.match.toLowerCase() : ''
+    const offset = typeof request.offset === 'number' && request.offset > 0 ? Math.floor(request.offset) : 0
+    const entries = Object.entries(state.snapshot).filter(([id]) =>
+      Number(id) >= 512 && !isUiEntity(state.snapshot, id) && (entityName(state.snapshot, id) ?? '').toLowerCase().includes(match))
     return {
-      selected: [...state.selected], editMode: state.frozen, total: entries.length,
-      entities: entries.slice(0, 150).map(([id, components]) => ({
+      selected: [...state.selected], editMode: state.frozen, total: entries.length, offset,
+      entities: entries.slice(offset, offset + 150).map(([id, components]) => ({
         id, name: entityName(state.snapshot, id),
         components: Object.fromEntries(Object.entries(components).filter(([name]) => isAllowedComponent(name)))
       }))

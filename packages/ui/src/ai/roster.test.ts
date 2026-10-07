@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildGuideIndex, buildSceneRoster, sceneRows, type GuideEntry } from './roster'
+import { buildAssetSummary, buildGuideIndex, buildSceneSummary, sceneOutline, sceneRows, type GuideEntry } from './roster'
 import type { Snapshot } from '@scene/state'
 
 const NAME = 'core-schema::Name'
@@ -58,8 +58,10 @@ describe('sceneRows', () => {
   })
 })
 
-describe('buildSceneRoster', () => {
-  it('names every zone on its own line', () => {
+describe('the scene the assistant looks up', () => {
+  const outline = (snapshot: Snapshot): string => sceneOutline(snapshot).lines.join('\n')
+
+  it('sums the scene up in one line and outlines zones with their place and size', () => {
     const snapshot: Snapshot = {
       ...base(),
       '512': {
@@ -67,20 +69,15 @@ describe('buildSceneRoster', () => {
         Transform: { position: { x: 8, y: 1.5, z: 10 }, scale: { x: 4, y: 3, z: 4 }, parent: 0 },
         TriggerArea: { mesh: 0, collisionMask: 8 }
       },
-      '513': {
-        [NAME]: { value: 'Arena' },
-        Transform: { position: { x: 0, y: 0, z: 0 }, parent: 0 },
-        TriggerArea: { mesh: 1, collisionMask: 4 }
-      }
+      '513': { [NAME]: { value: 'Front Door' }, GltfContainer: { src: 'models/door.glb' } }
     }
-    const text = buildSceneRoster(snapshot)
-    expect(text).toContain('Zones in this scene: "Front Hall", "Arena"')
-    expect(text).toContain('"Front Hall" (id 512) — Trigger area — at 8 1.5 10 m — size 4 3 4 m')
-  })
-
-  it('says so when there are no zones', () => {
-    expect(buildSceneRoster(base())).toContain('Zones in this scene: none yet.')
-    expect(buildSceneRoster(base())).toContain('no authored entities yet')
+    expect(buildSceneSummary(snapshot)).toBe(
+      '[Scene] 2 named entities, 1 of them zones. Look them up with outline (names, kinds, places) and inspect (components) before acting on them.'
+    )
+    expect(buildSceneSummary(base())).toBe('[Scene] No authored entities yet.')
+    expect(outline(snapshot)).toContain('"Front Hall" (id 512) — Trigger area — at 8 1.5 10 m — size 4 3 4 m')
+    // a kind derived from the entity, not its name echoed back
+    expect(outline(snapshot)).toContain('"Front Door" (id 513) — door · model')
   })
 
   it('lists a script with its current param values', () => {
@@ -103,30 +100,19 @@ describe('buildSceneRoster', () => {
         }
       }
     }
-    expect(buildSceneRoster(snapshot)).toContain(
+    expect(outline(snapshot)).toContain(
       '    script custom/trigger_zone/scripts/trigger-zone.ts — who: "any player", cooldown: 0.3'
     )
   })
 
-  it('derives a kind for a named entity instead of echoing its name', () => {
-    const snapshot: Snapshot = {
-      ...base(),
-      '512': { [NAME]: { value: 'Front Door' }, GltfContainer: { src: 'models/door.glb' } }
-    }
-    const text = buildSceneRoster(snapshot)
-    expect(text).toContain('"Front Door" (id 512) — door · model')
-    expect(text).toContain('has GltfContainer')
-  })
-
-  it('keeps every zone when the entity cap trims the roster', () => {
+  it('narrows the outline by name and pages through the rest', () => {
     const snapshot: Snapshot = base()
-    for (let i = 0; i < 30; i++) {
-      snapshot[String(600 + i)] = { [NAME]: { value: `Prop ${i}` } }
-    }
+    for (let i = 0; i < 30; i++) snapshot[String(600 + i)] = { [NAME]: { value: `Prop ${i}` } }
     snapshot['999'] = { [NAME]: { value: 'Front Hall' }, TriggerArea: { mesh: 0 } }
-    const text = buildSceneRoster(snapshot, 5)
-    expect(text).toContain('"Front Hall"')
-    expect(text).toContain('…and 26 more entities not listed.')
+    expect(sceneOutline(snapshot, { match: 'front' })).toMatchObject({ total: 1, offset: 0 })
+    const page = sceneOutline(snapshot, { offset: 28, limit: 5 })
+    expect(page.total).toBe(31)
+    expect(page.lines.map((l) => l.match(/"([^"]+)"/)?.[1])).toEqual(['Prop 28', 'Prop 29', 'Front Hall'])
   })
 })
 
@@ -171,5 +157,16 @@ describe('buildGuideIndex', () => {
     expect(buildGuideIndex([{ ...zone, version: '', description: '' }])).toContain(
       '- custom/trigger_zone — Trigger Zone — guide: custom/trigger_zone/ai.md'
     )
+  })
+})
+
+describe('buildAssetSummary', () => {
+  it('counts the project files by kind, leaving the paths for the assistant to ask for', () => {
+    const summary = buildAssetSummary([
+      'src/index.ts', 'models/tower.glb', 'models/gate.glb', 'models/tex/wood.png', 'assets/images/brick.png',
+      'assets/audio/door.mp3', 'assets/data/manifest.json', 'package.json', 'node_modules/x/model.glb'
+    ])
+    expect(summary).toBe('[Assets] This project has 2 models, 2 images, 1 sounds, 1 data. Ask list_files with a kind (and a match) for their paths before placing or using one.')
+    expect(buildAssetSummary(['src/index.ts'])).toBe('[Assets] This project has no models, images, sounds, videos or data files yet.')
   })
 })

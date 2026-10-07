@@ -9,7 +9,7 @@ import { state, entityLabel, type Snapshot } from '@scene/state'
 import { entityName, NAME_COMPONENT } from '@scene/custom-components'
 import { isAllowedComponent, SCRIPT_COMPONENT } from '@scene/allowed-components'
 import { isEntryPoint } from '../script/guarded'
-import { buildGuideIndex, buildSceneRoster, type GuideEntry } from './roster'
+import { buildAssetSummary, buildGuideIndex, buildSceneSummary, type GuideEntry } from './roster'
 import { buildGameConfigIndex, buildSpawnableIndex, type SpawnableEntry } from './kit-context'
 import { GAME_CONFIG_COMPONENT, normalizeGameConfig, type GameConfigValue } from '../gameconfig/normalize'
 import { effectiveSpawnable } from '../prefabs/spawnable'
@@ -86,8 +86,8 @@ function gameConfigValue(): GameConfigValue | null {
   return raw === undefined ? null : normalizeGameConfig(raw)
 }
 
-export function buildContext(sel: CodeSelection | null, open: string | null): string | undefined {
-  const parts: string[] = [buildSceneRoster(state.snapshot)]
+export function buildContext(sel: CodeSelection | null, open: string | null, files: readonly string[]): string | undefined {
+  const parts: string[] = [buildSceneSummary(state.snapshot), buildAssetSummary(files)]
   const spawnables = buildSpawnableIndex(spawnableEntries())
   if (spawnables !== '') parts.push(spawnables)
   const config = buildGameConfigIndex(gameConfigValue())

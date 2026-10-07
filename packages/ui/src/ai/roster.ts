@@ -19,12 +19,13 @@ import {
 } from '@scene/allowed-components'
 import { worldTransformOf } from '@scene/world-pos'
 import { parseLayout, type ScriptParam } from '../script/parser'
+import { ASSET_KINDS, assetKind, type AssetKind } from '@dcl-editor/contract'
 
 // Below this the ids are engine-reserved (root, player, camera, world origin).
 const FIRST_AUTHORED = 512
 // A big scene would otherwise crowd out the actual request. Zones are exempt:
 // they are the point of the roster and there are never many of them.
-const MAX_ROWS = 80
+const OUTLINE_PAGE = 200
 
 interface Vec3 {
   x: number
@@ -172,32 +173,27 @@ function lineFor(row: EntityRow): string {
 
 // The whole [Scene] block, ready to prepend to a turn. Pure: everything comes
 // from the snapshot the hierarchy and inspector already read.
-export function buildSceneRoster(snapshot: Snapshot, max = MAX_ROWS): string {
+// The scene in one line: the assistant looks entities up as it needs them (outline, inspect), the
+// way a coding agent lists and reads files, instead of carrying the whole scene in every turn.
+export function buildSceneSummary(snapshot: Snapshot): string {
   const rows = sceneRows(snapshot)
-  const zones = rows.filter((r) => r.zone)
-  let shown = rows
-  let omitted = 0
-  if (rows.length > max) {
-    const room = Math.max(0, max - zones.length)
-    const rest = rows.filter((r) => !r.zone).slice(0, room)
-    const keep = new Set([...zones, ...rest].map((r) => r.id))
-    shown = rows.filter((r) => keep.has(r.id))
-    omitted = rows.length - shown.length
-  }
+  if (rows.length === 0) return '[Scene] No authored entities yet.'
+  const zones = rows.filter((r) => r.zone).length
+  return `[Scene] ${rows.length} named entit${rows.length === 1 ? 'y' : 'ies'}${zones > 0 ? `, ${zones} of them zones` : ''}. ` +
+    'Look them up with outline (names, kinds, places) and inspect (components) before acting on them.'
+}
 
-  const head =
-    '[Scene] What the creator has authored, as the editor sees it right now. Refer to an entity by its Name — ' +
-    'that name is the one handle the creator, the scripts and you all share. Positions and sizes are WORLD metres; ' +
-    "a zone's size IS its Transform scale."
-  const body =
-    shown.length === 0 ? 'The scene has no authored entities yet.' : shown.map(lineFor).join('\n')
-  const tail = omitted === 0 ? [] : [`…and ${omitted} more entit${omitted === 1 ? 'y' : 'ies'} not listed.`]
-  const zoneLine =
-    zones.length === 0
-      ? 'Zones in this scene: none yet.'
-      : `Zones in this scene: ${zones.map((z) => `"${z.name}"`).join(', ')}`
-
-  return [head, body, ...tail, zoneLine].join('\n')
+// One line per named entity — name, kind, world position and size, components, scripts — for those
+// whose name contains `match`, a page at a time.
+export function sceneOutline(
+  snapshot: Snapshot,
+  opts: { match?: string; offset?: number; limit?: number } = {}
+): { total: number; offset: number; lines: string[] } {
+  const match = (opts.match ?? '').toLowerCase()
+  const rows = sceneRows(snapshot).filter((r) => r.name.toLowerCase().includes(match))
+  const offset = Math.max(0, Math.floor(opts.offset ?? 0))
+  const limit = Math.max(1, Math.floor(opts.limit ?? OUTLINE_PAGE))
+  return { total: rows.length, offset, lines: rows.slice(offset, offset + limit).map(lineFor) }
 }
 
 // One line per prefab copy in this project that ships an ai.md, so the prompt
@@ -239,3 +235,18 @@ export function buildGuideIndex(entries: GuideEntry[]): string {
   })
   return [head, ...lines].join('\n')
 }
+
+// How many files of each kind the project holds, in one line: the paths cost a turn's worth of
+// tokens in a big project, so the assistant asks list_files for the ones it needs.
+export function buildAssetSummary(files: readonly string[]): string {
+  const counts = new Map<AssetKind, number>()
+  for (const file of files) {
+    const kind = assetKind(file)
+    if (kind !== null && kind !== 'code') counts.set(kind, (counts.get(kind) ?? 0) + 1)
+  }
+  const parts = ASSET_KINDS.filter((kind) => counts.has(kind)).map((kind) => `${counts.get(kind)} ${kind}`)
+  return parts.length === 0
+    ? '[Assets] This project has no models, images, sounds, videos or data files yet.'
+    : `[Assets] This project has ${parts.join(', ')}. Ask list_files with a kind (and a match) for their paths before placing or using one.`
+}
+

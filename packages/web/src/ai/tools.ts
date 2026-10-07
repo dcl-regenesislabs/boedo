@@ -1,4 +1,4 @@
-import { ASSISTANT_MAX_FILE_BYTES, assistantReadable, assistantWritable } from '@dcl-editor/contract'
+import { ASSET_KINDS, ASSISTANT_MAX_FILE_BYTES, assetKind, assistantReadable, assistantWritable } from '@dcl-editor/contract'
 import type { BrowserToolCall } from '@dcl-editor/contract'
 
 export interface BrowserProject {
@@ -25,16 +25,20 @@ function parseRequest(text: string): unknown {
   }
 }
 
-const REFERENCED_ASSET = /^(?!node_modules\/|bin\/)[^.][^\0]*\.(glb|gltf|png|jpe?g|webp|ktx2|mp3|ogg|wav|mp4)$/i
-
 export function createBrowserTools(project: BrowserProject) {
   const reads = new Map<string, { revision: string; bytes: Uint8Array }>()
   return async (call: BrowserToolCall, signal: AbortSignal): Promise<string> => {
     signal.throwIfAborted()
     const { tool, args } = call
     if (tool === 'list_files') {
+      const kind = typeof args.kind === 'string' && (ASSET_KINDS as readonly string[]).includes(args.kind) ? args.kind : null
+      const match = typeof args.match === 'string' ? args.match.toLowerCase() : ''
       // models, images and sounds too: they can't be read, but scripts and components name them by path
-      return JSON.stringify([...project.files().keys()].filter((path) => assistantReadable(path) || REFERENCED_ASSET.test(path)).sort().slice(0, 2000))
+      return JSON.stringify([...project.files().keys()].filter((path) => {
+        const of = assetKind(path)
+        if (of === null || (of === 'code' && !assistantReadable(path))) return false
+        return (kind === null || of === kind) && path.toLowerCase().includes(match)
+      }).sort().slice(0, 2000))
     }
     if (tool === 'build') return JSON.stringify(await project.build(signal))
     if (tool === 'scene_request') {

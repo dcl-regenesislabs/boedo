@@ -73,4 +73,18 @@ describe('assistant browser tools', () => {
     await run('scene_request', { request: '{"type":"inspect"}' })
     expect(scene).toHaveBeenCalledWith({ type: 'inspect' }, expect.anything())
   })
+
+  it('lists one kind of file, narrowed by a match, and never secrets or dependencies', async () => {
+    const { run, files, encoder } = setup()
+    for (const path of ['models/tower.glb', 'models/gate.glb', 'assets/images/brick.png', 'assets/data/manifest.json', 'node_modules/x/m.glb']) {
+      files.set(path, encoder.encode('x'))
+    }
+    expect(JSON.parse(await run('list_files', { kind: 'models' }))).toEqual(['models/gate.glb', 'models/tower.glb'])
+    expect(JSON.parse(await run('list_files', { kind: 'models', match: 'TOW' }))).toEqual(['models/tower.glb'])
+    expect(JSON.parse(await run('list_files', { kind: 'data' }))).toEqual(['assets/data/manifest.json'])
+    expect(JSON.parse(await run('list_files'))).toEqual([
+      'assets/data/manifest.json', 'assets/images/brick.png', 'models/gate.glb', 'models/tower.glb', 'src/scripts/Door.ts'
+    ])
+  })
 })
+
