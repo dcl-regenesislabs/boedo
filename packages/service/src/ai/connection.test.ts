@@ -9,6 +9,7 @@ import type { AssistantServerMessage } from '../../../contract/src/assistant.ts'
 import type { AiSendParams } from '../../../contract/src/shell.ts'
 import { createConnection, parsePrompt } from './connection.ts'
 import { createAssistantMemory } from './memory.ts'
+import { createUsageMeter } from './usage.ts'
 import type { AgentFactory } from './types.ts'
 
 const params = { provider: 'claude' as const, model: 'test', text: 'Edit the door' }
@@ -21,7 +22,7 @@ describe('assistant tool bridge', () => {
       providers: async () => [],
       create: vi.fn(async (_params, call, emit) => ({
         prompt: async () => { results.push(await call('read_file', { path: 'src/scripts/Door.ts' })); emit({ text: 'Done' }) },
-        abort: async () => {}, dispose: () => {}, snapshot: () => []
+        abort: async () => {}, dispose: () => {}, snapshot: () => [], takeUsage: () => ({ cost: 0 })
       }))
     }
     const connection = createConnection({ factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true })
@@ -46,7 +47,7 @@ describe('assistant tool bridge', () => {
     const factory: AgentFactory = {
       providers: async () => [],
       create: async (_params, call) => ({
-        prompt: async () => { await call('write_file', { path: 'src/scripts/Door.ts' }) }, abort, dispose, snapshot: () => []
+        prompt: async () => { await call('write_file', { path: 'src/scripts/Door.ts' }) }, abort, dispose, snapshot: () => [], takeUsage: () => ({ cost: 0 })
       })
     }
     const connection = createConnection({ factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true })
@@ -71,7 +72,7 @@ describe('assistant tool bridge', () => {
             await expect(call('build', {})).rejects.toThrow('cancelled')
             throw new Error('a provider credential must not appear')
           },
-          abort: async () => {}, dispose: () => {}, snapshot: () => []
+          abort: async () => {}, dispose: () => {}, snapshot: () => [], takeUsage: () => ({ cost: 0 })
         })
       }
     })
@@ -110,7 +111,7 @@ describe('assistant tool bridge', () => {
           }]
         })
         sessions.push(session)
-        return { prompt: async (next: AiSendParams) => { await session.prompt(next.text) }, abort: () => session.abort(), dispose: () => session.dispose(), snapshot: () => [] }
+        return { prompt: async (next: AiSendParams) => { await session.prompt(next.text) }, abort: () => session.abort(), dispose: () => session.dispose(), snapshot: () => [], takeUsage: () => ({ cost: 0 }) }
       })
     }
     const events: AssistantServerMessage[] = []
@@ -147,7 +148,7 @@ describe('assistant tool bridge', () => {
       create: async (_params, _call, _emit, restore) => {
         restored.push(restore)
         const said: unknown[] = [...(restore ?? [])]
-        return { prompt: async (next: AiSendParams) => { said.push(next.text) }, abort: async () => {}, dispose: () => {}, snapshot: () => said }
+        return { prompt: async (next: AiSendParams) => { said.push(next.text) }, abort: async () => {}, dispose: () => {}, snapshot: () => said, takeUsage: () => ({ cost: 0 }) }
       }
     }
     // each connection on a fresh store over the same folder: a service that restarted in between
@@ -189,7 +190,7 @@ describe('assistant tool bridge', () => {
       create: async (_params, _call, _emit, restore) => {
         restored.push(restore)
         const said: unknown[] = [...(restore ?? [])]
-        return { prompt: async (next) => { said.push(next.text) }, abort: async () => {}, dispose: () => {}, snapshot: () => [...said] }
+        return { prompt: async (next) => { said.push(next.text) }, abort: async () => {}, dispose: () => {}, snapshot: () => [...said], takeUsage: () => ({ cost: 0 }) }
       }
     }
     const connection = createConnection({ factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true, memory: memory.forWallet(wallet) })
@@ -222,7 +223,7 @@ describe('assistant tool bridge', () => {
       logger, memory, send: (e) => events.push(e), allowTurn: () => true,
       factory: {
         providers: async () => [],
-        create: async () => ({ prompt: async () => {}, abort: async () => {}, dispose: () => {}, snapshot: () => [] })
+        create: async () => ({ prompt: async () => {}, abort: async () => {}, dispose: () => {}, snapshot: () => [], takeUsage: () => ({ cost: 0 }) })
       }
     })
     try {
@@ -239,5 +240,39 @@ describe('assistant tool bridge', () => {
       expect(logger.error.mock.calls).toEqual([['Assistant memory save failed'], ['Assistant memory deletion failed']])
       expect(events.some((e) => e.kind === 'failure' || (e.kind === 'event' && e.event.kind === 'error'))).toBe(false)
     } finally { await connection.close() }
+  })
+
+  it('keeps internal usage across restarts and refuses turns once the allowance is spent', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'assistant-usage-'))
+    const wallet = '0x' + 'a'.repeat(40)
+    const factory: AgentFactory = {
+      providers: async () => [],
+      create: async () => ({
+        prompt: async () => {}, abort: async () => {}, dispose: () => {}, snapshot: () => [],
+        takeUsage: () => ({ cost: 6 })
+      })
+    }
+    async function turn(turnId: string) {
+      const events: AssistantServerMessage[] = []
+      const connection = createConnection({
+        factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true,
+        usage: createUsageMeter(dir, { daily: 10, weekly: 100 }).forWallet(wallet)
+      })
+      connection.receive({ kind: 'prompt', turnId, projectId: 'scene', params })
+      await vi.waitFor(() => expect(events.some((e) => e.kind === 'failure' || (e.kind === 'event' && e.event.kind === 'done'))).toBe(true))
+      await connection.close()
+      return events
+    }
+    try {
+      const first = await turn('one')
+      const balance = () => createUsageMeter(dir, { daily: 10, weekly: 100 }).forWallet(wallet).balance()
+      expect(await balance()).toMatchObject({ dailyPercent: 60, weeklyPercent: 6 })
+      expect(JSON.stringify(first)).not.toContain('usage')
+      const second = await turn('two')
+      expect(await balance()).toMatchObject({ dailyPercent: 100, weeklyPercent: 12 })
+      expect(JSON.stringify(second)).not.toContain('usage')
+      const third = await turn('three')
+      expect(third).toEqual([{ kind: 'failure', message: expect.stringContaining('allowance') }])
+    } finally { await rm(dir, { recursive: true, force: true }) }
   })
 })

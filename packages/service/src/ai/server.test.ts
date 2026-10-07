@@ -15,7 +15,7 @@ async function setup(vars?: Record<string, string>) {
     providers: async () => [{ id: 'claude', label: 'Test', available: true, models: ['test'], defaultModel: 'test' }],
     create: async (_params, call, emit) => ({
       prompt: async () => { emit({ text: await call('read_file', { path: 'src/index.ts' }) }) },
-      abort: async () => {}, dispose: () => {}, snapshot: () => []
+      abort: async () => {}, dispose: () => {}, snapshot: () => [], takeUsage: () => ({ cost: 0 })
     })
   }
   const program = await createTestService({ agentFactory: factory, vars })

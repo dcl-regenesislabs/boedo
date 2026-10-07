@@ -20,7 +20,7 @@ export const assistantFixture: AgentFactory = {
       },
       abort: async () => {},
       dispose: () => {},
-      snapshot: () => [...prompts]
+      snapshot: () => [...prompts], takeUsage: () => ({ cost: 0 })
     }
   }
 }

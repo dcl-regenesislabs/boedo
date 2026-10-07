@@ -4,9 +4,14 @@ import type { AssistantServerMessage, BrowserToolName } from '../../../contract/
 import type { AiSendParams } from '../../../contract/src/shell.ts'
 import { MEMORY_ID, MEMORY_KEY } from './memory.ts'
 import type { MemoryRef, WalletMemory } from './memory.ts'
+import type { WalletUsage } from './usage.ts'
 import type { AgentFactory, AssistantAgent } from './types.ts'
 
 const MAX_TURN_RESULT_CHARS = 2_000_000
+const TOOL_LABELS: Record<BrowserToolName, string> = {
+  build: 'Building the scene', scene_request: 'Editing the scene', write_file: 'Saving a file',
+  read_file: 'Reading a file', list_files: 'Listing files'
+}
 
 interface Pending {
   turnId: string
@@ -15,8 +20,8 @@ interface Pending {
 
 export function parsePrompt(value: unknown): AiSendParams | null {
   if (!object(value) || !['claude', 'codex'].includes(String(value.provider))) return null
-  if (typeof value.text !== 'string' || !value.text.trim() || value.text.length > 32_000) return null
-  if (value.context !== undefined && (typeof value.context !== 'string' || value.context.length > 128_000)) return null
+  if (typeof value.text !== 'string' || !value.text.trim()) return null
+  if (value.context !== undefined && typeof value.context !== 'string') return null
   if (value.model !== undefined && (typeof value.model !== 'string' || value.model.length > 120)) return null
   if (value.images !== undefined && (!Array.isArray(value.images) || value.images.length > 4 || value.images.some((image) =>
     !object(image) || typeof image.name !== 'string' || image.name.length > 200 ||
@@ -39,6 +44,7 @@ export function createConnection(options: {
   logger: Pick<ILoggerComponent.ILogger, 'error'>
   send(message: AssistantServerMessage): void
   allowTurn(): boolean
+  usage?: WalletUsage
   memory?: WalletMemory
   toolTimeoutMs?: number
   turnTimeoutMs?: number
@@ -50,6 +56,7 @@ export function createConnection(options: {
   let running: Promise<void> | undefined
   let stopping: Promise<void> | undefined
   let saving: Promise<void> = Promise.resolve()
+  let browserCalls: Promise<void> = Promise.resolve()
   const pending = new Map<string, Pending>()
   const send = (message: AssistantServerMessage) => { if (!closed) options.send(message) }
 
@@ -63,38 +70,54 @@ export function createConnection(options: {
     stopping = agent?.abort().catch(() => send({ kind: 'failure', message: 'Unable to stop the assistant.' }))
   }
 
-  async function call(tool: BrowserToolName, args: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
+  function call(tool: BrowserToolName, args: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
     const turn = active
-    if (turn === null || turn.controller.signal.aborted || signal?.aborted) throw new Error('Turn cancelled')
-    const callId = crypto.randomUUID()
-    return new Promise<string>((resolve, reject) => {
-      const cancel = () => finish(false, 'The turn was cancelled.')
-      const timer = setTimeout(() => {
-        finish(false, 'The browser did not answer the tool request.')
-        abort('A browser action timed out. The turn stopped; check the scene before retrying.')
-      }, options.toolTimeoutMs ?? 60_000)
-      function finish(ok: boolean, text: string) {
-        if (!pending.delete(callId)) return
-        clearTimeout(timer)
-        signal?.removeEventListener('abort', cancel)
-        turn!.controller.signal.removeEventListener('abort', cancel)
-        if (ok) resolve(text)
-        else reject(new Error(text))
-      }
-      pending.set(callId, { turnId: turn.id, finish })
-      signal?.addEventListener('abort', cancel, { once: true })
-      turn.controller.signal.addEventListener('abort', cancel, { once: true })
-      send({ kind: 'call', turnId: turn.id, callId, tool, args })
+    // The browser serializes edits; queued calls must not spend their timeout waiting for earlier ones.
+    const result = browserCalls.then(() => {
+      if (turn === null || active !== turn || turn.controller.signal.aborted || signal?.aborted) throw new Error('Turn cancelled')
+      const controller = turn.controller
+      const callId = crypto.randomUUID()
+      return new Promise<string>((resolve, reject) => {
+        const cancel = () => finish(false, 'The turn was cancelled.')
+        const timer = setTimeout(() => {
+          finish(false, 'The browser did not answer the tool request.')
+          abort(`${TOOL_LABELS[tool]} timed out. The turn stopped; check the scene before retrying.`)
+        }, options.toolTimeoutMs ?? (tool === 'read_file' || tool === 'list_files' ? 60_000 : 15 * 60_000))
+        function finish(ok: boolean, text: string) {
+          if (!pending.delete(callId)) return
+          clearTimeout(timer)
+          signal?.removeEventListener('abort', cancel)
+          controller.signal.removeEventListener('abort', cancel)
+          if (ok) resolve(text)
+          else reject(new Error(text))
+        }
+        pending.set(callId, { turnId: turn.id, finish })
+        signal?.addEventListener('abort', cancel, { once: true })
+        turn.controller.signal.addEventListener('abort', cancel, { once: true })
+        send({ kind: 'call', turnId: turn.id, callId, tool, args })
+      })
     })
+    browserCalls = result.then(() => {}, () => {})
+    return result
   }
 
   async function prompt(turnId: string, projectId: string, params: AiSendParams, ref: MemoryRef | null): Promise<void> {
     const turn = { id: turnId, controller: new AbortController(), chars: 0, resumable: false }
     active = turn
-    send({ kind: 'event', event: { kind: 'started', turnId } })
+    let started = false
+    let turnAgent: AssistantAgent | null = null
     let ok = false
-    const timer = setTimeout(() => abort('The turn reached its 10-minute limit.', true), options.turnTimeoutMs ?? 10 * 60_000)
+    const timer = setTimeout(() => abort('The turn reached its 60-minute limit.', true), options.turnTimeoutMs ?? 60 * 60_000)
     try {
+      if (options.usage !== undefined && await options.usage.exhausted()) {
+        const balance = await options.usage.balance()
+        const resetAt = balance.weeklyPercent >= 100 ? balance.weeklyResetAt : balance.dailyResetAt
+        send({ kind: 'failure', message: `This account has used its assistant allowance for now. Try again after ${resetAt}.` })
+        return
+      }
+      turn.controller.signal.throwIfAborted()
+      started = true
+      send({ kind: 'event', event: { kind: 'started', turnId } })
       const key = JSON.stringify([projectId, params.provider, params.model, ref?.id, ref?.key])
       if (identity !== key) {
         agent?.dispose()
@@ -113,33 +136,40 @@ export function createConnection(options: {
         }
         agent = created
       }
+      turnAgent = agent
       await stopping
       turn.controller.signal.throwIfAborted()
       await agent.prompt(params)
       ok = !turn.controller.signal.aborted
     } catch {
       if (!turn.controller.signal.aborted) {
-        send({ kind: 'event', event: { kind: 'error', turnId, message: 'The assistant could not finish. Check the service connection and provider sign-in, then retry.' } })
+        if (started) send({ kind: 'event', event: { kind: 'error', turnId, message: 'The assistant could not finish. Check the service connection and provider sign-in, then retry.' } })
+        else send({ kind: 'failure', message: 'The assistant allowance could not be checked. Try again shortly.' })
       }
     } finally {
       clearTimeout(timer)
       turn.controller.abort()
-      active = null
-      // a failed turn keeps the last good memory: the next session starts from there
-      const kept = agent
-      if (ok && kept !== null && ref !== null && options.memory !== undefined) {
+      if (ok && turnAgent !== null && ref !== null && options.memory !== undefined) {
         const memory = options.memory
-        saving = saving.then(() => memory.save(ref, kept.snapshot())).catch(() => { options.logger.error('Assistant memory save failed') })
+        const snapshot = turnAgent.snapshot()
+        saving = saving.then(() => memory.save(ref, snapshot)).catch(() => { options.logger.error('Assistant memory save failed') })
+      }
+      // a stopped or failed turn still paid for the calls it made
+      const spent = turnAgent?.takeUsage()
+      if (spent !== undefined && options.usage !== undefined) {
+        await options.usage.record(spent.cost).catch(() => { options.logger.error('Assistant usage could not be recorded') })
       }
       if (!ok && (!turn.resumable || closed)) {
         agent?.dispose()
         agent = null
       }
-      send({ kind: 'event', event: { kind: 'done', turnId, ok } })
+      active = null
+      if (started) send({ kind: 'event', event: { kind: 'done', turnId, ok } })
     }
   }
 
   return {
+    isRunning: () => active !== null,
     receive(message: unknown): void {
       if (closed || !object(message)) return
       if (message.kind === 'result') {
@@ -192,11 +222,9 @@ export function createConnection(options: {
     async close(): Promise<void> {
       closed = true
       abort()
-      if (active === null) {
-        agent?.dispose()
-        agent = null
-      }
       await Promise.all([running, stopping])
+      agent?.dispose()
+      agent = null
       await saving
     }
   }

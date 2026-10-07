@@ -180,10 +180,28 @@ must preserve paths, origins, protocol headers and WebSocket upgrades, and must 
 log credential headers. Deploy the updated browser client and service together.
 
 Fixed limits: 32 connections per service, 3 per wallet, 10 turns and 10 connection
-tickets per minute per wallet; 10 minutes per turn; 60 seconds per browser call.
-Idle connections expire after 15 minutes. These limits live in one process. Prompts allow four images of at most 2 MiB each.
+tickets per minute per wallet; 60 minutes per turn; 15 minutes per browser build, edit or write,
+and 60 seconds per file read or listing. Browser calls are dispatched one at a time, so queued
+work does not spend another action's timeout. Idle connections expire after 15 minutes; active
+turns remain connected. These limits live in one process. Prompts allow four images of at most 2 MiB each.
+Each turn's cost, priced at the model's API rates, counts against the wallet's daily and weekly
+allowance (`ASSISTANT_DAILY_LIMIT`, `ASSISTANT_WEEKLY_LIMIT`), kept in `<data>/../.assistant/usage`.
+The defaults are 50,000 per day and 200,000 per week, plus 20,000 turns per day
+(`ASSISTANT_TURNS_PER_DAY`). Usage stays internal: the editor shows neither usage nor context
+meters. A spent allowance refuses new turns until it resets, including in other open tabs.
+Compaction calls count toward usage; completed conversation memory is saved even if a browser
+disconnects while usage is being recorded.
 
 ## Validation
+
+Assistant limit and timeout regression tests (no model calls):
+
+```bash
+npx vitest run packages/service/src/ai/connection-limits.test.ts packages/service/src/ai/pi.test.ts packages/ui/src/features/ai/error-details.test.ts
+```
+
+These cover long prompts, multiple tabs, allowance resets, disconnects during accounting,
+compaction costs, queued calls, slow builds/scene edits and duplicate hosted errors.
 
 ```bash
 npm run validate

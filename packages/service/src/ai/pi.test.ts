@@ -1,11 +1,17 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { ModelRuntime, SettingsManager } from '@earendil-works/pi-coding-agent'
+import type { FileEntry } from '@earendil-works/pi-coding-agent'
+import { createAssistantMessageEventStream, fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai'
+import type { Provider } from '@earendil-works/pi-ai'
+import { afterEach, expect, it, vi } from 'vitest'
 import { createPiFactory } from './pi.ts'
+import type { AssistantAgent } from './types.ts'
 
 const directories: string[] = []
 afterEach(async () => {
+  vi.restoreAllMocks()
   for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true })
 })
 
@@ -33,4 +39,56 @@ it('creates a browser-only agent with synthetic OAuth credentials without callin
 
 it('fails closed when the configured model is unknown', async () => {
   await expect(createPiFactory(await authPath(), 'model-that-does-not-exist')).rejects.toThrow('AI_MODEL')
+})
+
+it('charges compaction and replies once, including after restoring a conversation', async () => {
+  const faux = fauxProvider({ provider: 'anthropic', models: [{ id: 'test', contextWindow: 40_000, maxTokens: 1024 }] })
+  const originalCreate = ModelRuntime.create.bind(ModelRuntime)
+  vi.spyOn(ModelRuntime, 'create').mockImplementation(async (options) => {
+    const runtime = await originalCreate(options)
+    const auth = runtime.getProvider('anthropic')?.auth
+    if (auth === undefined) throw new Error('Missing synthetic OAuth provider')
+    const streamSimple: Provider['streamSimple'] = (model, context, opts) => {
+      const stream = createAssistantMessageEventStream()
+      void (async () => {
+        for await (const event of faux.provider.streamSimple(model, context, opts)) {
+          if (event.type === 'done') event.message.usage.cost = { input: 1, output: 0, cacheRead: 0, cacheWrite: 0, total: 1 }
+          stream.push(event)
+        }
+      })()
+      return stream
+    }
+    runtime.registerNativeProvider({ ...faux.provider, auth, streamSimple })
+    return runtime
+  })
+  const originalSettings = SettingsManager.inMemory.bind(SettingsManager)
+  vi.spyOn(SettingsManager, 'inMemory').mockImplementation((settings) => originalSettings({
+    ...settings, compaction: { enabled: true, reserveTokens: 1000, keepRecentTokens: 1000 }
+  }))
+  faux.setResponses(Array.from({ length: 50 }, () => fauxAssistantMessage('Done.')))
+  const factory = await createPiFactory(await authPath(), 'test', 'sk-ant-oat-synthetic-test-token')
+  const params = { provider: 'claude' as const, model: 'test', text: 'Build a game' }
+  let agent: AssistantAgent | undefined
+  try {
+    agent = await factory.create(params, async () => 'unused', () => {})
+    let charged = 0
+    for (let turn = 0; turn < 10; turn++) {
+      await agent.prompt({ ...params, text: `Request ${turn}: ${'x'.repeat(18_000)}` })
+      charged += agent.takeUsage().cost
+      expect(agent.takeUsage().cost).toBe(0)
+    }
+    const entries = agent.snapshot() as FileEntry[]
+    expect(entries.some((entry) => entry.type === 'compaction')).toBe(true)
+    const actual = entries.reduce((total, entry) => {
+      if (entry.type === 'message' && entry.message.role === 'assistant') return total + entry.message.usage.cost.total
+      if (entry.type === 'compaction') return total + (entry.usage?.cost.total ?? 0)
+      return total
+    }, 0)
+    expect(charged).toBe(actual)
+    agent.dispose()
+    agent = await factory.create(params, async () => 'unused', () => {}, entries)
+    expect(agent.takeUsage().cost).toBe(0)
+    await agent.prompt(params)
+    expect(agent.takeUsage().cost).toBe(1)
+  } finally { agent?.dispose() }
 })

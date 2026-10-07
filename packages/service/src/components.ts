@@ -10,6 +10,7 @@ import { createSkillsComponent } from './adapters/skills.ts'
 import { createAssistantComponent, DEFAULT_ASSISTANT_LIMITS } from './ai/server.ts'
 import type { AssistantLimits } from './ai/server.ts'
 import { createAssistantMemory } from './ai/memory.ts'
+import { createUsageMeter, DEFAULT_USAGE_LIMITS } from './ai/usage.ts'
 import { ASSISTANT_MODEL, createPiFactory } from './ai/pi.ts'
 import type { AgentFactory } from './ai/types.ts'
 import { createRateLimiter, createUploadGate, envFromConfig, DEFAULT_LIMITS, walletAllowlist } from './config.ts'
@@ -83,7 +84,11 @@ export async function initComponents(options: ComponentOptions = {}): Promise<Ap
     factory, allowedOrigins: env.allowedOrigins, basePath: env.basePath,
     limits,
     // beside the credential, outside STORAGE_DIR and its project backups
-    memory: authPath === undefined ? undefined : createAssistantMemory(join(dirname(authPath), 'memory'))
+    memory: authPath === undefined ? undefined : createAssistantMemory(join(dirname(authPath), 'memory')),
+    usage: authPath === undefined ? undefined : createUsageMeter(join(dirname(authPath), 'usage'), {
+      daily: (await config.getNumber('ASSISTANT_DAILY_LIMIT')) ?? DEFAULT_USAGE_LIMITS.daily,
+      weekly: (await config.getNumber('ASSISTANT_WEEKLY_LIMIT')) ?? DEFAULT_USAGE_LIMITS.weekly
+    })
   })
   const server = await createServerComponent<GlobalContext>({ config, logs, ws: assistant.ws }, {})
   if (!metrics.registry) throw new Error('Metrics registry is not initialized')

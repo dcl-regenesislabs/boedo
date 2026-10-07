@@ -7,6 +7,7 @@ import { ASSISTANT_MAX_MESSAGE_BYTES, ASSISTANT_PROTOCOL, ASSISTANT_TICKET_PREFI
 import { createRateLimiter } from '../config.ts'
 import { createConnection } from './connection.ts'
 import type { AssistantMemory } from './memory.ts'
+import type { UsageMeter } from './usage.ts'
 import type { AgentFactory, AssistantService } from './types.ts'
 import type { BaseComponents } from '../types.ts'
 
@@ -30,7 +31,7 @@ export interface AssistantLimits {
   turnsPerDay: number
 }
 
-export const DEFAULT_ASSISTANT_LIMITS: AssistantLimits = { wallets: null, turnsPerMinute: 30, turnsPerDay: 200 }
+export const DEFAULT_ASSISTANT_LIMITS: AssistantLimits = { wallets: null, turnsPerMinute: 30, turnsPerDay: 20_000 }
 
 const MAX_SOCKETS = 32
 const SOCKETS_PER_WALLET = 3
@@ -43,6 +44,7 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
   allowedOrigins: readonly string[]
   basePath?: string
   limits?: AssistantLimits
+  usage?: UsageMeter
   memory?: AssistantMemory
 }): AssistantComponent {
   const limits = options.limits ?? DEFAULT_ASSISTANT_LIMITS
@@ -91,7 +93,10 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
     sockets.set(socket, wallet)
     let connection: ReturnType<typeof createConnection> | null = null
     const deadline = setTimeout(() => socket.terminate(), 5000)
-    const idle = setTimeout(() => socket.close(1000, 'Session expired'), 15 * 60_000)
+    const idle = setTimeout(() => {
+      if (connection?.isRunning()) idle.refresh()
+      else socket.close(1000, 'Session expired')
+    }, 15 * 60_000)
     let answered = true
     socket.on('pong', () => { answered = true })
     const keepalive = setInterval(() => {
@@ -115,7 +120,8 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
     void factory.providers().then((providers) => {
       if (socket.readyState !== WebSocket.OPEN) return
       clearTimeout(deadline)
-      connection = createConnection({ factory, logger, send, allowTurn: () => allowTurn(wallet), memory: memory?.forWallet(wallet) })
+      const usage = options.usage?.forWallet(wallet)
+      connection = createConnection({ factory, logger, send, allowTurn: () => allowTurn(wallet), memory: memory?.forWallet(wallet), usage })
       send({ kind: 'ready', providers })
     }).catch(() => socket.close(1011, 'Assistant unavailable'))
     socket.on('error', () => socket.close())

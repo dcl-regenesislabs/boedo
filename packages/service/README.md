@@ -268,7 +268,9 @@ block and directory overhead when sizing the volume; logical byte limits are not
 | `AI_MODEL` | `claude-opus-5-5` | assistant model (`--ai-model`); the only model clients may use |
 | `ASSISTANT_WALLETS` | any wallet; **required when `NODE_ENV=production`** and a credential is set | comma-separated wallets that may use the assistant, or `*` for any |
 | `ASSISTANT_TURNS_PER_MINUTE` | 30 | assistant turns across all wallets |
-| `ASSISTANT_TURNS_PER_DAY` | 200 | assistant turns per wallet per UTC day |
+| `ASSISTANT_TURNS_PER_DAY` | 20000 | assistant turns per wallet per UTC day |
+| `ASSISTANT_DAILY_LIMIT` | 50000 | internal allowance per wallet per UTC day, priced at the model's API rates; usage is not displayed in the editor |
+| `ASSISTANT_WEEKLY_LIMIT` | 200000 | the same per week, from Monday 00:00 UTC |
 
 Fixed in code: signed-fetch window 60 seconds, ticket lifetime 15 minutes, JSON body 2 MB, project
 name 100 characters, path 512 characters, 3 auth-chain links, 500 spent tickets per purge run.

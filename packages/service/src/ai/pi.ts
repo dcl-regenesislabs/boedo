@@ -119,6 +119,8 @@ export async function createPiFactory(authPath: string, preferredModel?: string,
         session.dispose()
         throw new Error('Unexpected assistant tool')
       }
+      // usage already counted: a restored conversation was paid for when it ran
+      let counted = session.getSessionStats().cost
       let emittedText = false
       let separator = false
       session.subscribe((event) => {
@@ -145,6 +147,12 @@ export async function createPiFactory(authPath: string, preferredModel?: string,
           if (last?.role === 'assistant' && (last.stopReason === 'error' || last.stopReason === 'aborted')) {
             throw new Error('The model did not complete this turn.')
           }
+        },
+        takeUsage() {
+          const stats = session.getSessionStats()
+          const cost = Math.max(0, stats.cost - counted)
+          counted = stats.cost
+          return { cost }
         },
         abort: () => session.abort(),
         dispose: () => session.dispose(),

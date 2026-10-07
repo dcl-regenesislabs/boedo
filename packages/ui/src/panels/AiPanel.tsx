@@ -25,9 +25,10 @@ import { uiSelectEntity } from '../actions/selection'
 import { QuickOpen } from '../features/ai/QuickOpen'
 import { StudioShell } from '../features/ai/StudioShell'
 import { Composer } from '../features/ai/Composer'
+import { ErrorDetails } from '../features/ai/ErrorDetails'
 import { AiEmpty, AiSetup, MessageList, type ChatMsg } from '../features/ai/transcript'
 import { type ToolUse } from '../features/ai/activity'
-import { friendlyError, keptTranscript, MAX_ATTACH, readImages, restoredTranscript, sameFile } from '../features/ai/chat-helpers'
+import { keptTranscript, MAX_ATTACH, readImages, restoredTranscript, sameFile } from '../features/ai/chat-helpers'
 import { baseName } from '../script/project-files'
 import { attachScript } from '../script/attach'
 import { attachablePath } from '../script/template'
@@ -583,8 +584,7 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
           </>
         }
       >
-        <div className="eui-ai-modal-hint">{friendlyError(errorDetail, current?.transport === 'service')}</div>
-        <pre className="eui-ai-errpre">{errorDetail}</pre>
+        <ErrorDetails message={errorDetail} hosted={current?.transport === 'service'} />
       </Modal>
     ) : null
 
