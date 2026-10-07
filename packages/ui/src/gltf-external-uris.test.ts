@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { gltfExternalUris } from './gltf-refs'
 
 // A model can reference textures/buffers by relative uri instead of embedding
-// them. Whatever it references must ship with it — see uploadModel.
+// them. Whatever it references must ship with it — see importFiles.
 
 const gltfJson = {
   images: [

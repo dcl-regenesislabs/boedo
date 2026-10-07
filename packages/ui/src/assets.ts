@@ -261,24 +261,42 @@ export async function missingModelRefs(files: File[]): Promise<string[]> {
   return await unsatisfiedRefs(missing)
 }
 
-// Upload local model files from disk (HTML Files — works in both the browser
-// and the electron renderer): persist them via the data-layer, register them
-// with the live scene, then place the first model. Non-model files are saved at
-// the exact relative path the model references (that's how renderers resolve
-// them); returns the placed model's name plus any referenced files that are
-// still missing, so the UI can tell the creator before an explorer 404s.
-export async function uploadModel(
+const IMAGE_EXT = /\.(png|jpe?g|webp|ktx2)$/i
+const DATA_EXT = /\.(json|txt|md)$/i
+const AUDIO_EXT = /\.(mp3|ogg|wav)$/i
+const VIDEO_EXT = /\.mp4$/i
+// a Worlds deployment refuses any single file over this
+const MAX_FILE_BYTES = 50 * 1024 * 1024
+
+export interface ImportResult {
+  // the model placed in the scene, if the import had one
+  placed: string | null
+  // images, sounds, videos and data files added on their own, by project path
+  added: string[]
+  // files the models reference that are still not in the project
+  missing: string[]
+  // files left out, each with why
+  skipped: string[]
+}
+
+// Import files from disk (HTML Files — the browser and the electron renderer alike). Models are
+// saved with the files they reference at the exact relative path they use (that's how renderers
+// resolve them) and the first is placed. Everything else needs no model: images, sounds, videos and
+// data files land in assets/images, assets/audio, assets/video and assets/data.
+export async function importFiles(
   files: File[],
   position: { x: number; y: number; z: number }
-): Promise<{ name: string; missing: string[] }> {
+): Promise<ImportResult> {
   if (dataLayerAvailable() !== true) {
-    throw new Error('upload needs the scene server running with --data-layer')
+    throw new Error('import needs the scene server running with --data-layer')
   }
-  const models = files.filter((f) => MODEL_EXT.test(f.name))
-  if (models.length === 0) {
-    throw new Error('select a .glb or .gltf (plus any textures/buffers it references)')
-  }
-  const primary = models[0]
+  const skipped: string[] = []
+  const fits = files.filter((f) => {
+    if (f.size <= MAX_FILE_BYTES) return true
+    skipped.push(`${f.name} (over 50 MB, which Worlds refuse)`)
+    return false
+  })
+  const models = fits.filter((f) => MODEL_EXT.test(f.name))
 
   // what the models reference, keyed by basename so picked files (which arrive
   // without folders) can be matched back to the referenced path
@@ -295,25 +313,57 @@ export async function uploadModel(
     }
   }
 
-  for (const f of files) {
+  const taken = new Set((await projectFiles().catch(() => [])).map((p) => p.toLowerCase()))
+  // a second texture.png must not replace the first
+  const freePath = (dir: string, name: string): string => {
+    const dot = name.lastIndexOf('.')
+    const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, '']
+    let path = `${dir}/${name}`
+    for (let n = 2; taken.has(path.toLowerCase()); n++) path = `${dir}/${stem}-${n}${ext}`
+    taken.add(path.toLowerCase())
+    return path
+  }
+
+  const added: string[] = []
+  for (const f of fits) {
     if (MODEL_EXT.test(f.name)) continue
     const uri = wantedByBasename.get(f.name.toLowerCase())
-    // referenced files keep the model's spelling — a sanitized name would no
-    // longer match the uri inside the model
-    const rel = uri !== undefined ? `models/${uri}` : `models/${sanitizeName(f.name)}`
+    if (uri !== undefined) {
+      // referenced files keep the model's spelling — a sanitized name would no
+      // longer match the uri inside the model
+      await dataLayerSaveFileBytes(`models/${uri}`, await fileBytes(f))
+      missing.delete(uri)
+      continue
+    }
+    const dir = IMAGE_EXT.test(f.name)
+      ? 'assets/images'
+      : DATA_EXT.test(f.name)
+        ? 'assets/data'
+        : AUDIO_EXT.test(f.name)
+          ? 'assets/audio'
+          : VIDEO_EXT.test(f.name)
+            ? 'assets/video'
+            : null
+    if (dir === null) {
+      skipped.push(`${f.name} (not a model, image, sound, video or data file)`)
+      continue
+    }
+    const rel = freePath(dir, sanitizeName(f.name))
     await dataLayerSaveFileBytes(rel, await fileBytes(f))
-    if (uri !== undefined) missing.delete(uri)
+    added.push(rel)
   }
 
   for (const { file, bytes } of loaded) {
     await dataLayerSaveFileBytes(`models/${sanitizeName(file.name)}`, bytes)
   }
+  if (models.length === 0) return { placed: null, added, missing: [], skipped }
 
+  const primary = models[0]
   const placeRel = `models/${sanitizeName(primary.name)}`
   await ensureContentMapped(placeRel)
   const stillMissing = await unsatisfiedRefs(missing)
   await placeLocalModel(placeRel, primary.name.replace(MODEL_EXT, ''), position)
-  return { name: primary.name, missing: stillMissing }
+  return { placed: primary.name, added, missing: stillMissing, skipped }
 }
 
 // Fallback drop position: the centre of the parcel the editor was opened at

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { state } from '@scene/state'
 import { useStore } from '../core/store'
-import { uiCheckModelRefs, uiFetchCatalog, uiImportAsset, uiLoadLocalModels, uiPlaceLocalModel, uiUploadModel } from '../actions/assets'
+import { uiCheckModelRefs, uiFetchCatalog, uiImportAsset, uiLoadLocalModels, uiPlaceLocalModel, uiImportFiles } from '../actions/assets'
 import { opendclUrl } from '../assets'
 import { Button, IconButton, LinkButton, Modal, SearchField, Select, Shelf } from '../ds'
 import { LeftTabs, type LeftView } from './left-view'
@@ -81,7 +81,7 @@ function LocalGrid(props: { list: string[]; onUploaded: () => void }): JSX.Eleme
   }, [])
 
   const upload = async (files: File[]): Promise<void> => {
-    await uiUploadModel(files)
+    await uiImportFiles(files)
     props.onUploaded()
   }
 
@@ -107,18 +107,18 @@ function LocalGrid(props: { list: string[]; onUploaded: () => void }): JSX.Eleme
       <div className="eui-asset-grid">
         <label
           className="eui-asset eui-asset-upload"
-          data-tip="Add a .glb / .gltf from your computer — select its textures/.bin along with it if the model keeps them in separate files"
+          data-tip="Add models (.glb / .gltf, with their textures and .bin), images, sounds (.mp3 .ogg .wav), videos (.mp4) or data files like a manifest.json"
         >
           <input
             ref={fileRef}
             type="file"
             multiple
-            accept=".glb,.gltf,.bin,.png,.jpg,.jpeg,.webp,.ktx2,model/gltf-binary"
+            accept=".glb,.gltf,.bin,.png,.jpg,.jpeg,.webp,.ktx2,.mp3,.ogg,.wav,.mp4,.json,.txt,.md,model/gltf-binary"
             style={{ display: 'none' }}
             onChange={(e) => void onFile(e)}
           />
           <div className="glyph">+</div>
-          <span className="name">Add model</span>
+          <span className="name">Import files</span>
           <span className="pack">from your computer</span>
         </label>
         {props.list.map((p) => {
@@ -251,7 +251,7 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
           )}
         </Shelf>
         {catalogFailed ? (
-          <p className="eui-asset-note">Catalog unavailable here. Use “Add model” to bring in a .glb from your computer.</p>
+          <p className="eui-asset-note">Catalog unavailable here. Use “Import files” to bring in models, images, sounds, videos or data files from your computer.</p>
         ) : (
           <Shelf title="Catalog" count={entries.length}>
             <CatalogGrid entries={entries} resetKey={`${f}|${category}`} />

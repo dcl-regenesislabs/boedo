@@ -9,7 +9,7 @@ import {
   dropPosition,
   loadLocalModels,
   placeLocalModel,
-  uploadModel,
+  importFiles,
   missingModelRefs
 } from '../assets'
 import { sendToScene } from '../engine/bus'
@@ -90,18 +90,19 @@ export const uiCheckModelRefs = async (files: File[]): Promise<string[]> => {
   }
 }
 
-// Upload local model files from disk (browser or electron) and place the model.
-export const uiUploadModel = async (files: File[]): Promise<void> => {
+// Import files from disk (browser or electron): a model is placed, other media and data files are added.
+export const uiImportFiles = async (files: File[]): Promise<void> => {
   state.assetBusy = true
   try {
-    const { name, missing } = await uploadModel(files, await dropPosition())
-    focusPlaced()
-    state.saveStatus =
-      missing.length > 0
-        ? `Added ${name} — it references files not in the project: ${missing.join(', ')}. Select them together with the model to include them.`
-        : `Added ${name}`
+    const { placed, added, missing, skipped } = await importFiles(files, await dropPosition())
+    const parts: string[] = []
+    if (placed !== null) parts.push(`Added ${placed}`)
+    if (added.length > 0) parts.push(`${placed === null ? 'Added' : 'and'} ${added.length === 1 ? added[0] : `${added.length} files under assets/`}`)
+    if (missing.length > 0) parts.push(`— it references files not in the project: ${missing.join(', ')}. Select them together with the model to include them`)
+    if (skipped.length > 0) parts.push(`${parts.length > 0 ? '— ' : ''}left out ${skipped.join(', ')}`)
+    state.saveStatus = parts.length > 0 ? parts.join(' ') : 'Nothing to import'
   } catch (e) {
-    state.saveStatus = `upload failed: ${String(e)}`
+    state.saveStatus = `import failed: ${String(e)}`
   } finally {
     state.assetBusy = false
     void sendToScene({ type: 'resync' })

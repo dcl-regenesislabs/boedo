@@ -85,7 +85,7 @@ export async function createPiFactory(authPath: string, preferredModel?: string,
         build: Type.Object({})
       }
       const descriptions: Record<BrowserToolName, string> = {
-        list_files: 'List readable files in the open browser project.',
+        list_files: 'List the open browser project\'s files: code and data files (read_file opens them) and models, images and sounds, which scenes reference by path.',
         read_file: 'Read a browser project file and its revision. Missing files have a null revision.',
         write_file: 'Create or replace source code, only if its revision still matches.',
         scene_request: 'Inspect or change the live scene using the editor actions documented in the system prompt.',

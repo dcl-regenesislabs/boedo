@@ -25,13 +25,16 @@ function parseRequest(text: string): unknown {
   }
 }
 
+const REFERENCED_ASSET = /^(?!node_modules\/|bin\/)[^.][^\0]*\.(glb|gltf|png|jpe?g|webp|ktx2|mp3|ogg|wav|mp4)$/i
+
 export function createBrowserTools(project: BrowserProject) {
   const reads = new Map<string, { revision: string; bytes: Uint8Array }>()
   return async (call: BrowserToolCall, signal: AbortSignal): Promise<string> => {
     signal.throwIfAborted()
     const { tool, args } = call
     if (tool === 'list_files') {
-      return JSON.stringify([...project.files().keys()].filter(assistantReadable).sort().slice(0, 2000))
+      // models, images and sounds too: they can't be read, but scripts and components name them by path
+      return JSON.stringify([...project.files().keys()].filter((path) => assistantReadable(path) || REFERENCED_ASSET.test(path)).sort().slice(0, 2000))
     }
     if (tool === 'build') return JSON.stringify(await project.build(signal))
     if (tool === 'scene_request') {
