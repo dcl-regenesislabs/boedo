@@ -20,6 +20,9 @@ vi.mock('@ui/actions/entities', () => ({ uiAddEntity: vi.fn() }))
 vi.mock('@ui/actions/components', () => ({ uiSetComponentValue: setValue }))
 vi.mock('@ui/ai/requests', () => ({ runRequestText: vi.fn() }))
 vi.mock('@ui/ai/request-format', () => ({ resolveEntityRef: (_: unknown, ref: string) => ref }))
+vi.mock('@ui/features/editor/scene-check-context', () => ({
+  refreshSceneChecks: async () => [{ id: 'empty-prefab-ref', level: 'blocker', title: 'Nothing picked', detail: 'Pick a prefab', entityId: '512', fix: { label: 'x', action: 'y' } }]
+}))
 
 describe('assistant scene requests', () => {
   it('writes a oneof the model gave in the SDK form the way the engine reads it', async () => {
@@ -30,4 +33,11 @@ describe('assistant scene requests', () => {
     )
     expect(setValue).toHaveBeenCalledWith('512:Material', '512', 'Material', JSON.stringify({ material: { pbr: { albedoColor: green } } }))
   })
+
+  it('answers check with the editor\'s findings, naming the entity each one is about', async () => {
+    expect(await browserSceneRequest({ type: 'check' }, new AbortController().signal)).toEqual({
+      findings: [{ level: 'blocker', title: 'Nothing picked', detail: 'Pick a prefab', entity: 'Box' }]
+    })
+  })
 })
+

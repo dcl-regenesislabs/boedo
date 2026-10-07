@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GAME_LIFE_MARKER } from '../play/game-life'
-import { PROBLEM_MARKER, allProblemLines, gameTabLines, lastSeconds, type LogLine, type RelayedLine } from './log-roles'
+import { PROBLEM_MARKER, allProblemLines, errorLines, gameTabLines, lastSeconds, type LogLine, type RelayedLine } from './log-roles'
 
 function relayed(lines: string[], at: number | null = null): RelayedLine[] {
   return lines.map((text) => ({ text, at }))
@@ -171,5 +171,17 @@ describe('the Game tab’s rows', () => {
       { text: '[server] backlog two', at: null }
     ])
     expect(merged.map((r) => r.text)).toEqual(['backlog one', 'backlog two', '[5] Log: late'])
+  })
+})
+
+describe('errorLines', () => {
+  it('keeps only what the engine flagged, without the tag', () => {
+    expect(errorLines([
+      '[12.5] [you] Error: Cannot read properties of undefined',
+      '[12.6] Log: tick 42',
+      '[12.7] SceneError: Door.start is not a function',
+      `[13.0] ${PROBLEM_MARKER} Door.start threw`,
+      ''
+    ].join('\n'))).toEqual(['Error: Cannot read properties of undefined', 'Door.start is not a function', 'Door.start threw'])
   })
 })

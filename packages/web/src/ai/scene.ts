@@ -9,6 +9,7 @@ import { uiSetComponentValue } from '@ui/actions/components'
 import { runRequestText } from '@ui/ai/requests'
 import { resolveEntityRef } from '@ui/ai/request-format'
 import { sceneOutline } from '@ui/ai/roster'
+import { refreshSceneChecks } from '@ui/features/editor/scene-check-context'
 import type { AssistantSceneSettings } from '../shell/scene-json'
 
 function entity(ref: unknown): string {
@@ -87,6 +88,16 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
       match: typeof request.match === 'string' ? request.match : undefined,
       offset: typeof request.offset === 'number' ? request.offset : undefined
     })
+  }
+  if (request.type === 'check') {
+    // the editor's own scene checks, as the Scene checks card shows them
+    const findings = await refreshSceneChecks()
+    return {
+      findings: findings.map((f) => ({
+        level: f.level, title: f.title, detail: f.detail,
+        ...(f.entityId === undefined ? {} : { entity: entityName(state.snapshot, f.entityId) ?? f.entityId })
+      }))
+    }
   }
   if (request.type === 'inspect') {
     // a big scene doesn't fit one answer: match narrows by name, offset pages through the rest

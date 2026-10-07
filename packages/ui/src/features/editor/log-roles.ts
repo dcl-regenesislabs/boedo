@@ -82,6 +82,16 @@ function taggedLine(raw: string, at: number | null = null): LogLine {
   return { role, text: text.slice(0, m.index) + text.slice(m.index + m[0].length), at: seconds, error }
 }
 
+/** What the engine flagged in the scene's console: the lines a creator (or the assistant) must act on. */
+// the engine's own levels on a /scene_logs line: `[1.23] SceneError: …`, `SystemError: …`
+const ENGINE_ERROR = /^\s*(?:\[\d+(?:\.\d+)?\]\s*)?(?:Scene|System)?Error:/
+export function errorLines(logs: string): string[] {
+  return taggedLines(logs)
+    .filter((line) => line.error || ENGINE_ERROR.test(line.text))
+    .map((line) => line.text.replace(STAMP, '').trim().replace(/^(?:Scene|System)Error:\s*/, ''))
+    .filter((text) => text !== '')
+}
+
 /** The Game tab's rows: every console line, minus the editor's own machinery. */
 function taggedLines(logs: string): LogLine[] {
   return logs

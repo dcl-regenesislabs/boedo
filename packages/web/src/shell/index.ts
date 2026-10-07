@@ -34,6 +34,7 @@ import { scriptAttacher } from '../ai/attach'
 import { browserSceneRequest } from '../ai/scene'
 import { sameBytes } from '../ai/tools'
 import { captureView } from '../ai/view'
+import { runFreshBuild } from '@ui/actions/verify-build'
 import { externalDependencies } from '../archive/dependencies'
 import { createPublisher } from '../publish/publish'
 import { publishWorlds } from '../publish/worlds'
@@ -200,7 +201,11 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
             await fileWrites
             const result = await previews.build(open.id, new Map(open.files))
             signal.throwIfAborted()
-            return { ok: result.ok, diagnostics: result.diagnostics }
+            if (!result.ok) return { ok: false, diagnostics: result.diagnostics }
+            // compiled is not working: run it once and report what it printed
+            const run = await runFreshBuild()
+            signal.throwIfAborted()
+            return { ok: true, diagnostics: result.diagnostics, run }
           }
         }
       }
