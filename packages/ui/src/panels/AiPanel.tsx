@@ -75,7 +75,7 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
   const [fileStatus, setFileStatus] = useState<{ text: string; kind: 'dim' | 'ok' | 'err' }>({ text: '', kind: 'dim' })
   const [dirty, setDirty] = useState(false)
   const railKey = useStore(() => aiStore.railVersion)
-  const [confirmWipe, setConfirmWipe] = useState<{ kind: 'new' | AiProvider; label: string } | null>(null)
+  const [confirmWipe, setConfirmWipe] = useState<{ label: string } | null>(null)
   const [showQuickOpen, setShowQuickOpen] = useState(false)
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -502,28 +502,14 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
     setMessages((prev) => prev.map((m) => (m.role === 'assistant' && !m.done ? { ...m, done: true } : m)))
   }
   stopRef.current = stop
-  const doWipe = (kind: 'new' | AiProvider): void => {
+  const doWipe = (): void => {
     void shell.aiStop?.()
     void shell.aiReset?.()
     activeTurn.current = null
     setMessages([])
     setBusy(false)
     editorRef.current?.freeze(false)
-    if (kind === 'new') setHistory([])
-    else {
-      // a kept chat stays as history: the new provider never saw it
-      if (kept.current !== null) setHistory((prev) => keptTranscript([...prev, ...messages]))
-      const p = providers.find((x) => x.id === kind)
-      setProvider(kind)
-      if (p !== undefined) setModel(p.defaultModel)
-    }
-  }
-  const requestSwitch = (id: AiProvider): void => {
-    if (id === provider) return
-    if (messages.length > 0) {
-      const p = providers.find((x) => x.id === id)
-      setConfirmWipe({ kind: id, label: `Switch to ${p?.label ?? id}? This starts a new conversation.` })
-    } else doWipe(id)
+    setHistory([])
   }
 
   // a running turn is stopped by doWipe, so clearing never waits on it
@@ -531,7 +517,7 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
     <button
       className="eui-ai-headbtn icon eui-ai-newchat"
       disabled={messages.length === 0 && history.length === 0}
-      onClick={() => setConfirmWipe({ kind: 'new', label: 'Start a new chat? This clears the conversation for this scene.' })}
+      onClick={() => setConfirmWipe({ label: 'Start a new chat? This clears the conversation for this scene.' })}
       {...labelTip('New chat')}
     >
       <IconNewChat />
@@ -571,15 +557,9 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
         onAddImages={addImages}
         onRemoveImage={(i) => setAttachments((prev) => prev.filter((_, j) => j !== i))}
         fileRef={fileRef}
-        providers={providers}
-        provider={provider}
-        model={model}
-        current={current}
-        onProvider={requestSwitch}
-        onModel={setModel}
         confirm={confirmWipe}
         onConfirmYes={() => {
-          if (confirmWipe !== null) doWipe(confirmWipe.kind)
+          if (confirmWipe !== null) doWipe()
           setConfirmWipe(null)
         }}
         onConfirmCancel={() => setConfirmWipe(null)}

@@ -265,7 +265,7 @@ block and directory overhead when sizing the volume; logical byte limits are not
 | `PURGE_WALLETS_PER_RUN` | 20 | wallets one purge run visits |
 | `ANTHROPIC_OAUTH_SETUP_TOKEN` | none | Node-only Claude setup token; seeds `.auth.json` in a sibling `.assistant` directory unless `--ai-auth` supplies its path |
 | `AI_AUTH_PATH` | none | existing OAuth session file (`--ai-auth`) |
-| `AI_MODEL` | provider default | assistant model (`--ai-model`); when set, the only model clients may use |
+| `AI_MODEL` | `claude-opus-5-5` | assistant model (`--ai-model`); the only model clients may use |
 | `ASSISTANT_WALLETS` | any wallet; **required when `NODE_ENV=production`** and a credential is set | comma-separated wallets that may use the assistant, or `*` for any |
 | `ASSISTANT_TURNS_PER_MINUTE` | 30 | assistant turns across all wallets |
 | `ASSISTANT_TURNS_PER_DAY` | 200 | assistant turns per wallet per UTC day |

@@ -1,9 +1,8 @@
-import type { AiImageAttachment, AiProvider, AiProviderInfo } from '@dcl-editor/contract'
+import type { AiImageAttachment } from '@dcl-editor/contract'
 import type { RefObject } from 'react'
 import { baseName } from '../../script/project-files'
 import { type CodeSelection } from '../../panels/ai-store'
 import { type EntityInfo } from '../../ai/context'
-import { ModelMenu } from './ModelMenu'
 import { ArrowUpIcon, CubeIcon, ImageIcon } from './icons'
 import { composerPlaceholder, MAX_ATTACH, QUICK_ACTIONS } from './chat-helpers'
 
@@ -23,12 +22,6 @@ export function Composer(props: {
   onAddImages: (files: Iterable<File>) => void
   onRemoveImage: (index: number) => void
   fileRef: RefObject<HTMLInputElement>
-  providers: AiProviderInfo[]
-  provider: AiProvider
-  model: string
-  current?: AiProviderInfo
-  onProvider: (id: AiProvider) => void
-  onModel: (m: string) => void
   confirm: { label: string } | null
   onConfirmYes: () => void
   onConfirmCancel: () => void
@@ -135,14 +128,6 @@ export function Composer(props: {
           }}
         />
         <div className="eui-ai-fieldbar">
-          <ModelMenu
-            providers={props.providers}
-            provider={props.provider}
-            model={props.model}
-            current={props.current}
-            onProvider={props.onProvider}
-            onModel={props.onModel}
-          />
           <input
             ref={props.fileRef}
             type="file"

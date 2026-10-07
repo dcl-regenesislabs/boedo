@@ -31,6 +31,9 @@ function resources(skills: SkillsComponent): ResourceLoader {
   }
 }
 
+// one model for every turn: the strongest, and no choice to make in the composer
+export const ASSISTANT_MODEL = 'claude-opus-5-5'
+
 export async function createPiFactory(authPath: string, preferredModel?: string, setupToken?: string, skills?: SkillsComponent): Promise<AgentFactory> {
   const skillLibrary = skills ?? await createSkillsComponent()
   if (setupToken !== undefined) await seedSetupToken(authPath, setupToken)

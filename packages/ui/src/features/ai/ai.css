@@ -202,39 +202,6 @@
 }
 .eui-ai-send.busy .sq { position: relative; width: 9px; height: 9px; border-radius: 2px; background: var(--primary); }
 
-/* ---- model menu ---- */
-.eui-ai-model { position: relative; }
-.eui-ai-modelbtn {
-  display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
-  background: none; border: 1px solid var(--divider); color: var(--text-2);
-  border-radius: var(--r-control); padding: 5px 9px; font: 12px/1 var(--font-family);
-}
-.eui-ai-modelbtn:hover { color: var(--text); border-color: var(--primary-border); }
-.eui-ai-modelbtn .prov { font-weight: 600; color: var(--text); }
-.eui-ai-modelbtn .dot { color: var(--text-3); }
-.eui-ai-modelbtn .chev { transition: transform .15s; opacity: .7; }
-.eui-ai-modelbtn .chev.open { transform: rotate(180deg); }
-.eui-ai-menu {
-  position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 5; min-width: 210px;
-  background: var(--paper-hi); border: 1px solid var(--divider); border-radius: var(--r-card);
-  padding: 6px; box-shadow: var(--shadow-float); display: flex; flex-direction: column; gap: 1px;
-}
-.eui-ai-menu-label { font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-3); padding: 8px 10px 4px; }
-.eui-ai-menu-sep { height: 1px; background: var(--divider-soft); margin: 5px 2px; }
-.eui-ai-menu-item {
-  display: flex; align-items: center; gap: 8px; text-align: left; width: 100%;
-  background: none; border: 0; color: var(--text); cursor: pointer;
-  padding: 7px 10px; border-radius: var(--r-control); font: 13px/1 var(--font-family);
-}
-.eui-ai-menu-item:hover:not(:disabled) { background: var(--hover); }
-.eui-ai-menu-item:disabled { cursor: default; }
-.eui-ai-menu-item .tick { width: 14px; display: inline-flex; color: var(--primary); flex: none; }
-.eui-ai-menu-item .lbl { flex: 1; }
-.eui-ai-menu-item .tag { font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); border: 1px solid var(--divider-soft); border-radius: 5px; padding: 2px 5px; }
-.eui-ai-menu-item .tag.soft { border: 0; color: var(--primary); background: var(--primary-selected); }
-.eui-ai-menu-item.off { color: var(--text-3); }
-.eui-ai-menu-item.off .lbl { opacity: .7; }
-
 /* ---- studio ---- */
 .eui-studio-head {
   position: relative; display: flex; align-items: center; gap: 10px; padding: 0 10px 0 14px; height: var(--head-h);

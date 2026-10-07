@@ -9,7 +9,7 @@ import { createPurgeJobComponent } from './adapters/purge-job.ts'
 import { createSkillsComponent } from './adapters/skills.ts'
 import { createAssistantComponent, DEFAULT_ASSISTANT_LIMITS } from './ai/server.ts'
 import type { AssistantLimits } from './ai/server.ts'
-import { createPiFactory } from './ai/pi.ts'
+import { ASSISTANT_MODEL, createPiFactory } from './ai/pi.ts'
 import type { AgentFactory } from './ai/types.ts'
 import { createRateLimiter, createUploadGate, envFromConfig, DEFAULT_LIMITS, walletAllowlist } from './config.ts'
 import { createQuotaStore } from './quota-store.ts'
@@ -72,7 +72,7 @@ export async function initComponents(options: ComponentOptions = {}): Promise<Ap
     if (authInStorage) throw new Error('AI_AUTH_PATH must be outside STORAGE_DIR in production')
   }
   const factory = options.agentFactory ?? (authPath === undefined ? undefined :
-    await createPiFactory(authPath, await config.getString('AI_MODEL'), setupToken, skills))
+    await createPiFactory(authPath, (await config.getString('AI_MODEL')) ?? ASSISTANT_MODEL, setupToken, skills))
   const metrics = await createMetricsComponent(metricDeclarations, { config })
   const logs = await createLogComponent({ config, metrics })
   if (authInStorage) {

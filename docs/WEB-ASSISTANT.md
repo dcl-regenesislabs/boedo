@@ -69,7 +69,7 @@ node packages/service/scripts/assistant-login.ts --provider claude --auth /absol
 
 node packages/service/dev-server.ts --port 8787 --data /tmp/dcl-projects \
   --origin http://localhost:5230 --ai-auth /absolute/path/.auth.json
-# Optional: --ai-model <model-id> sets the default in the matching provider's catalog.
+# Optional: --ai-model <model-id> replaces claude-opus-5-5, the only model the assistant uses.
 
 npm run build -w @dcl-editor/web
 ```
