@@ -36,7 +36,7 @@ function setup(options: Partial<Parameters<typeof createConnection>[0]> = {}) {
       providers: async () => [],
       create: async () => ({ prompt, abort: async () => {}, dispose() {}, snapshot: () => ['completed'], takeUsage: () => ({ cost: 10 }) })
     },
-    logger: { error: vi.fn() }, allowTurn: () => true, send: (event) => events.push(event), ...options
+    logger: { error: vi.fn(), info: vi.fn() }, allowTurn: () => true, send: (event) => events.push(event), ...options
   })
   cleanup.push(() => connection.close())
   const send = (turnId: string) => connection.receive({ kind: 'prompt', turnId, projectId: 'scene', params })

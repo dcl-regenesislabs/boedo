@@ -25,7 +25,7 @@ describe('assistant tool bridge', () => {
         abort: async () => {}, dispose: () => {}, snapshot: () => [], takeUsage: () => ({ cost: 0 })
       }))
     }
-    const connection = createConnection({ factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true })
+    const connection = createConnection({ factory, logger: { error: vi.fn(), info: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true })
     connection.receive({ kind: 'prompt', turnId: 'one', projectId: 'scene', params })
     await vi.waitFor(() => expect(events.some((e) => e.kind === 'call')).toBe(true))
     const call = events.find((e) => e.kind === 'call')
@@ -50,7 +50,7 @@ describe('assistant tool bridge', () => {
         prompt: async () => { await call('write_file', { path: 'src/scripts/Door.ts' }) }, abort, dispose, snapshot: () => [], takeUsage: () => ({ cost: 0 })
       })
     }
-    const connection = createConnection({ factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true })
+    const connection = createConnection({ factory, logger: { error: vi.fn(), info: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true })
     connection.receive({ kind: 'prompt', turnId: 'one', projectId: 'scene', params })
     await vi.waitFor(() => expect(events.some((e) => e.kind === 'call')).toBe(true))
     connection.close()
@@ -63,7 +63,7 @@ describe('assistant tool bridge', () => {
     const events: AssistantServerMessage[] = []
     let toolError = ''
     const connection = createConnection({
-      logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true, toolTimeoutMs: 5,
+      logger: { error: vi.fn(), info: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true, toolTimeoutMs: 5,
       factory: {
         providers: async () => [],
         create: async (_params, call) => ({
@@ -115,7 +115,7 @@ describe('assistant tool bridge', () => {
       })
     }
     const events: AssistantServerMessage[] = []
-    const connection = createConnection({ factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true, turnTimeoutMs: 50 })
+    const connection = createConnection({ factory, logger: { error: vi.fn(), info: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true, turnTimeoutMs: 50 })
     faux.setResponses([fauxAssistantMessage(fauxToolCall('build', {}), { stopReason: 'toolUse' })])
     connection.receive({ kind: 'prompt', turnId: 'one', projectId: 'scene', params: { ...params, text: 'Build a door' } })
     await vi.waitFor(() => expect(events).toContainEqual({ kind: 'event', event: { kind: 'done', turnId: 'one', ok: false } }))
@@ -154,7 +154,7 @@ describe('assistant tool bridge', () => {
     // each connection on a fresh store over the same folder: a service that restarted in between
     async function turn(memoryKey: string, text: string) {
       const events: AssistantServerMessage[] = []
-      const connection = createConnection({ factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true, memory: createAssistantMemory(dir).forWallet(wallet) })
+      const connection = createConnection({ factory, logger: { error: vi.fn(), info: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true, memory: createAssistantMemory(dir).forWallet(wallet) })
       connection.receive({ kind: 'prompt', turnId: text.replace(/\W/g, '-'), projectId: 'scene', params: { ...params, text }, memory: { id: ref.id, key: memoryKey } })
       await vi.waitFor(() => expect(events.some((e) => e.kind === 'event' && e.event.kind === 'done')).toBe(true))
       await connection.close()
@@ -171,7 +171,7 @@ describe('assistant tool bridge', () => {
       const [stored] = await readdir(join(dir, wallet))
       expect((await readFile(join(dir, wallet, stored))).includes('Make a door')).toBe(false)
 
-      const connection = createConnection({ factory, logger: { error: vi.fn() }, send: () => {}, allowTurn: () => true, memory: createAssistantMemory(dir).forWallet(wallet) })
+      const connection = createConnection({ factory, logger: { error: vi.fn(), info: vi.fn() }, send: () => {}, allowTurn: () => true, memory: createAssistantMemory(dir).forWallet(wallet) })
       connection.receive({ kind: 'forget', id: ref.id })
       await connection.close()
       expect(await readdir(join(dir, wallet))).toEqual([])
@@ -193,7 +193,7 @@ describe('assistant tool bridge', () => {
         return { prompt: async (next) => { said.push(next.text) }, abort: async () => {}, dispose: () => {}, snapshot: () => [...said], takeUsage: () => ({ cost: 0 }) }
       }
     }
-    const connection = createConnection({ factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true, memory: memory.forWallet(wallet) })
+    const connection = createConnection({ factory, logger: { error: vi.fn(), info: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true, memory: memory.forWallet(wallet) })
     async function turn(turnId: string, key: string) {
       connection.receive({ kind: 'prompt', turnId, projectId: 'scene', params: { ...params, text: turnId }, memory: { ...ref, key } })
       await vi.waitFor(() => expect(events).toContainEqual({ kind: 'event', event: { kind: 'done', turnId, ok: true } }))
@@ -211,7 +211,7 @@ describe('assistant tool bridge', () => {
 
   it('logs memory failures without secrets and keeps later saves and deletions working', async () => {
     const events: AssistantServerMessage[] = []
-    const logger = { error: vi.fn() }
+    const logger = { error: vi.fn(), info: vi.fn() }
     const ref = { id: 'b'.repeat(32), key: Buffer.alloc(32, 7).toString('base64url') }
     const failure = new Error(`Private conversation and key: ${ref.key}`)
     const memory = {
@@ -255,7 +255,7 @@ describe('assistant tool bridge', () => {
     async function turn(turnId: string) {
       const events: AssistantServerMessage[] = []
       const connection = createConnection({
-        factory, logger: { error: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true,
+        factory, logger: { error: vi.fn(), info: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true,
         usage: createUsageMeter(dir, { daily: 10, weekly: 100 }).forWallet(wallet)
       })
       connection.receive({ kind: 'prompt', turnId, projectId: 'scene', params })

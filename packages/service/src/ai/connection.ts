@@ -41,7 +41,7 @@ function parseMemory(value: unknown): MemoryRef | null | undefined {
 
 export function createConnection(options: {
   factory: AgentFactory
-  logger: Pick<ILoggerComponent.ILogger, 'error'>
+  logger: Pick<ILoggerComponent.ILogger, 'error' | 'info'>
   send(message: AssistantServerMessage): void
   allowTurn(): boolean
   usage?: WalletUsage
@@ -51,7 +51,7 @@ export function createConnection(options: {
 }) {
   let agent: AssistantAgent | null = null
   let identity = ''
-  let active: { id: string; controller: AbortController; chars: number; resumable: boolean } | null = null
+  let active: { id: string; controller: AbortController; chars: number; resumable: boolean; steps: number; lastStepAt: number } | null = null
   let closed = false
   let running: Promise<void> | undefined
   let stopping: Promise<void> | undefined
@@ -75,8 +75,12 @@ export function createConnection(options: {
     // The browser serializes edits; queued calls must not spend their timeout waiting for earlier ones.
     const result = browserCalls.then(() => {
       if (turn === null || active !== turn || turn.controller.signal.aborted || signal?.aborted) throw new Error('Turn cancelled')
+      const live = turn
       const controller = turn.controller
       const callId = crypto.randomUUID()
+      // the model's thinking is the gap since the last step ended, the tool's work is the rest
+      const asked = Date.now()
+      live.steps++
       return new Promise<string>((resolve, reject) => {
         const cancel = () => finish(false, 'The turn was cancelled.')
         const timer = setTimeout(() => {
@@ -86,6 +90,8 @@ export function createConnection(options: {
         function finish(ok: boolean, text: string) {
           if (!pending.delete(callId)) return
           clearTimeout(timer)
+          options.logger.info(`assistant step turn=${live.id} n=${live.steps} tool=${tool} think=${asked - live.lastStepAt}ms tool_ms=${Date.now() - asked} ok=${ok} chars=${text.length}`)
+          live.lastStepAt = Date.now()
           signal?.removeEventListener('abort', cancel)
           controller.signal.removeEventListener('abort', cancel)
           if (ok) resolve(text)
@@ -102,7 +108,8 @@ export function createConnection(options: {
   }
 
   async function prompt(turnId: string, projectId: string, params: AiSendParams, ref: MemoryRef | null): Promise<void> {
-    const turn = { id: turnId, controller: new AbortController(), chars: 0, resumable: false }
+    const startedAt = Date.now()
+    const turn = { id: turnId, controller: new AbortController(), chars: 0, resumable: false, steps: 0, lastStepAt: startedAt }
     active = turn
     let started = false
     let turnAgent: AssistantAgent | null = null
@@ -156,6 +163,8 @@ export function createConnection(options: {
       }
       // a stopped or failed turn still paid for the calls it made
       const spent = turnAgent?.takeUsage()
+      // a slow turn shows where it went: no prompt or scene content, only shape and timing
+      options.logger.info(`assistant turn=${turnId} ms=${Date.now() - startedAt} ok=${ok} steps=${turn.steps}`)
       if (spent !== undefined && options.usage !== undefined) {
         await options.usage.record(spent.cost).catch(() => { options.logger.error('Assistant usage could not be recorded') })
       }
