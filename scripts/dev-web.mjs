@@ -42,12 +42,23 @@ if (!fs.existsSync(path.join(reactWeb, '..', 'deploy', 'web', 'engine', 'pkg')))
   process.exit(1)
 }
 
+// the latest modification time under a directory; 0 when it doesn't exist
+function newest(dir) {
+  if (!fs.existsSync(dir)) return 0
+  let latest = 0
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true, recursive: true })) {
+    if (entry.isFile()) latest = Math.max(latest, fs.statSync(path.join(entry.parentPath, entry.name)).mtimeMs)
+  }
+  return latest
+}
+
 function run(command, args, cwd = root) {
   console.log(`▶ ${command} ${args.join(' ')}`)
   if (spawnSync(command, args, { cwd, stdio: 'inherit' }).status !== 0) process.exit(1)
 }
 if (!values['no-build']) {
-  if (!fs.existsSync(path.join(root, 'packages', 'web', 'dist', 'scene'))) {
+  // re-exported whenever its sources changed: an old export silently serves the old editor scene
+  if (newest(path.join(root, 'packages', 'scene', 'src')) > newest(path.join(root, 'packages', 'web', 'dist', 'scene'))) {
     run('npm', ['run', 'export-static', '-w', '@dcl-editor/scene'])
   }
   run('npm', ['run', 'build', '-w', '@dcl-editor/web'])

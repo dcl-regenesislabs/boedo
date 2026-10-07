@@ -16,9 +16,10 @@ import { state } from '../state'
 import { worldTransformOf, computeWorldPositions, rootLocalForWorld } from '../world-pos'
 import { cameraFovY } from './camera-projection'
 import { rotateVec3ByQuat } from './perspective-to-screen'
+import type { CameraGesture } from '../bridge-protocol'
 
 const MOUSE_SENSITIVITY = 0.003
-// creators-hub-pro fly feel: 15 m/s default, scroll wheel adjusts (1..200)
+// creators-hub-pro fly feel: 15 m/s default, the mouse wheel adjusts it while flying (1..200)
 let flySpeed = 15
 export function adjustFlySpeed(factor: number): void {
   flySpeed = Math.max(1, Math.min(200, flySpeed * factor))
@@ -69,6 +70,22 @@ const PITCH_LIMIT = Math.PI / 2 - 0.01
 const RAD_TO_DEG = 180 / Math.PI
 const TWEEN_DURATION = 0.3
 
+const GESTURE_ORBIT = 0.004 // rad per pixel
+const GESTURE_PAN = 0.0015 // per pixel, times the orbit distance
+const GESTURE_ZOOM = 0.002 // per zoom unit: an orbit distance factor, or fly metres per m/s of speed
+let gesture: CameraGesture = { orbitX: 0, orbitY: 0, panX: 0, panY: 0, zoom: 0 }
+export function cameraGesture(g: CameraGesture): void {
+  gesture = {
+    orbitX: gesture.orbitX + g.orbitX,
+    orbitY: gesture.orbitY + g.orbitY,
+    panX: gesture.panX + g.panX,
+    panY: gesture.panY + g.panY,
+    zoom: gesture.zoom + g.zoom
+  }
+}
+// how far a pan has moved the orbit pivot off its target; a new target starts centred
+let orbitOffset = Vector3.Zero()
+
 let camEntity: Entity | null = null
 let yaw = 0
 let pitch = 0
@@ -103,6 +120,7 @@ function aimAlong(dir: Vector3): void {
 // Begin an eased move to `toPos` aiming along `lookDir`, from the current pose.
 function startTween(toPos: Vector3, lookDir: Vector3): void {
   if (camEntity === null) return
+  orbitOffset = Vector3.Zero()
   const horiz = Math.sqrt(lookDir.x * lookDir.x + lookDir.z * lookDir.z)
   const rawYaw = Math.atan2(lookDir.x, lookDir.z)
   const dYaw = Math.atan2(Math.sin(rawYaw - yaw), Math.cos(rawYaw - yaw))
@@ -166,6 +184,7 @@ export function setCamMode(mode: 'none' | 'free' | 'target'): void {
   // lock the orbit onto whatever is active right now; later selection changes
   // don't move the camera
   orbitTargetId = mode === 'target' ? state.activeEntity : null
+  orbitOffset = Vector3.Zero()
   if (mode === 'free') initFree()
   else if (mode === 'target') initTarget()
 }
@@ -282,7 +301,10 @@ function cameraSystem(dt: number): void {
   }
   wasGizmoDragging = state.gizmoDragging
 
+  const g = gesture
+  gesture = { orbitX: 0, orbitY: 0, panX: 0, panY: 0, zoom: 0 }
   if (state.camMode === 'none') return
+  const gestured = g.orbitX !== 0 || g.orbitY !== 0 || g.panX !== 0 || g.panY !== 0 || g.zoom !== 0
 
   const locked = PointerLock.getOrNull(engine.CameraEntity)?.isPointerLocked ?? false
   const ptr = PrimaryPointerInfo.getOrNull(engine.RootEntity)
@@ -298,7 +320,7 @@ function cameraSystem(dt: number): void {
 
   // Eased move to a target pose; any manual input cancels it.
   if (tween !== null) {
-    if (anyKey || lookDx !== 0 || lookDy !== 0) {
+    if (anyKey || gestured || lookDx !== 0 || lookDy !== 0) {
       tween = null
     } else {
       tween.elapsed += dt
@@ -317,14 +339,14 @@ function cameraSystem(dt: number): void {
     }
   }
 
-  if (state.camMode === 'free') flyStep(dt, lookDx, lookDy)
-  else orbitStep(dt, lookDx, lookDy)
+  if (state.camMode === 'free') flyStep(dt, lookDx, lookDy, g)
+  else orbitStep(dt, lookDx, lookDy, g)
 }
 
-function flyStep(dt: number, lookDx: number, lookDy: number): void {
+function flyStep(dt: number, lookDx: number, lookDy: number, g: CameraGesture): void {
   if (camEntity === null) return
-  yaw += lookDx * MOUSE_SENSITIVITY
-  pitch = clampPitch(pitch + lookDy * MOUSE_SENSITIVITY)
+  yaw += lookDx * MOUSE_SENSITIVITY + g.orbitX * GESTURE_ORBIT
+  pitch = clampPitch(pitch + lookDy * MOUSE_SENSITIVITY + g.orbitY * GESTURE_ORBIT)
 
   const rotation = lookRotation()
   const forward = Vector3.rotate(Vector3.Forward(), rotation)
@@ -343,12 +365,19 @@ function flyStep(dt: number, lookDx: number, lookDy: number): void {
   if (Vector3.lengthSquared(move) > 1e-6) {
     t.position = Vector3.add(t.position, Vector3.scale(Vector3.normalize(move), flySpeed * dt))
   }
+  // a pinch flies along the look, a pan slides sideways and up, both scaled to the fly speed
+  const step = GESTURE_ZOOM * flySpeed
+  const glide = Vector3.add(
+    Vector3.scale(forward, g.zoom * step),
+    Vector3.add(Vector3.scale(right, g.panX * step), Vector3.scale(Vector3.rotate(Vector3.Up(), rotation), -g.panY * step))
+  )
+  if (Vector3.lengthSquared(glide) > 0) t.position = Vector3.add(t.position, glide)
   t.rotation = rotation
 }
 
 // Orbit the active selection: mouse / left-right rotate around it, jump/walk
 // tilt, forward/back dolly in/out.
-function orbitStep(dt: number, lookDx: number, lookDy: number): void {
+function orbitStep(dt: number, lookDx: number, lookDy: number, g: CameraGesture): void {
   if (camEntity === null) return
   // Freeze the orbit while a gizmo drag is live: the target entity is being moved
   // BY the drag, and chasing it feeds back into the drag ray (camera rises with
@@ -358,20 +387,26 @@ function orbitStep(dt: number, lookDx: number, lookDy: number): void {
   const target = activeTarget()
   if (target === null) return
 
-  yaw += lookDx * MOUSE_SENSITIVITY
-  pitch = clampPitch(pitch + lookDy * MOUSE_SENSITIVITY)
+  yaw += lookDx * MOUSE_SENSITIVITY + g.orbitX * GESTURE_ORBIT
+  pitch = clampPitch(pitch + lookDy * MOUSE_SENSITIVITY + g.orbitY * GESTURE_ORBIT)
   if (inputSystem.isPressed(InputAction.IA_LEFT)) yaw -= ORBIT_KEY_SPEED * dt
   if (inputSystem.isPressed(InputAction.IA_RIGHT)) yaw += ORBIT_KEY_SPEED * dt
   if (inputSystem.isPressed(InputAction.IA_SECONDARY)) pitch = clampPitch(pitch + ORBIT_KEY_SPEED * dt)
   if (inputSystem.isPressed(InputAction.IA_PRIMARY)) pitch = clampPitch(pitch - ORBIT_KEY_SPEED * dt)
   if (inputSystem.isPressed(InputAction.IA_FORWARD)) distance -= DOLLY_SPEED * dt
   if (inputSystem.isPressed(InputAction.IA_BACKWARD)) distance += DOLLY_SPEED * dt
-  distance = Math.max(MIN_DIST, distance)
+  distance = Math.max(MIN_DIST, distance * Math.exp(-g.zoom * GESTURE_ZOOM))
 
   const rotation = lookRotation()
   const forward = Vector3.rotate(Vector3.Forward(), rotation)
+  if (g.panX !== 0 || g.panY !== 0) {
+    const right = Vector3.rotate(Vector3.Right(), rotation)
+    const up = Vector3.rotate(Vector3.Up(), rotation)
+    const slide = distance * GESTURE_PAN
+    orbitOffset = Vector3.add(orbitOffset, Vector3.add(Vector3.scale(right, g.panX * slide), Vector3.scale(up, -g.panY * slide)))
+  }
   const t = Transform.getMutable(camEntity)
-  t.position = Vector3.subtract(target, Vector3.scale(forward, distance))
+  t.position = Vector3.subtract(Vector3.add(target, orbitOffset), Vector3.scale(forward, distance))
   t.rotation = rotation
 }
 

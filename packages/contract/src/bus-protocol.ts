@@ -42,6 +42,16 @@ export interface HoverHint {
 export type CameraMode = 'off' | 'free' | 'target'
 
 
+// Trackpad, wheel and middle-drag input over the viewport, which the scene never sees, batched per
+// frame: pixels to orbit and pan the editor camera by, and a zoom step (positive moves in).
+export interface CameraGesture {
+  orbitX: number
+  orbitY: number
+  panX: number
+  panY: number
+  zoom: number
+}
+
 export type PageToSceneMessage =
   // page UI announces itself; scene hides its panels and replies scene-ready. baseCorner: the
   // edited scene's base parcel corner in metres, which the world frame is rebuilt from
@@ -79,6 +89,7 @@ export type PageToSceneMessage =
   | { type: 'pick-at-pointer'; add: boolean; toggle: boolean }
   // scroll wheel over the viewport while flying: multiplicative speed change
   | { type: 'fly-speed'; factor: number }
+  | ({ type: 'camera-gesture' } & CameraGesture)
   | { type: 'resync' } // unconditional re-pull (after a scene restart the frozen CRDT is fresh)
   // mirror a page-side mutation into the scene's snapshot — /crdt_snapshot is
   // stale while the scene is frozen, so a refetch can't carry these
@@ -157,6 +168,7 @@ export const PROTOCOL_KINDS = [
   'pointer-up',
   'pick-at-pointer',
   'fly-speed',
+  'camera-gesture',
   'resync',
   'component-written',
   'component-deleted',

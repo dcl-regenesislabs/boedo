@@ -70,6 +70,7 @@ import type { Snapshot } from '@scene/state'
 import { setSceneBaseCorner } from '@scene/world-origin'
 import { startDevSceneReload, notifyDevSceneReady } from './dev-hmr'
 import '../engine/gizmo-debug'
+import { installCameraGestures } from '../engine/camera-gestures'
 
 export type BootPhase = 'waiting-engine' | 'waiting-scene' | 'ready'
 
@@ -205,8 +206,7 @@ export async function boot(): Promise<void> {
   })
 
   // True when an event targets the engine viewport (the host div) rather than a
-  // UI panel inside the shadow root — scopes viewport-only gestures (the wheel
-  // fly-speed below). Model picking is engine-input-driven scene-side, not here.
+  // UI panel inside the shadow root — scopes the camera gestures below. Model picking is engine-input-driven scene-side, not here.
   const onCanvas = (e: Event): boolean => {
     const path = e.composedPath()
     const first = path[0]
@@ -214,26 +214,7 @@ export async function boot(): Promise<void> {
     return !path.some((n) => n instanceof HTMLElement && n.id === 'editor-ui-host')
   }
 
-  // scroll over the viewport while flying adjusts fly speed (creators-hub-pro
-  // pattern); accumulated and flushed so a fast wheel doesn't flood the bus
-  let wheelFactor = 1
-  let wheelTimer: ReturnType<typeof setTimeout> | null = null
-  window.addEventListener(
-    'wheel',
-    (e) => {
-      if (state.camMode !== 'free' || !onCanvas(e)) return
-      wheelFactor *= e.deltaY > 0 ? 0.9 : 1.1
-      if (wheelTimer === null) {
-        wheelTimer = setTimeout(() => {
-          wheelTimer = null
-          const f = wheelFactor
-          wheelFactor = 1
-          void sendToScene({ type: 'fly-speed', factor: f })
-        }, 120)
-      }
-    },
-    { capture: true, passive: true }
-  )
+  installCameraGestures(onCanvas)
 
   // mirror page-side writes/deletes into the scene's snapshot over the bus —
   // the scene can't refetch them while frozen (stale /crdt_snapshot) — and
