@@ -7,6 +7,11 @@ live, how to make the change, and how to prove you didn't break anything.**
 
 Read [`ARCHITECTURE.md`](./ARCHITECTURE.md) first for the architecture. This file is the how-to.
 
+**The web editor** (Create in the Decentraland web explorer) spans this repo and
+`decentraland/bevy-explorer`. [`docs/WEB-EDITOR.md`](./docs/WEB-EDITOR.md) is its handbook: how the
+two connect, local development without Docker, how a change reaches players, the deployed service,
+and what we ran into. Read it before touching `packages/web`, `packages/service` or the host contract.
+
 ---
 
 ## The loop
@@ -41,7 +46,7 @@ GPU/scene); say so explicitly when you skip it.
 | A new message between the UI and the scene | `packages/contract/src/bus-protocol.ts` (single source of truth) | The scene re-exports it via `bridge-protocol.ts`, so you edit the type **once**. Handle it in `scene/src/page-ui.ts`; send it from `ui/src/`. |
 | Project picker, scene dev-servers, window/menu, IPC | `packages/desktop/src` | Electron main process (`main.ts`), preload bridge (`preload.ts`), server lifecycle (`servers.ts`). |
 | A new Electron IPC method exposed to the page | `packages/contract/src/shell.ts` (`EditorShell`) + `packages/desktop/src/{main.ts,preload.ts}` + consume in `packages/ui/src` | `contract` is the single source of truth for this type. |
-| Engine behavior | **Don't.** The editor runs on **stock upstream** `bevy-explorer` (the `@dcl-regenesislabs/bevy-explorer-web` npm package) — no fork, no patches. Implement what you need **scene-side** in `packages/scene/src` with upstream-only SDK7 APIs (Raycast, TextureCamera/CameraLayer, `/scene_content`, CRDT). | If something seems to need an engine change, it almost certainly doesn't — find the scene-side way first. |
+| Engine or explorer behavior | `decentraland/bevy-explorer`, its own PR | We own the engine and the explorer. When the editor needs something they don't do, fix it there rather than working around it here (`docs/WEB-EDITOR.md`). |
 
 ---
 
