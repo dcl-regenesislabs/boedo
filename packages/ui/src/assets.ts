@@ -56,8 +56,15 @@ export type ModelAsset = {
   collection: string
   category: string
   tags: string[]
+  subcategory?: string
   description?: string
   thumbnailUrl?: string
+  width?: number
+  height?: number
+  depth?: number
+  triangles?: number
+  fileSize?: number
+  animations?: string[]
 }
 
 let assets: ModelAsset[] | null = null

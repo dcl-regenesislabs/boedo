@@ -10,6 +10,25 @@ import { sendToScene } from '@ui/engine/bus'
 const MAX_SIDE = 1024
 // the focus tween is 0.3 s; the frame after it has the new view
 const FOCUS_SETTLE_MS = 700
+const RELOAD_SETTLE_MS = 2000
+const RELOAD_TRIES = 5
+
+async function frame(signal: AbortSignal): Promise<ImageBitmap> {
+  const png = await consoleCommand('/screenshot')
+  signal.throwIfAborted()
+  return createImageBitmap(await (await fetch(`data:image/png;base64,${png.trim()}`)).blob())
+}
+
+function isBlack(bitmap: ImageBitmap): boolean {
+  const probe = new OffscreenCanvas(16, 16)
+  const ctx = probe.getContext('2d')
+  if (ctx === null) return false
+  ctx.drawImage(bitmap, 0, 0, 16, 16)
+  const data = ctx.getImageData(0, 0, 16, 16).data
+  let sum = 0
+  for (let i = 0; i < data.length; i += 4) sum += data[i] + data[i + 1] + data[i + 2]
+  return sum / (data.length / 4) < 12
+}
 
 export interface ViewCapture {
   mimeType: 'image/jpeg'
@@ -58,9 +77,14 @@ async function captureFrame({ entity, from, lookAt }: ViewRequest, signal: Abort
     await new Promise((resolve) => setTimeout(resolve, FOCUS_SETTLE_MS))
     signal.throwIfAborted()
   }
-  const png = await consoleCommand('/screenshot')
-  signal.throwIfAborted()
-  const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png.trim()}`)).blob())
+  let bitmap = await frame(signal)
+  // new content or a build re-instances the scene, and its frames are black until it is back
+  for (let tries = 0; tries < RELOAD_TRIES && isBlack(bitmap); tries++) {
+    bitmap.close()
+    await new Promise((resolve) => setTimeout(resolve, RELOAD_SETTLE_MS))
+    signal.throwIfAborted()
+    bitmap = await frame(signal)
+  }
   const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height))
   const width = Math.max(1, Math.round(bitmap.width * scale))
   const height = Math.max(1, Math.round(bitmap.height * scale))

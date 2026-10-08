@@ -31,6 +31,7 @@ import { persistReady } from '@ui/core/persist'
 import { version } from '../../package.json'
 import { createBrowserAssistant } from '../ai/client'
 import { scriptAttacher } from '../ai/attach'
+import { state } from '@scene/state'
 import { browserSceneRequest } from '../ai/scene'
 import { sameBytes } from '../ai/tools'
 import { captureView } from '../ai/view'
@@ -187,11 +188,15 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
               await editSceneJson(open.id, (raw) => applyAssistantSettings(raw, settings))
               const raw = parseSceneJson(await readFile(open.id, 'scene.json'))
               const moved = layout(raw) !== before
-              if (moved) relaunch = { id: open.id, done: false, timer: undefined }
+              if (moved) {
+                relaunch = { id: open.id, done: false, timer: undefined }
+                // the editor's bounds follow the new parcels at once; the engine's follow the relaunch
+                if (state.scene !== undefined) state.scene = { ...state.scene, parcels: (raw?.scene?.parcels ?? []).map((p) => ({ x: Number(p.split(',')[0]), y: Number(p.split(',')[1]) })) }
+              }
               return {
                 requiredPermissions: raw?.requiredPermissions ?? [], spawnPoints: raw?.spawnPoints ?? [],
                 parcels: raw?.scene?.parcels ?? [], base: raw?.scene?.base ?? null,
-                ...(moved ? { note: 'The scene relaunches with these parcels when this turn ends; until then the running scene keeps the old ones.' } : {})
+                ...(moved ? { note: 'The scene relaunches with these parcels when this turn ends; until then pictures show only the old parcels, so build on and look at the whole tower on the next turn.' } : {})
               }
             }),
           written: scriptAttacher(),

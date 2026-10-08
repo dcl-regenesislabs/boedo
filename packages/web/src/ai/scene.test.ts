@@ -20,6 +20,8 @@ vi.mock('@ui/engine/cmd', () => ({ cmd: { componentSchema: () => Promise.reject(
 vi.mock('@scene/allowed-components', () => ({ isAllowedComponent: () => true }))
 vi.mock('@ui/actions/entities', () => ({ uiAddEntity: vi.fn() }))
 vi.mock('@ui/actions/components', () => ({ uiSetComponentValue: setValue, uiDeleteComponent: deleteValue }))
+vi.mock('@ui/assets', () => ({ importCatalogFile: vi.fn(), loadModelCatalog: vi.fn(async () => []), modelById: () => undefined }))
+vi.mock('@ui/engine/bus', () => ({ sendToScene: vi.fn() }))
 vi.mock('@ui/ai/requests', () => ({ runRequestText: vi.fn() }))
 vi.mock('@ui/ai/request-format', () => ({ resolveEntityRef: (_: unknown, ref: string) => ref }))
 vi.mock('@ui/features/editor/scene-check-context', () => ({
