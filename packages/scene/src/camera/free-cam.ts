@@ -200,6 +200,28 @@ export function setCameraPose(position: Vector3, lookAt: Vector3 | null): void {
   t.rotation = lookRotation()
 }
 
+// The creator's camera while the assistant looks around for a picture; release restores it.
+let held: { mode: 'none' | 'free' | 'target'; position: Vector3; yaw: number; pitch: number; distance: number; orbitTargetId: string | null; orbitOffset: Vector3 } | null = null
+export function holdCameraPose(): void {
+  if (camEntity === null || held !== null) return
+  held = { mode: state.camMode, position: { ...Transform.get(camEntity).position }, yaw, pitch, distance, orbitTargetId, orbitOffset: { ...orbitOffset } }
+}
+export function releaseCameraPose(): void {
+  if (camEntity === null || held === null) return
+  const was = held
+  held = null
+  setCamMode(was.mode)
+  tween = null
+  yaw = was.yaw
+  pitch = was.pitch
+  distance = was.distance
+  orbitTargetId = was.orbitTargetId
+  orbitOffset = { ...was.orbitOffset }
+  const t = Transform.getMutable(camEntity)
+  t.position = { ...was.position }
+  t.rotation = lookRotation()
+}
+
 // Bring an entity into view and then get out of the way. Two things this does
 // NOT do, both deliberate:
 //

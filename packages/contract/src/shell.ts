@@ -154,7 +154,7 @@ export interface AiImageAttachment {
 export type AiEvent =
   | { kind: 'started'; turnId: string }
   | { kind: 'text'; turnId: string; text: string }
-  | { kind: 'tool'; turnId: string; tool: string; detail: string }
+  | { kind: 'tool'; turnId: string; tool: string; detail: string; label?: string }
   // resumable: a limit paused the turn and the same conversation can continue (hosted only)
   | { kind: 'error'; turnId: string; message: string; resumable?: boolean }
   | { kind: 'done'; turnId: string; ok: boolean }

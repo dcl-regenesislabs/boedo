@@ -172,7 +172,7 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
         const msg = next[i] as Extract<ChatMsg, { role: 'assistant' }>
         if (e.kind === 'started') next[i] = { ...msg, turnId: e.turnId }
         else if (e.kind === 'text') next[i] = { ...msg, turnId: e.turnId, text: msg.text + e.text }
-        else if (e.kind === 'tool') next[i] = { ...msg, turnId: e.turnId, tools: [...msg.tools, { tool: e.tool, detail: e.detail }] }
+        else if (e.kind === 'tool') next[i] = { ...msg, turnId: e.turnId, tools: [...msg.tools, { tool: e.tool, detail: e.detail, ...(e.label === undefined ? {} : { label: e.label }) }] }
         else if (e.kind === 'error') next[i] = e.resumable === true ? { ...msg, paused: e.message } : { ...msg, error: e.message }
         else if (e.kind === 'done') next[i] = { ...msg, done: true }
         return next

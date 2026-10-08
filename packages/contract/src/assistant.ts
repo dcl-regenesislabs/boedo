@@ -14,6 +14,8 @@ export interface BrowserToolCall {
   callId: string
   tool: BrowserToolName
   args: Record<string, unknown>
+  // the assistant's own words for this step, shown as the turn's running status
+  label?: string
 }
 /** A conversation the service keeps encrypted between sessions; only the browser holds `key`. */
 export interface AssistantMemoryRef {

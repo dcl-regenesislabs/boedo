@@ -20,7 +20,7 @@ import {
   applyExternalComponentDelete,
   applyExternalEntityDelete
 } from './inspector'
-import { setCamMode, orientToAxis, frameEntityOnce, frameEntitiesOnce, adjustFlySpeed, cameraDropLocal, cameraGesture, setCameraPose } from './camera/free-cam'
+import { setCamMode, orientToAxis, frameEntityOnce, frameEntitiesOnce, adjustFlySpeed, cameraDropLocal, cameraGesture, setCameraPose, holdCameraPose, releaseCameraPose } from './camera/free-cam'
 import { setPointerSpace } from './camera/camera-projection'
 import { endGizmoDrag, gizmoDebugReport } from './viewport/gizmo'
 import { forceCursorUnlock } from './system-actions'
@@ -204,6 +204,12 @@ async function handle(msg: PageToSceneMessage): Promise<void> {
       break
     case 'camera-pose':
       setCameraPose(msg.position, msg.lookAt ?? null)
+      break
+    case 'camera-hold':
+      holdCameraPose()
+      break
+    case 'camera-release':
+      releaseCameraPose()
       break
     case 'resync':
       // forced re-pull — after a restart the freeze-time CRDT is the fresh state.

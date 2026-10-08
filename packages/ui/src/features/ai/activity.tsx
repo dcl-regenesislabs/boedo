@@ -8,6 +8,7 @@ import { CheckIcon } from './icons'
 export interface ToolUse {
   tool: string
   detail: string
+  label?: string
 }
 
 // tool chips that changed the project or the scene, highlighted apart from reads
@@ -35,6 +36,7 @@ const TOOL_VERBS: Record<string, [string, string]> = {
 }
 
 export function toolLabel(t: ToolUse, active = false): string {
+  if (active && t.label !== undefined) return t.label
   const verbs = TOOL_VERBS[t.tool]
   const verb = verbs === undefined ? t.tool : verbs[active ? 1 : 0]
   return t.detail === '' ? verb : `${verb} ${t.detail}`
@@ -53,8 +55,10 @@ export function groupTools(tools: ToolUse[]): Array<ToolChip | ToolUse[]> {
   for (const t of tools) {
     const last = out[out.length - 1]
     if (CHIP_TOOLS.has(t.tool)) {
-      if (last !== undefined && !Array.isArray(last) && last.t.tool === t.tool && last.t.detail === t.detail) last.n++
-      else out.push({ t, n: 1 })
+      if (last !== undefined && !Array.isArray(last) && last.t.tool === t.tool && last.t.detail === t.detail) {
+        last.t = t
+        last.n++
+      } else out.push({ t, n: 1 })
     } else if (Array.isArray(last)) last.push(t)
     else out.push([t])
   }

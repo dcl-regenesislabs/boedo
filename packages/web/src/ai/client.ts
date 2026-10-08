@@ -41,41 +41,41 @@ export function createBrowserAssistant(options: {
     emit({ kind: 'done', turnId: turn.id, ok })
   }
 
-  function reportTool(turnId: string, call: BrowserToolCall, text: string): void {
-    const path = typeof call.args.path === 'string' ? call.args.path : ''
+  // null when the row needs the result; write_file too, since the panel refreshes the file rail on its row
+  function rowFor(call: BrowserToolCall): { tool: string; detail: string } | null {
+    const request = object(call.args.request) ? call.args.request : {}
     switch (call.tool) {
-      case 'write_file': {
-        emit({ kind: 'tool', turnId, tool: call.args.revision === null ? 'Write' : 'Edit', detail: path })
-        const result: unknown = JSON.parse(text)
-        if (object(result) && object(result.attached) && typeof result.attached.name === 'string') {
-          emit({ kind: 'tool', turnId, tool: 'Attached', detail: `${path.split('/').pop() ?? path} to ${result.attached.name}` })
-        }
-        return
-      }
-      case 'read_file':
-        emit({ kind: 'tool', turnId, tool: 'Read', detail: path })
-        return
-      case 'build':
-        emit({ kind: 'tool', turnId, tool: 'Build', detail: 'Scene' })
-        return
+      case 'write_file': return null
+      case 'read_file': return { tool: 'Read', detail: typeof call.args.path === 'string' ? call.args.path : '' }
+      case 'build': return { tool: 'Build', detail: 'Scene' }
       case 'scene_request':
-        if (object(call.args.request) && call.args.request.type === 'batch' && Array.isArray(call.args.request.requests)) {
-          emit({ kind: 'tool', turnId, tool: 'Scene', detail: `${call.args.request.requests.length} changes` })
-          return
-        }
-        if (object(call.args.request) && call.args.request.type === 'sceneSettings') {
-          emit({ kind: 'tool', turnId, tool: 'Scene', detail: 'Settings' })
-          return
-        }
-        if (object(call.args.request) && call.args.request.type === 'attachScript') {
-          const result: unknown = JSON.parse(text)
-          if (object(result) && Array.isArray(result.attached)) {
-            for (const script of result.attached) if (typeof script === 'string') emit({ kind: 'tool', turnId, tool: 'AttachScript', detail: script })
-          }
-          return
-        }
+        if (request.type === 'batch' && Array.isArray(request.requests)) return { tool: 'Scene', detail: `${request.requests.length} changes` }
+        if (request.type === 'sceneSettings') return { tool: 'Scene', detail: 'Settings' }
+        if (request.type === 'attachScript') return null
     }
-    emit({ kind: 'tool', turnId, tool: 'Inspect', detail: 'Project' })
+    return { tool: 'Inspect', detail: 'Project' }
+  }
+
+  function reportTool(turnId: string, call: BrowserToolCall, text: string, shown: boolean): void {
+    const label = call.label === undefined ? {} : { label: call.label }
+    const row = rowFor(call)
+    if (row !== null) {
+      if (!shown) emit({ kind: 'tool', turnId, ...row, ...label })
+      return
+    }
+    if (call.tool === 'write_file') {
+      const path = typeof call.args.path === 'string' ? call.args.path : ''
+      emit({ kind: 'tool', turnId, tool: call.args.revision === null ? 'Write' : 'Edit', detail: path, ...label })
+      const result: unknown = JSON.parse(text)
+      if (object(result) && object(result.attached) && typeof result.attached.name === 'string') {
+        emit({ kind: 'tool', turnId, tool: 'Attached', detail: `${path.split('/').pop() ?? path} to ${result.attached.name}`, ...label })
+      }
+      return
+    }
+    const result: unknown = JSON.parse(text)
+    if (object(result) && Array.isArray(result.attached)) {
+      for (const script of result.attached) if (typeof script === 'string') emit({ kind: 'tool', turnId, tool: 'AttachScript', detail: script, ...label })
+    }
   }
 
   async function runTool(call: BrowserToolCall): Promise<void> {
@@ -83,13 +83,22 @@ export function createBrowserAssistant(options: {
     if (turn === null || turn.id !== call.turnId || turn.controller.signal.aborted) return
     let ok = false
     let text = ''
+    let shown = false
     try {
       if (options.wallet() !== turn.wallet || options.project().id !== turn.projectId) throw new Error('The open project or account changed.')
+      // a labelled step shows while it runs, not once it is over
+      if (call.label !== undefined) {
+        const row = rowFor(call)
+        if (row !== null) {
+          emit({ kind: 'tool', turnId: turn.id, ...row, label: call.label })
+          shown = true
+        }
+      }
       text = await turn.execute(call, turn.controller.signal)
       if (text.length > 500_000) throw new Error('The tool result is too large. Ask for a smaller part of the project.')
       turn.controller.signal.throwIfAborted()
       ok = true
-      reportTool(turn.id, call, text)
+      reportTool(turn.id, call, text, shown)
     } catch (error) {
       text = error instanceof Error ? error.message : 'The browser tool failed.'
     }
@@ -103,7 +112,8 @@ export function createBrowserAssistant(options: {
     if (message.kind === 'failure' && typeof message.message === 'string') { finish(false, message.message); return }
     if (message.kind === 'call' && typeof message.turnId === 'string' && typeof message.callId === 'string' &&
       ASSISTANT_ID.test(message.callId) && ['list_files', 'read_file', 'write_file', 'scene_request', 'build', 'view'].includes(String(message.tool)) && object(message.args)) {
-      const call = message as unknown as BrowserToolCall
+      const { label, ...rest } = message as unknown as Omit<BrowserToolCall, 'label'> & { label?: unknown }
+      const call: BrowserToolCall = typeof label === 'string' ? { ...rest, label } : rest
       if (active === null || active.id !== call.turnId || active.calls.has(call.callId)) return
       active.calls.add(call.callId)
       toolQueue = toolQueue.then(() => runTool(call)).catch(() => finish(false, 'The browser tool failed.'))

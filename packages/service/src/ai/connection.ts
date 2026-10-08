@@ -8,6 +8,7 @@ import type { WalletUsage } from './usage.ts'
 import type { AgentFactory, AssistantAgent } from './types.ts'
 
 const MAX_TURN_RESULT_CHARS = 2_000_000
+const MAX_LABEL_CHARS = 80
 const TOOL_LABELS: Record<BrowserToolName, string> = {
   build: 'Building the scene', scene_request: 'Editing the scene', write_file: 'Saving a file',
   read_file: 'Reading a file', list_files: 'Listing files', view: 'Looking at the scene'
@@ -70,8 +71,9 @@ export function createConnection(options: {
     stopping = agent?.abort().catch(() => send({ kind: 'failure', message: 'Unable to stop the assistant.' }))
   }
 
-  function call(tool: BrowserToolName, args: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
+  function call(tool: BrowserToolName, { label: said, ...args }: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
     const turn = active
+    const label = typeof said === 'string' && said.trim() !== '' ? said.trim().slice(0, MAX_LABEL_CHARS) : undefined
     // The browser serializes edits; queued calls must not spend their timeout waiting for earlier ones.
     const result = browserCalls.then(() => {
       if (turn === null || active !== turn || turn.controller.signal.aborted || signal?.aborted) throw new Error('Turn cancelled')
@@ -85,7 +87,7 @@ export function createConnection(options: {
         const cancel = () => finish(false, 'The turn was cancelled.')
         const timer = setTimeout(() => {
           finish(false, 'The browser did not answer the tool request.')
-          abort(`${TOOL_LABELS[tool]} timed out. The turn stopped; check the scene before retrying.`)
+          abort(`${label ?? TOOL_LABELS[tool]} timed out. The turn stopped; check the scene before retrying.`)
         }, options.toolTimeoutMs ?? (tool === 'read_file' || tool === 'list_files' ? 60_000 : 15 * 60_000))
         function finish(ok: boolean, text: string) {
           if (!pending.delete(callId)) return
@@ -100,7 +102,7 @@ export function createConnection(options: {
         pending.set(callId, { turnId: turn.id, finish })
         signal?.addEventListener('abort', cancel, { once: true })
         turn.controller.signal.addEventListener('abort', cancel, { once: true })
-        send({ kind: 'call', turnId: turn.id, callId, tool, args })
+        send({ kind: 'call', turnId: turn.id, callId, tool, args, ...(label === undefined ? {} : { label }) })
       })
     })
     browserCalls = result.then(() => {}, () => {})

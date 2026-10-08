@@ -104,14 +104,13 @@
 }
 .eui-ai-activity-head:hover { color: var(--text-2); }
 .eui-ai-activity-head .ti { display: inline-flex; flex: none; }
-.eui-ai-activity-head .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eui-ai-activity-head .lbl { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .eui-ai-activity-head .ct { flex: none; opacity: .65; }
 .eui-ai-activity-head .chev { flex: none; opacity: .55; transition: transform .12s; }
 .eui-ai-activity.open .eui-ai-activity-head .chev { transform: rotate(180deg); }
 .eui-ai-activity-list { display: flex; flex-direction: column; gap: 2px; padding: 3px 0 3px 18px; border-left: 1px solid var(--divider-soft); margin-left: 5px; }
 .eui-ai-activity-list .row {
-  font: 11px/1.45 var(--font-mono); color: var(--text-3);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 11px/1.45 var(--font-mono); color: var(--text-3); overflow-wrap: anywhere;
 }
 .eui-ai-activity-list .row .n { opacity: .6; margin-left: 5px; }
 .eui-ai-thinking { display: flex; align-items: center; gap: 8px; color: var(--text-3); font-size: 12.5px; }

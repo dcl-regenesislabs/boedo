@@ -71,6 +71,9 @@ export type PageToSceneMessage =
   | { type: 'set-camera'; mode: CameraMode; axis?: string }
   // the free camera placed at a world position, aimed at a point when given (the assistant's viewpoints)
   | { type: 'camera-pose'; position: { x: number; y: number; z: number }; lookAt?: { x: number; y: number; z: number } }
+  // the assistant's view borrows the camera: hold keeps the creator's pose, release puts it back
+  | { type: 'camera-hold' }
+  | { type: 'camera-release' }
   // the page owns the transport; the scene's own frozen flag gates avatar input
   // and the free camera, and it samples the engine only once at boot
   | { type: 'set-frozen'; frozen: boolean }
@@ -164,6 +167,8 @@ export const PROTOCOL_KINDS = [
   'set-selection',
   'set-camera',
   'camera-pose',
+  'camera-hold',
+  'camera-release',
   'set-frozen',
   'focus',
   'frame',

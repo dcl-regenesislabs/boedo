@@ -2,10 +2,10 @@ import { object } from '@dcl-editor/contract'
 import { state, componentKey, isUiEntity } from '@scene/state'
 import { buildFromSchema, getSchema, type ComponentSchema } from '@scene/schema'
 import { cmd } from '@ui/engine/cmd'
-import { entityName } from '@scene/custom-components'
+import { entityName, NAME_COMPONENT } from '@scene/custom-components'
 import { isAllowedComponent } from '@scene/allowed-components'
 import { uiAddEntity } from '@ui/actions/entities'
-import { uiSetComponentValue } from '@ui/actions/components'
+import { uiDeleteComponent, uiSetComponentValue } from '@ui/actions/components'
 import { runRequestText } from '@ui/ai/requests'
 import { resolveEntityRef } from '@ui/ai/request-format'
 import { sceneOutline } from '@ui/ai/roster'
@@ -160,6 +160,15 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
       await setComponent(id, request.component, request.value, request.expected)
     }
     return { id, component: request.component, value: state.snapshot[id]?.[String(request.component)] }
+  }
+  if (request.type === 'removeComponent') {
+    const id = entity(request.to)
+    const name = request.component
+    // isAllowedComponent admits Transform and the name, which every entity must keep
+    if (typeof name !== 'string' || !isAllowedComponent(name) || name === 'Transform' || name === NAME_COMPONENT) throw new Error('That component cannot be removed.')
+    if (state.snapshot[id]?.[name] === undefined) return { id, component: name, removed: false }
+    uiDeleteComponent(id, name)
+    return { id, component: name, components: state.snapshot[id] }
   }
   if (!['attachScript', 'setParams', 'placePrefab'].includes(String(request.type))) throw new Error('Unsupported scene request.')
   if (request.type !== 'placePrefab') entity(request.to)

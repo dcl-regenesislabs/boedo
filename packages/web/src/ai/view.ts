@@ -32,7 +32,18 @@ export interface ViewRequest {
   lookAt: Point | null
 }
 
-export async function captureView({ entity, from, lookAt }: ViewRequest, signal: AbortSignal): Promise<ViewCapture> {
+// The creator's camera comes back where it was once the picture is taken.
+export async function captureView(request: ViewRequest, signal: AbortSignal): Promise<ViewCapture> {
+  const moving = request.from !== null || request.entity !== null
+  if (moving) await sendToScene({ type: 'camera-hold' })
+  try {
+    return await captureFrame(request, signal)
+  } finally {
+    if (moving) await sendToScene({ type: 'camera-release' })
+  }
+}
+
+async function captureFrame({ entity, from, lookAt }: ViewRequest, signal: AbortSignal): Promise<ViewCapture> {
   let framed: string | null = null
   if (from !== null) {
     await sendToScene({ type: 'camera-pose', position: from, ...(lookAt === null ? {} : { lookAt }) })

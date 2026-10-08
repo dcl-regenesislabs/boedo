@@ -2,23 +2,24 @@ import { describe, expect, it, vi } from 'vitest'
 import { browserSceneRequest } from './scene'
 import { state } from '@scene/state'
 
-const { setValue, status } = vi.hoisted(() => {
+const { setValue, deleteValue, status } = vi.hoisted(() => {
   const status = new Map<string, string>()
   const setValue = vi.fn(async (key: string) => {
     status.set(key, '✓ set')
   })
-  return { setValue, status }
+  const deleteValue = vi.fn()
+  return { setValue, deleteValue, status }
 })
 vi.mock('@scene/state', () => ({
   state: { snapshot: { '512': {} }, frozen: true, selected: new Set(), editStatus: status, activeEntity: null, schemas: new Map() },
   componentKey: (id: string, name: string) => `${id}:${name}`,
   isUiEntity: () => false
 }))
-vi.mock('@scene/custom-components', () => ({ entityName: () => 'Box' }))
+vi.mock('@scene/custom-components', () => ({ entityName: () => 'Box', NAME_COMPONENT: 'core::Name' }))
 vi.mock('@ui/engine/cmd', () => ({ cmd: { componentSchema: () => Promise.reject(new Error('no engine')) } }))
 vi.mock('@scene/allowed-components', () => ({ isAllowedComponent: () => true }))
 vi.mock('@ui/actions/entities', () => ({ uiAddEntity: vi.fn() }))
-vi.mock('@ui/actions/components', () => ({ uiSetComponentValue: setValue }))
+vi.mock('@ui/actions/components', () => ({ uiSetComponentValue: setValue, uiDeleteComponent: deleteValue }))
 vi.mock('@ui/ai/requests', () => ({ runRequestText: vi.fn() }))
 vi.mock('@ui/ai/request-format', () => ({ resolveEntityRef: (_: unknown, ref: string) => ref }))
 vi.mock('@ui/features/editor/scene-check-context', () => ({
@@ -55,6 +56,19 @@ describe('assistant scene requests', () => {
     state.snapshot['512'] = { Transform: { position: { x: 1, y: 0.5, z: 1 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 }, parent: 0 } }
     expect(await browserSceneRequest({ type: 'move', to: '512', by: { y: 2 } }, new AbortController().signal)).toEqual({ id: '512', position: { x: 1, y: 2.5, z: 1 } })
     await expect(browserSceneRequest({ type: 'move', to: '512', by: {} }, new AbortController().signal)).rejects.toThrow('move needs')
+  })
+
+  it('removes a component through the editor action, but never Transform or the name', async () => {
+    state.snapshot['512'] = { Transform: { position: { x: 1, y: 0.5, z: 1 } }, MeshRenderer: { mesh: { box: {} } } }
+    deleteValue.mockImplementation((id: string, name: string) => { delete state.snapshot[id][name] })
+    expect(await browserSceneRequest({ type: 'removeComponent', to: '512', component: 'MeshRenderer' }, new AbortController().signal))
+      .toEqual({ id: '512', component: 'MeshRenderer', components: { Transform: { position: { x: 1, y: 0.5, z: 1 } } } })
+    expect(deleteValue).toHaveBeenCalledWith('512', 'MeshRenderer')
+    expect(await browserSceneRequest({ type: 'removeComponent', to: '512', component: 'Material' }, new AbortController().signal)).toEqual({ id: '512', component: 'Material', removed: false })
+    for (const component of ['Transform', 'core::Name']) {
+      await expect(browserSceneRequest({ type: 'removeComponent', to: '512', component }, new AbortController().signal)).rejects.toThrow('cannot be removed')
+    }
+    expect(deleteValue).toHaveBeenCalledTimes(1)
   })
 })
 

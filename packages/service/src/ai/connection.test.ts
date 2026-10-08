@@ -21,7 +21,7 @@ describe('assistant tool bridge', () => {
     const factory: AgentFactory = {
       providers: async () => [],
       create: vi.fn(async (_params, call, emit) => ({
-        prompt: async () => { results.push(await call('read_file', { path: 'src/scripts/Door.ts' })); emit({ text: 'Done' }) },
+        prompt: async () => { results.push(await call('read_file', { path: 'src/scripts/Door.ts', label: 'Reading the door' })); emit({ text: 'Done' }) },
         abort: async () => {}, dispose: () => {}, snapshot: () => [], takeUsage: () => ({ cost: 0 })
       }))
     }
@@ -30,6 +30,8 @@ describe('assistant tool bridge', () => {
     await vi.waitFor(() => expect(events.some((e) => e.kind === 'call')).toBe(true))
     const call = events.find((e) => e.kind === 'call')
     if (call?.kind !== 'call') throw new Error('No call')
+    expect(call.label).toBe('Reading the door')
+    expect(call.args).toEqual({ path: 'src/scripts/Door.ts' })
     connection.receive({ kind: 'result', turnId: 'foreign', callId: call.callId, ok: true, text: 'wrong' })
     expect(results).toEqual([])
     connection.receive({ kind: 'result', turnId: 'one', callId: call.callId, ok: true, text: 'browser content' })
@@ -53,6 +55,7 @@ describe('assistant tool bridge', () => {
     const connection = createConnection({ factory, logger: { error: vi.fn(), info: vi.fn() }, send: (e) => events.push(e), allowTurn: () => true })
     connection.receive({ kind: 'prompt', turnId: 'one', projectId: 'scene', params })
     await vi.waitFor(() => expect(events.some((e) => e.kind === 'call')).toBe(true))
+    expect(events.find((e) => e.kind === 'call')).not.toHaveProperty('label')
     connection.close()
     await vi.waitFor(() => expect(dispose).toHaveBeenCalledOnce())
     expect(abort).toHaveBeenCalledOnce()

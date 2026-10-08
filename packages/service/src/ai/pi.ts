@@ -77,19 +77,22 @@ export async function createPiFactory(authPath: string, preferredModel?: string,
       if (!info.models.includes(chosen)) throw new Error('Unknown model')
       const model = runtime.getModel(PROVIDERS[info.id], chosen)
       if (model === undefined) throw new Error('Unknown model')
+      const label = Type.Optional(Type.String({ description: 'What you are doing now, for the creator, at most six words' }))
       const schema = {
         list_files: Type.Object({
           kind: Type.Optional(Type.Union([...ASSET_KINDS].map((kind) => Type.Literal(kind)))),
-          match: Type.Optional(Type.String())
+          match: Type.Optional(Type.String()),
+          label
         }),
-        read_file: Type.Object({ path: Type.String() }),
-        write_file: Type.Object({ path: Type.String(), content: Type.String(), revision: Type.Union([Type.String(), Type.Null()]) }),
-        scene_request: Type.Object({ request: Type.Object({ type: Type.String() }, { additionalProperties: true }) }),
-        build: Type.Object({}),
+        read_file: Type.Object({ path: Type.String(), label }),
+        write_file: Type.Object({ path: Type.String(), content: Type.String(), revision: Type.Union([Type.String(), Type.Null()]), label }),
+        scene_request: Type.Object({ request: Type.Object({ type: Type.String() }, { additionalProperties: true }), label }),
+        build: Type.Object({ label }),
         view: Type.Object({
           entity: Type.Optional(Type.String()),
           from: Type.Optional(Type.Object({ x: Type.Number(), y: Type.Number(), z: Type.Number() })),
-          lookAt: Type.Optional(Type.Object({ x: Type.Number(), y: Type.Number(), z: Type.Number() }))
+          lookAt: Type.Optional(Type.Object({ x: Type.Number(), y: Type.Number(), z: Type.Number() })),
+          label
         })
       }
       const descriptions: Record<BrowserToolName, string> = {
