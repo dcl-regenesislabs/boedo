@@ -4,19 +4,21 @@ prefab: leaderboard
 
 # Leaderboard — AI guide
 
-A panel that shows one board: it reads a `game.state` key and paints the places.
-It never decides or stores a score.
+A panel or screen overlay that shows game scores or persisted course best times.
+The server validates and stores scores; this prefab displays them.
 
 The project copy is normally custom/leaderboard/ — check what is on disk, a
 second copy is custom/leaderboard_2/.
 
 ## When to use
 
-Whenever a game already keeps a ranked list and wants it on a wall. Place one per
-board: round scores and all-time bests are two keys, so two panels.
+For a course, place Run Progress and choose Source "Run best times" on this prefab.
+Use the same Course Id (default "course"). Confirmed finishes automatically fill
+the board, fastest first, and survive player departures and server restarts. No
+custom score code is needed. One course has one top-25 board.
 
-Place NOTHING if no server code writes rows — the panel would just show its empty
-line. Write the rows first, then place the board on that key.
+For other scoring systems choose Source "State key" and provide server-owned rows
+as below. Place one panel per board; use 2D UI when the scores belong on screen.
 
 ## API
 
@@ -37,12 +39,19 @@ There is nothing to import. The contract is the state key:
 
 Params of the prefab's script — set them in the placePrefab request:
 
+- `source`: `State key` (default) or `Run best times`.
+- `courseId`: matches Run Progress when source is `Run best times`.
+- `display`: `3D panel` (default) or `2D UI`. The overlay uses UI Theme.
+- `position`: `left` or `right` for the overlay.
 - `title`: the heading on the panel (default "Leaderboard").
 - `boardKey`: the `game.state` key to read (default `'leaderboard'`). Game Flow
   reads the same key for its winners line — point both at one key.
 - `sort`: `'desc'` (highest wins — points) or `'asc'` (lowest wins — best times,
   which also renders the score as m:ss).
-- `rows`: how many places the panel lists (default 8, max 25).
+- `rows`: how many places to list (default 8; max 25 in 3D, 10 on screen).
+
+For Run best times, Board Key and Sort are hidden: the course supplies the key,
+scores in seconds and ascending order. The shared key is `run:<courseId>:leaderboard`.
 
 ## The all-time board idiom
 
@@ -66,6 +75,10 @@ Then place a second Leaderboard with `boardKey: 'bestTimes'`.
   connected, so offline players show as a shortened address.
 
 ## Example
+
+Without code: place Leaderboard, choose Source "Run best times", leave Course Id
+"course" to match Run Progress, and choose Display "2D UI". Finish the course;
+the server-validated time appears. Restarting or leaving does not erase the board.
 
 "Show the fastest climbers": in a handler inside the server branch keep the list,
 and place a board on that key.

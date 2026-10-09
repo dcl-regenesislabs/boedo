@@ -9,6 +9,7 @@ export interface ServerStoreOptions<T extends object> {
   /** Unique per store: two stores sharing a key would share state without saying so. */
   key: string
   defaults: () => T
+  preserveUnknownFields?: boolean
 }
 
 export class ServerStore<T extends object> {
@@ -37,14 +38,14 @@ export class ServerStore<T extends object> {
     }
   }
 
-  /**
-   * Adopt a persisted payload: only fields `defaults()` declares survive, and
-   * only when the stored kind still matches. Anything else falls back, so an
-   * older schema or a hand-edit in the storage UI cannot crash the server.
-   */
+  /** Repair declared fields, or keep a dynamic dictionary's keys as stored. */
   adopt(raw: unknown): void {
     if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return
     const stored = raw as Record<string, unknown>
+    if (this.options.preserveUnknownFields) {
+      this.value = { ...stored } as T
+      return
+    }
     const defaults = this.options.defaults() as Record<string, unknown>
     for (const [field, fallback] of Object.entries(defaults)) {
       const candidate = stored[field]

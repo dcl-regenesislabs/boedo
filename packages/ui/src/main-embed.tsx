@@ -50,7 +50,7 @@ function start(): void {
     ) : (
       <Picker />
     )
-  mountEditorUi(document.body, view)
+  mountEditorUi(document.body, view, 'eui-docked')
 }
 
 start()

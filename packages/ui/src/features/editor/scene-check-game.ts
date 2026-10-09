@@ -162,6 +162,7 @@ const broadcastUnsent: SceneCheck = (ctx) => {
   for (const { row, use } of placed(ctx, uses)) {
     for (const message of use.listens) {
       if (sent.has(message)) continue
+      if (message === 'announce' && hasLocalAnnouncement(ctx, row)) continue
       const key = `${row.path}|${message}`
       if (seen.has(key)) continue
       seen.add(key)
@@ -176,6 +177,15 @@ const broadcastUnsent: SceneCheck = (ctx) => {
     }
   }
   return out
+}
+
+function hasLocalAnnouncement(ctx: SceneCheckContext, row: ScriptRow): boolean {
+  const announcer = ctx.prefabs.find((prefab) => prefab.data.id === 'fb41d8d1-b842-437d-a830-f38379e74743')
+  if (announcer === undefined || row.path !== `${announcer.folder}/scripts/announcer.tsx`) return false
+  const zone = row.params.find((param) => param.name === 'zone')?.value
+  const text = row.params.find((param) => param.name === 'message')?.value
+  return typeof zone === 'string' && zone.trim() !== '' && typeof text === 'string' && text.trim() !== ''
+    && Object.keys(ctx.snapshot).some((id) => nameKey(entityName(ctx.snapshot, id) ?? '') === nameKey(zone))
 }
 
 export const GAME_SCENE_CHECKS: ReadonlyArray<readonly [string, SceneCheck]> = [

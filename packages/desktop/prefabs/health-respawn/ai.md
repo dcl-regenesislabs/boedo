@@ -26,9 +26,13 @@ owns all three, and health a client can edit is health nobody can trust.
 - `damage(player, amount)` — WHICH SIDE: the SERVER, inside the `if (isServer())`
   branch, from a `game.onRequest`, `game.onEnterArea`, `game.every` or
   `game.onRoundStart` handler. Takes the player to a minimum of 0; at 0 this
-  prefab respawns them within half a second and refills them. A player who is not
-  in the scene is ignored.
+  prefab refills them and respawns them after respawnDelay, checked every half
+  second. A player who is not in the scene is ignored.
 - `healthOf(player)` — reads hit points on either side, the client included.
+- `heal(player, amount)` and `kill(player)` — SERVER helpers from the same health.ts.
+  Healing caps at maxHealth and cannot revive a dead player. kill forces health to zero.
+- `lifeOf(player)` — reads life number, death count, dead status, respawnAt and
+  protectedUntil, or null before the player joins. Times use game.now().
 - `game.state.health` — the whole `{ wallet: points }` map, readable on every
   client and by late joiners. Read it to draw bars or count who is alive; never
   write it.
@@ -43,6 +47,22 @@ Params of the prefab's script — set them in the placePrefab request:
 - `dieBelowHeight`: players below this height die (default 0 = off). This is the
   death plane for a climbing or platforming scene; set it under the lowest floor
   a player is allowed to stand on.
+- `respawnDelay`: seconds to remain dead before returning (default 0).
+- `protectionSeconds`: damage/fall protection after returning (default 1).
+
+Checkpoint destinations and an explicit restart move use the shared
+`src/scripts/runtime/respawn.ts` module; read its header. Health & Respawn must
+be placed to receive the move. Each player's destination overrides respawnAt;
+leaving clears it. The course owns resetting destinations at a new round or
+personal restart; Run Progress does both before requesting the move.
+The owner also publishes game.state.healthLife and game.state.healthMax for HUDs.
+
+For a course, read Run Progress and Trigger Area too. Place the start and checkpoint
+markers inside the active parcels, above a collidable landing. Enable
+`ALLOW_TO_MOVE_PLAYER_INSIDE_SCENE` through sceneSettings. Test falling, returning
+to each checkpoint, and Restart run through playtest before finishing the turn.
+If the preview still has the old parcels, retry sceneSettings and wait for success;
+an outside respawn destination is a broken game, not a task to leave to the creator.
 
 ## Hazards
 

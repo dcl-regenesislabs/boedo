@@ -21,6 +21,7 @@ export type ScriptParam = {
   type: 'number' | 'boolean' | 'string' | 'entity' | 'action' | 'enum' | 'prefab' | 'prefabList'
   value: number | boolean | string | string[] | ActionRef
   optional?: boolean
+  control?: 'color' | 'entityName' | 'entityNames' | 'zone' | 'zones'
   // for 'enum': the string-literal union members, in declaration order
   options?: string[]
   // the param's JSDoc line, carried into the layout so the inspector can show it
@@ -48,6 +49,9 @@ export type ScriptLayout = {
 }
 
 const ROOT_ENTITY = 0
+const AUTHORING_CONTROLS: Record<string, ScriptParam['control']> = {
+  ColorHex: 'color', EntityName: 'entityName', EntityNames: 'entityNames', ZoneName: 'zone', ZoneNames: 'zones'
+}
 
 function getValueAndTypeFromExpression(expression: Expression): ScriptParam {
   switch (expression.type) {
@@ -110,6 +114,8 @@ function getValueAndTypeFromType(typeAnnotation: TSTypeAnnotation['typeAnnotatio
       return { type: 'boolean', value: false }
     case 'TSTypeReference':
       if (typeAnnotation.typeName.type === 'Identifier') {
+        const control = AUTHORING_CONTROLS[typeAnnotation.typeName.name]
+        if (control !== undefined) return { type: 'string', value: '', control }
         if (typeAnnotation.typeName.name === 'Entity') {
           return { type: 'entity', value: ROOT_ENTITY }
         }
@@ -209,6 +215,7 @@ function extractParamsFromFunctionParams(
     let type: ScriptParam['type'] = 'string'
     let value: ScriptParam['value'] = ''
     let options: string[] | undefined
+    let control: ScriptParam['control']
 
     // "public param: Type" (constructor parameter property)
     if (param.type === 'TSParameterProperty') {
@@ -217,7 +224,7 @@ function extractParamsFromFunctionParams(
         identifier = parameter
         optional = identifier.optional === true
         if (identifier.typeAnnotation?.type === 'TSTypeAnnotation') {
-          ;({ type, value, options } = getValueAndTypeFromType(identifier.typeAnnotation.typeAnnotation))
+          ;({ type, value, options, control } = getValueAndTypeFromType(identifier.typeAnnotation.typeAnnotation))
         }
       } else if (parameter.type === 'AssignmentPattern' && parameter.left.type === 'Identifier') {
         identifier = parameter.left
@@ -226,7 +233,7 @@ function extractParamsFromFunctionParams(
         // the annotation and the default value from the expression
         const typeAnnotation = identifier.typeAnnotation
         if (typeAnnotation?.type === 'TSTypeAnnotation') {
-          ;({ type, options } = getValueAndTypeFromType(typeAnnotation.typeAnnotation))
+          ;({ type, options, control } = getValueAndTypeFromType(typeAnnotation.typeAnnotation))
           value = defaultValueFor(type, parameter.right)
         } else {
           ;({ type, value } = getValueAndTypeFromExpression(parameter.right))
@@ -239,7 +246,7 @@ function extractParamsFromFunctionParams(
       optional = true
       const typeAnnotation = identifier.typeAnnotation
       if (typeAnnotation?.type === 'TSTypeAnnotation') {
-        ;({ type, options } = getValueAndTypeFromType(typeAnnotation.typeAnnotation))
+        ;({ type, options, control } = getValueAndTypeFromType(typeAnnotation.typeAnnotation))
         value = defaultValueFor(type, param.right)
       } else {
         ;({ type, value } = getValueAndTypeFromExpression(param.right))
@@ -248,7 +255,7 @@ function extractParamsFromFunctionParams(
       identifier = param
       optional = identifier.optional === true
       if (identifier.typeAnnotation?.type === 'TSTypeAnnotation') {
-        ;({ type, value, options } = getValueAndTypeFromType(identifier.typeAnnotation.typeAnnotation))
+        ;({ type, value, options, control } = getValueAndTypeFromType(identifier.typeAnnotation.typeAnnotation))
       }
     }
 
@@ -258,6 +265,7 @@ function extractParamsFromFunctionParams(
       type,
       optional,
       value,
+      ...(control !== undefined ? { control } : {}),
       ...(options !== undefined ? { options } : {}),
       ...(description !== undefined ? { description } : {})
     } as ScriptParam

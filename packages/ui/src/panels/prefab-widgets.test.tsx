@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { PrefabInstanceStrip, PrefabRuntimeChips } from './prefab-widgets'
 import { prefabStore } from './prefab-store'
 import type { PlacementInstance } from '../prefabs/placement'
-import type { GuaranteeChip } from '../prefabs/guarantees'
 import type { PrefabData } from '../prefabs/format'
 import { mount } from '../test/render'
 
@@ -14,12 +13,10 @@ function prefab(over: Partial<PrefabData> = {}): PrefabData {
 
 const placed = (): PlacementInstance => ({ entityId: '7', prefabId: ZOMBIE_ID })
 
-const planned: GuaranteeChip[] = [{ tone: 'info', label: 'Planned spawns', tip: 'Same spawns everywhere.' }]
 
 function chips(props: {
   data?: PrefabData
   instances?: PlacementInstance[]
-  guarantees?: GuaranteeChip[]
   stale?: boolean
   inProject?: boolean
 }): ReturnType<typeof mount> {
@@ -27,7 +24,6 @@ function chips(props: {
     <PrefabRuntimeChips
       data={props.data ?? prefab({ spawnable: { max: 24, instancing: 'onDemand' } })}
       instances={props.instances ?? []}
-      guarantees={props.guarantees ?? []}
       inProject={props.inProject ?? true}
     />
   )
@@ -65,7 +61,7 @@ describe('PrefabRuntimeChips render', () => {
   it('says where the prefab stands, never whether it is spawnable', () => {
     const view = chips({ data: prefab() })
     const labels = view.all('.eui-prefab-chips .eui-ds-chip').map((c) => c.textContent)
-    expect(labels).toContain('Not in the scene')
+    expect(labels).toContain('Ready to place')
     expect(labels.some((l) => l?.includes('Spawnable') === true)).toBe(false)
     view.unmount()
   })
@@ -80,10 +76,9 @@ describe('PrefabRuntimeChips render', () => {
   })
 
   it('never claims a placement for a library master this project has not copied', () => {
-    const view = chips({ inProject: false, guarantees: planned })
+    const view = chips({ inProject: false })
     const labels = view.all('.eui-prefab-chips .eui-ds-chip').map((c) => c.textContent)
-    expect(labels.some((l) => l === 'Not in the scene')).toBe(false)
-    expect(labels).not.toContain('Planned spawns')
+    expect(labels.some((l) => l === 'Ready to place')).toBe(false)
     view.unmount()
   })
 
@@ -94,21 +89,8 @@ describe('PrefabRuntimeChips render', () => {
   })
 
 
-  it('shows the derived guarantees last, in the colour language they carry', () => {
-    const view = chips({
-      guarantees: [
-        { tone: 'server', label: 'Server-owned', tip: 'one copy' },
-        { tone: 'client', label: 'read-only on clients', tip: 'validator wins' }
-      ]
-    })
-    const all = view.all('.eui-prefab-chips .eui-ds-chip')
-    expect(all[all.length - 2].className).toContain('server')
-    expect(all[all.length - 1].className).toContain('client')
-    view.unmount()
-  })
-
   it('gives every chip a tooltip — the card is too narrow to read one whole', () => {
-    const view = chips({ instances: [placed()], guarantees: planned })
+    const view = chips({ data: prefab({ spawnable: { max: 32, instancing: 'perPlayer' } }), instances: [placed()] })
     const all = view.all('.eui-prefab-chips .eui-ds-chip')
     expect(all.length).toBeGreaterThan(1)
     for (const chip of all) expect(chip.getAttribute('data-tip')).toBeTruthy()

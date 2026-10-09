@@ -1,0 +1,422 @@
+{
+  "steps": [
+    {
+      "name": "Fresh generated game",
+      "hud": [
+        "Cross the start to begin",
+        "0:00.0",
+        "0 / 5",
+        "0 / 3"
+      ],
+      "position": {
+        "x": 1.8,
+        "y": 3,
+        "z": 3,
+        "tolerance": 0.7
+      },
+      "shown": [
+        547,
+        548,
+        549,
+        550,
+        551
+      ]
+    },
+    {
+      "name": "Cross start",
+      "walk": {
+        "x": 4.7,
+        "y": 3,
+        "z": 3
+      },
+      "position": {
+        "x": 4.7,
+        "y": 3,
+        "z": 3,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": [
+        "RUN IN PROGRESS"
+      ]
+    },
+    {
+      "name": "Jump to first plank",
+      "walk": {
+        "x": 7.5,
+        "y": 3.3,
+        "z": 3
+      },
+      "position": {
+        "x": 7.5,
+        "y": 3.3,
+        "z": 3,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": [],
+      "jump": true
+    },
+    {
+      "name": "Collect first orb",
+      "walk": {
+        "x": 10.5,
+        "y": 3.6,
+        "z": 3
+      },
+      "position": {
+        "x": 10.5,
+        "y": 3.6,
+        "z": 3,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": [
+        "1 / 5"
+      ],
+      "jump": true,
+      "hidden": [
+        547
+      ]
+    },
+    {
+      "name": "Reach first checkpoint",
+      "walk": {
+        "x": 13.2,
+        "y": 3.9,
+        "z": 3.5
+      },
+      "position": {
+        "x": 13.2,
+        "y": 3.9,
+        "z": 3.5,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": [
+        "1 / 3"
+      ],
+      "jump": true
+    },
+    {
+      "name": "Fall and retain checkpoint one progress",
+      "toward": {
+        "x": 10,
+        "y": 0,
+        "z": 6.5
+      },
+      "durationMs": 1000,
+      "settleMs": 3500,
+      "hud": [
+        "1 / 5",
+        "1 / 3"
+      ],
+      "position": {
+        "x": 14.9,
+        "y": 3.9,
+        "z": 4.4,
+        "tolerance": 1
+      }
+    },
+    {
+      "name": "Approach north takeoff",
+      "walk": {
+        "x": 14,
+        "y": 3.9,
+        "z": 5
+      },
+      "position": {
+        "x": 14,
+        "y": 3.9,
+        "z": 5,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": []
+    },
+    {
+      "name": "Collect second orb",
+      "walk": {
+        "x": 14,
+        "y": 4.2,
+        "z": 8
+      },
+      "position": {
+        "x": 14,
+        "y": 4.2,
+        "z": 8,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": [
+        "2 / 5"
+      ],
+      "jump": true,
+      "hidden": [
+        548
+      ]
+    },
+    {
+      "name": "Reach second checkpoint",
+      "walk": {
+        "x": 14,
+        "y": 4.5,
+        "z": 11.3
+      },
+      "position": {
+        "x": 14,
+        "y": 4.5,
+        "z": 11.3,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": [
+        "2 / 3"
+      ],
+      "jump": true
+    },
+    {
+      "name": "Approach west takeoff",
+      "walk": {
+        "x": 13,
+        "y": 4.5,
+        "z": 12.5
+      },
+      "position": {
+        "x": 13,
+        "y": 4.5,
+        "z": 12.5,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": []
+    },
+    {
+      "name": "Collect third orb",
+      "walk": {
+        "x": 10,
+        "y": 4.8,
+        "z": 12.5
+      },
+      "position": {
+        "x": 10,
+        "y": 4.8,
+        "z": 12.5,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": [
+        "3 / 5"
+      ],
+      "jump": true,
+      "hidden": [
+        549
+      ]
+    },
+    {
+      "name": "Approach third disc edge",
+      "walk": {
+        "x": 9.35,
+        "y": 4.8,
+        "z": 12.5
+      },
+      "position": {
+        "x": 9.35,
+        "y": 4.8,
+        "z": 12.5,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": []
+    },
+    {
+      "name": "Collect fourth orb",
+      "walk": {
+        "x": 6.5,
+        "y": 5.1,
+        "z": 12.8
+      },
+      "position": {
+        "x": 6.5,
+        "y": 5.1,
+        "z": 12.8,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": [
+        "4 / 5"
+      ],
+      "jump": true,
+      "hidden": [
+        550
+      ]
+    },
+    {
+      "name": "Reach third checkpoint",
+      "walk": {
+        "x": 3.8,
+        "y": 5.4,
+        "z": 12.5
+      },
+      "position": {
+        "x": 3.8,
+        "y": 5.4,
+        "z": 12.5,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": [
+        "3 / 3"
+      ],
+      "jump": true
+    },
+    {
+      "name": "Fall and return to checkpoint three",
+      "toward": {
+        "x": 6.5,
+        "y": 0,
+        "z": 10
+      },
+      "durationMs": 900,
+      "settleMs": 3500,
+      "hud": [
+        "4 / 5",
+        "3 / 3"
+      ],
+      "position": {
+        "x": 2,
+        "y": 5.4,
+        "z": 11.2,
+        "tolerance": 1
+      }
+    },
+    {
+      "name": "Approach last orb takeoff",
+      "walk": {
+        "x": 2.8,
+        "y": 5.4,
+        "z": 11
+      },
+      "position": {
+        "x": 2.8,
+        "y": 5.4,
+        "z": 11,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": []
+    },
+    {
+      "name": "Collect final orb",
+      "walk": {
+        "x": 2.8,
+        "y": 5.7,
+        "z": 8.2
+      },
+      "position": {
+        "x": 2.8,
+        "y": 5.7,
+        "z": 8.2,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": [
+        "5 / 5"
+      ],
+      "jump": true,
+      "hidden": [
+        551
+      ]
+    },
+    {
+      "name": "Jump cleanly across final gap",
+      "walk": {
+        "x": 5.15,
+        "y": 6,
+        "z": 7.8
+      },
+      "position": {
+        "x": 5.15,
+        "y": 6,
+        "z": 7.8,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": [],
+      "jump": true
+    },
+    {
+      "name": "Land on finish island",
+      "walk": {
+        "x": 8,
+        "y": 6.3,
+        "z": 7.8
+      },
+      "position": {
+        "x": 8,
+        "y": 6.3,
+        "z": 7.8,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": [],
+      "jump": true
+    },
+    {
+      "name": "Complete original generated course",
+      "walk": {
+        "x": 9.3,
+        "y": 6.3,
+        "z": 7.8
+      },
+      "position": {
+        "x": 9.3,
+        "y": 6.3,
+        "z": 7.8,
+        "tolerance": 0.7
+      },
+      "durationMs": 300,
+      "settleMs": 700,
+      "hud": [
+        "RUN COMPLETE",
+        "5 / 5",
+        "3 / 3",
+        "Personal best",
+        "Run again"
+      ],
+      "hidden": [
+        547,
+        548,
+        549,
+        550,
+        551
+      ]
+    },
+    {
+      "name": "Completion remains after server validation",
+      "durationMs": 3000,
+      "settleMs": 3500,
+      "hud": [
+        "RUN COMPLETE",
+        "Personal best",
+        "Run again"
+      ]
+    }
+  ]
+}

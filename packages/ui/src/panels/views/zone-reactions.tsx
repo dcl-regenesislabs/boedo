@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react'
+import { uiAddZoneMessage } from '../../actions/zone-message'
+import { uiAddSpawnerFor } from '../../actions/prefabs'
 import { canAskAssistant, prefillAssistant } from '../ai-store'
 import { ZONE_ASKS, listenerWhere, zonePrompt, type ZoneListener } from './zone-listeners'
 
 export function ZoneReactions(props: {
+  zoneId: string
   zoneName: string
   listeners: ZoneListener[]
   /** Reactions on this entity — rendered as `children`, counted here. */
@@ -12,6 +15,10 @@ export function ZoneReactions(props: {
   children?: ReactNode
 }): JSX.Element {
   const { zoneName, listeners, localCount, busy, onAdd, children } = props
+  const presets = <div className="eui-zone-asks">
+    <button className="eui-zone-ask" disabled={busy} onClick={() => void uiAddZoneMessage(props.zoneId)}>Show a message</button>
+    <button className="eui-zone-ask" disabled={busy} onClick={() => void uiAddSpawnerFor(props.zoneId)}>Spawn a prefab</button>
+  </div>
   // Reactions living HERE are the children above; re-listing them would print the
   // same filename twice. Only reactions on other entities need reporting, because
   // nothing else in this inspector shows them.
@@ -22,7 +29,8 @@ export function ZoneReactions(props: {
     return (
       <div className="eui-zone-none">
         <p className="eui-zone-hint">Nothing reacts to this area yet.</p>
-        <AddReaction label="+ Add a reaction" busy={busy} onClick={onAdd} />
+        {presets}
+        <AddReaction label="+ Custom script" busy={busy} onClick={onAdd} />
         {canAskAssistant() && (
           <>
             <p className="eui-zone-hint">or describe it:</p>
@@ -56,7 +64,8 @@ export function ZoneReactions(props: {
           <span className="where">{listenerWhere(l)}</span>
         </div>
       ))}
-      <AddReaction label="+ Add another reaction" busy={busy} onClick={onAdd} />
+      {presets}
+      <AddReaction label="+ Custom script" busy={busy} onClick={onAdd} />
     </>
   )
 }

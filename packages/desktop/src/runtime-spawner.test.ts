@@ -77,6 +77,14 @@ describe('_runtime scriptInit', () => {
     expect(fired).toEqual([{ entity: 513, action: 'open' }])
   })
 
+  it('leaves an unwired optional action undefined, matching the upgraded SDK', () => {
+    const layout = parseScriptLayout('{"params":{"go":{"type":"action","value":{"entity":0,"action":""}}}}')
+    let created = false
+    const params = resolveScriptParams(layout, () => { created = true; return () => {} })
+    expect(params).toEqual([undefined])
+    expect(created).toBe(false)
+  })
+
   it('only synthesises a callback when the action value is an object, as the runner does', () => {
     const layout = parseScriptLayout(
       '{"params":{"a":{"type":"action","value":null},"b":{"type":"action","value":"open"},"c":{"type":"action"}}}'

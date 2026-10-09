@@ -78,11 +78,12 @@ export function canRedo(): boolean {
 // Run writes that must NOT become undo steps (history replay itself does this
 // inline; the scene-UI hide toggle borrows it — hiding chrome isn't an edit).
 export async function withHistorySuppressed(fn: () => Promise<void>): Promise<void> {
+  const previous = suppress
   suppress = true
   try {
     await fn()
   } finally {
-    suppress = false
+    suppress = previous
   }
 }
 

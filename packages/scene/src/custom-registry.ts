@@ -66,6 +66,7 @@ enum MediaSource {
 // --- definitions (defined on the scene engine; the returned defs are used as decoders) ---
 
 export const CUSTOM_REGISTRY_DEFS = [
+  engine.defineComponent('editor::UiThemeBinding', { value: Schemas.String }),
   // asset-packs::
   engine.defineComponent('asset-packs::ActionTypes', {
     value: Schemas.Array(Schemas.Map({ type: Schemas.String, jsonSchema: Schemas.String }))

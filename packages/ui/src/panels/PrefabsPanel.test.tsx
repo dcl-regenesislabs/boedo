@@ -1,13 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { state } from '@scene/state'
 import { PrefabsPanel } from './PrefabsPanel'
-import { prefabStore, type PrefabEntry } from './prefab-store'
+import { prefabStore, resetProjectPrefabs, type PrefabEntry } from './prefab-store'
 import { consumerStore } from '../prefabs/consumers'
 import { NO_PREFABS_YET } from '../prefabs/copy'
 import type { PrefabData } from '../prefabs/format'
 import { mount, run } from '../test/render'
 
-const { placePrefab } = vi.hoisted(() => ({ placePrefab: vi.fn(async (_id: string): Promise<void> => {}) }))
+const { placePrefab, sceneState, catalog } = vi.hoisted(() => ({
+  catalog: { available: false, list: vi.fn(async () => [{ ref: 'builtin:theme', scope: 'builtin', data: { id: 'theme', name: 'UI Theme', category: 'custom', tags: [] } }]) },
+  placePrefab: vi.fn(async (_id: string): Promise<void> => {}), sceneState: { empty: null as boolean | null }
+}))
+vi.mock('../prefabs/library', () => ({
+  libraryAvailable: () => catalog.available, listLibrary: catalog.list,
+  userLibraryState: () => 'unavailable', importAvailable: () => false
+}))
+vi.mock('../engine/datalayer', () => ({
+  dataLayerAvailable: () => true, probeDataLayer: async () => true,
+  dataLayerListFiles: async () => [], dataLayerReadFileBytes: vi.fn()
+}))
+vi.mock('./empty-scene', () => ({ sceneEmptiness: () => sceneState.empty }))
 
 vi.mock('../actions/prefabs', () => ({
   uiDeleteLibraryPrefab: vi.fn(),
@@ -35,6 +47,10 @@ function panel(): ReturnType<typeof mount> {
 }
 
 beforeEach(() => {
+  catalog.available = false
+  catalog.list.mockClear()
+  sceneState.empty = null
+  prefabStore.libraryLoaded = true
   state.status = 'ready'
   state.snapshot = {}
   state.assetBusy = false
@@ -146,7 +162,7 @@ describe('PrefabsPanel cards', () => {
     prefabStore.items = [entry()]
     const view = panel()
     const chips = view.all('.eui-prefab-card .eui-prefab-chips .eui-ds-chip').map((c) => c.textContent ?? '')
-    expect(chips).toContain('Not in the scene')
+    expect(chips).toContain('Ready to place')
     expect(chips.some((c) => c.includes('Spawnable'))).toBe(false)
     view.unmount()
   })
@@ -185,4 +201,35 @@ describe('PrefabsPanel cards', () => {
     view.unmount()
   })
 
+})
+
+describe('fresh scene diagnostics', () => {
+  it.each([null, true])('does not offer cleanup before a nonempty scene is known (%s)', (empty) => {
+    sceneState.empty = empty
+    prefabStore.items = [entry({ name: 'Trigger Area', origin: { source: 'builtin' } })]
+    const view = panel()
+    expect(view.text()).not.toContain('built-in copy isn’t used')
+    expect(view.text()).toContain('Trigger Area')
+    view.unmount()
+  })
+
+  it('still offers cleanup after the scene is ready and populated', () => {
+    sceneState.empty = false
+    prefabStore.items = [entry({ origin: { source: 'builtin' } })]
+    const view = panel()
+    expect(view.text()).toContain('built-in copy isn’t used')
+    view.unmount()
+  })
+})
+
+it('reloads the catalog after a project reset without requiring a tab remount', async () => {
+  catalog.available = true
+  sceneState.empty = true
+  const view = panel()
+  expect(view.text()).not.toContain('UI Theme')
+  run(resetProjectPrefabs)
+  await view.settle()
+  expect(catalog.list).toHaveBeenCalledOnce()
+  expect(view.text()).toContain('UI Theme')
+  view.unmount()
 })

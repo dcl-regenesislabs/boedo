@@ -145,3 +145,50 @@ describe('enum display labels', () => {
     view.unmount()
   })
 })
+
+
+describe('scene theme and course controls', () => {
+  it('accepts a hex edit, rejects invalid colors and exposes a native color picker', () => {
+    let picked: unknown
+    const view = mount(<ParamField name="accent" param={{ type: 'string', control: 'color', value: '#FF2D55' }} onChange={(v) => { picked = v }} />)
+    expect(view.find('input[type="color"]')).not.toBeNull()
+    view.type(view.find('input[aria-label="accent hex"]'), '#59e0ac')
+    expect(picked).toBe('#59E0AC')
+    picked = undefined
+    view.type(view.find('input[aria-label="accent hex"]'), 'invalid')
+    expect(picked).toBeUndefined()
+    expect((view.find('input[aria-label="accent hex"]') as HTMLInputElement).value).toBe('#FF2D55')
+    view.unmount()
+  })
+
+  it('lets a creator pick, order and remove named entities without typing CSV', () => {
+    run(() => { state.snapshot = { '512': { [NAME_COMPONENT]: { value: 'First' } }, '513': { [NAME_COMPONENT]: { value: 'Second' } } } })
+    let picked: unknown
+    const render = (value: string) => <ParamField name="markers" param={{ type: 'string', control: 'entityNames', value }} onChange={(v) => { picked = v }} />
+    const view = mount(render('First, Second'))
+    view.click(view.find('[aria-label="Move Second up"]'))
+    expect(picked).toBe('Second, First')
+    view.render(render(String(picked)))
+    view.click(view.find('[aria-label="Remove First"]'))
+    expect(picked).toBe('Second')
+    view.render(render(String(picked)))
+    view.click(view.find('[aria-label="Add markers"]'))
+    view.click(view.all('.eui-ds-pop-row').find((row) => row.textContent === 'First#512') ?? null)
+    expect(picked).toBe('Second, First')
+    view.unmount()
+  })
+
+  it('offers only actual uniquely named Trigger Areas to zone controls', () => {
+    run(() => { state.snapshot = {
+      '512': { [NAME_COMPONENT]: { value: 'Start' }, 'asset-packs::Script': { value: [{ path: 'custom/trigger_zone/scripts/trigger-zone.ts' }] } },
+      '513': { [NAME_COMPONENT]: { value: 'Wall' } },
+      '514': { [NAME_COMPONENT]: { value: 'Duplicate' } },
+      '515': { [NAME_COMPONENT]: { value: 'Duplicate' } }
+    } })
+    const view = mount(<ParamField name="zone" param={{ type: 'string', control: 'zone', value: '' }} onChange={() => {}} />)
+    view.click(view.find('.eui-ds-select-field'))
+    const rows = view.all('.eui-ds-pop-row').map((e) => e.textContent)
+    expect(rows).toEqual(['Choose a Trigger Area', 'Start#512'])
+    view.unmount()
+  })
+})

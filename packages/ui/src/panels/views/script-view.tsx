@@ -239,6 +239,7 @@ export const ScriptView: ComponentView = (props: ComponentViewProps): JSX.Elemen
       )}
       {isZone && (
         <ZoneReactions
+          zoneId={props.entityId}
           zoneName={zoneName}
           listeners={zoneListeners(snapshot, props.entityId, zoneName, detectorPath)}
           localCount={reactions.length}

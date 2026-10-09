@@ -152,6 +152,10 @@ the creator placed by hand, and a param that lives on a prefab's *child* (the
 Player Rig's gun sits on the Hand Anchor, not the rig root, so the placement's
 own `params` never sees it).
 
+Entity parameters accept an existing entity ID or a unique scene name, such as
+`{"respawnAt":"Start Spawn"}`. Missing and duplicate names are rejected; use
+an ID to disambiguate, or `0` to clear the reference.
+
 ### Params by name, including prefab params
 
 A `PrefabRef` param stores a prefab **UUID**, and the assistant never sees one —

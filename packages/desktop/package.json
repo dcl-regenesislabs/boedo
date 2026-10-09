@@ -9,7 +9,7 @@
     "build": "node esbuild.mjs && npm run build:ui",
     "build:main": "node esbuild.mjs",
     "build:ui": "npm run build -w @dcl-editor/ui",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p prefabs/tsconfig.json && tsc --noEmit -p validate/fixtures/tower-of-madness/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p prefabs/tsconfig.json && tsc --noEmit -p tsconfig.prefab-tests.json && tsc --noEmit -p validate/fixtures/tower-of-madness/tsconfig.json",
     "app": "electron .",
     "start": "npm run build && electron .",
     "stage": "node scripts/stage-resources.mjs",
@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@dcl-editor/contract": "*",
+    "@dcl/sdk-auth": "npm:@dcl/sdk@7.30.2-37807847179.commit-24c42ea",
     "@types/qrcode": "^1.5.6",
     "electron": "42.4.1",
     "electron-builder": "^26.0.12",
@@ -27,7 +28,6 @@
     "esbuild": "^0.24.0",
     "qrcode": "^1.5.4",
     "typescript": "^5.6.0",
-    "ws": "^8.18.0",
-    "@dcl/sdk-auth": "npm:@dcl/sdk@7.25.1-30310486734.commit-5ffe873"
+    "ws": "^8.18.0"
   }
 }

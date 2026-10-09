@@ -24,7 +24,7 @@ export function SyncChip(props: { project: string }): JSX.Element | null {
   if (sync === undefined || label === null) return null
   if (sync.state === 'conflict') {
     return (
-      <Button variant="danger" size="sm" tip="Choose which version to keep" onClick={() => (conflictAsk.open = true)}>
+      <Button variant="danger" size="sm" className="eui-sync-conflict" tip="Choose which version to keep" onClick={() => (conflictAsk.open = true)}>
         {label}
       </Button>
     )
@@ -33,6 +33,7 @@ export function SyncChip(props: { project: string }): JSX.Element | null {
     <AutoSaveChip
       state={chipState(sync.state)}
       tip={sync.state === 'error' ? sync.message : TIPS[sync.state]}
+      role={sync.state === 'error' ? 'alert' : undefined}
     >
       {label}
     </AutoSaveChip>

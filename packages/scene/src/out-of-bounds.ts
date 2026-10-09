@@ -17,7 +17,7 @@ export const PARCEL_SIZE = 16
 const OOB_MARGIN = 2
 
 // Parcel (x, y) covers world x ∈ [x*16, x*16+16] and z ∈ [y*16, y*16+16].
-function insideParcels(pos: { x: number; z: number }, parcels: ParcelCoord[]): boolean {
+export function insideParcels(pos: { x: number; z: number }, parcels: ParcelCoord[]): boolean {
   return parcels.some((p) => {
     const [minX, minZ] = [p.x * PARCEL_SIZE, p.y * PARCEL_SIZE]
     return (

@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest'
-import { isCheckedScript } from './scene-check-context'
+import { describe, expect, it, vi } from 'vitest'
+import { state } from '@scene/state'
+import { runSceneChecks } from './scene-checks'
+import { collectSceneCheckContext, isCheckedScript } from './scene-check-context'
 
 describe('which files the scene checks read', () => {
   it('reads a .tsx script — the Announcer is one, and every rule was blind to it', () => {
@@ -18,4 +20,26 @@ describe('which files the scene checks read', () => {
     expect(isCheckedScript('src/scene.json')).toBe(false)
     expect(isCheckedScript('node_modules/@dcl/sdk/index.ts')).toBe(false)
   })
+})
+
+vi.mock('../../engine/datalayer', () => ({
+  dataLayerAvailable: () => true, dataLayerListFiles: async () => [],
+  dataLayerWriteTick: () => 0, dataLayerReadFile: async () => ''
+}))
+
+it('keeps the engine world origin when filtering code-spawned entities for bounds checks', async () => {
+  state.initialBaseline = {
+    '0': {}, '512': { Transform: { position: { x: 24, y: 0, z: 8 } } }
+  }
+  state.savedBaseline = null
+  state.snapshot = { ...state.initialBaseline,
+    '5': { Transform: { position: { x: -32, y: 0, z: 16 } } },
+    '600': { Transform: { position: { x: 100, y: 0, z: 100 } } }
+  }
+  state.scene = { hash: 'test', title: 'Offset parcel', parcels: [{ x: 2, y: -1 }],
+    isPortable: false, isBroken: false, isBlocked: false, isSuper: false, sdkVersion: '7' }
+  const context = await collectSceneCheckContext()
+  expect(context?.snapshot['600']).toBeUndefined()
+  expect(context?.snapshot['5']).toBeDefined()
+  expect(runSceneChecks(context!).filter(f => f.id === 'outside-scene-bounds').map(f => f.entityId)).toEqual(['512'])
 })

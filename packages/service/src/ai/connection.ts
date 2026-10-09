@@ -1,5 +1,5 @@
 import type { ILoggerComponent } from '@well-known-components/interfaces'
-import { ASSISTANT_ID, ASSISTANT_MAX_IMAGE_BYTES, object } from '../../../contract/src/assistant.ts'
+import { ASSISTANT_ID, ASSISTANT_MAX_IMAGE_BYTES, isCatalogSearch, object } from '../../../contract/src/assistant.ts'
 import type { AssistantServerMessage, BrowserToolName } from '../../../contract/src/assistant.ts'
 import type { AiSendParams } from '../../../contract/src/shell.ts'
 import { MEMORY_ID, MEMORY_KEY } from './memory.ts'
@@ -10,7 +10,8 @@ import type { AgentFactory, AssistantAgent } from './types.ts'
 const MAX_TURN_RESULT_CHARS = 2_000_000
 const MAX_LABEL_CHARS = 80
 const TOOL_LABELS: Record<BrowserToolName, string> = {
-  build: 'Building the scene', scene_request: 'Editing the scene', write_file: 'Saving a file',
+  playtest: 'Testing the game',
+  build: 'Building the scene', scene_request: 'Editing the scene', write_file: 'Saving a file', asset_request: 'Working with assets',
   read_file: 'Reading a file', list_files: 'Listing files', view: 'Looking at the scene'
 }
 
@@ -74,15 +75,17 @@ export function createConnection(options: {
   function call(tool: BrowserToolName, { label: said, ...args }: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
     const turn = active
     const label = typeof said === 'string' && said.trim() !== '' ? said.trim().slice(0, MAX_LABEL_CHARS) : undefined
+    const parallel = isCatalogSearch(tool, args)
     // The browser serializes edits; queued calls must not spend their timeout waiting for earlier ones.
-    const result = browserCalls.then(() => {
+    const result = (parallel ? Promise.resolve() : browserCalls).then(() => {
       if (turn === null || active !== turn || turn.controller.signal.aborted || signal?.aborted) throw new Error('Turn cancelled')
       const live = turn
       const controller = turn.controller
       const callId = crypto.randomUUID()
       // the model's thinking is the gap since the last step ended, the tool's work is the rest
       const asked = Date.now()
-      live.steps++
+      const thinking = pending.size === 0 ? asked - live.lastStepAt : 0
+      const step = ++live.steps
       return new Promise<string>((resolve, reject) => {
         const cancel = () => finish(false, 'The turn was cancelled.')
         const timer = setTimeout(() => {
@@ -92,7 +95,7 @@ export function createConnection(options: {
         function finish(ok: boolean, text: string) {
           if (!pending.delete(callId)) return
           clearTimeout(timer)
-          options.logger.info(`assistant step turn=${live.id} n=${live.steps} tool=${tool} think=${asked - live.lastStepAt}ms tool_ms=${Date.now() - asked} ok=${ok} chars=${text.length}`)
+          options.logger.info(`assistant step turn=${live.id} n=${step} tool=${tool} think=${thinking}ms tool_ms=${Date.now() - asked} ok=${ok} chars=${text.length}`)
           live.lastStepAt = Date.now()
           signal?.removeEventListener('abort', cancel)
           controller.signal.removeEventListener('abort', cancel)
@@ -105,7 +108,7 @@ export function createConnection(options: {
         send({ kind: 'call', turnId: turn.id, callId, tool, args, ...(label === undefined ? {} : { label }) })
       })
     })
-    browserCalls = result.then(() => {}, () => {})
+    if (!parallel) browserCalls = result.then(() => {}, () => {})
     return result
   }
 

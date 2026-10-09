@@ -71,7 +71,7 @@ describe('the game flow', () => {
 
   // These names are the wire between the inspector, the guide and the assistant's
   // placePrefab request — a rename that only lands in the script is a silent break.
-  it('exposes the six settings the guide is written against', () => {
+  it('exposes round rules and timer display settings', () => {
     const { params, error } = getScriptParams(read(`${FOLDER}/scripts/game-flow.ts`))
     expect(error).toBeUndefined()
     expect(Object.keys(params)).toEqual([
@@ -80,7 +80,9 @@ describe('the game flow', () => {
       'intermissionSeconds',
       'minPlayers',
       'endsWhen',
-      'boardKey'
+      'boardKey',
+      'display',
+      'position'
     ])
     expect(params.endsWhen.options).toEqual(['timer', 'script'])
     expect(params.boardKey.value).toBe('leaderboard')
@@ -198,7 +200,7 @@ describe('the health & respawn', () => {
   it('takes its respawn point as an entity pick, not a typed id', () => {
     const { params, error } = getScriptParams(read(`${FOLDER}/scripts/health-respawn.ts`))
     expect(error).toBeUndefined()
-    expect(Object.keys(params)).toEqual(['respawnAt', 'maxHealth', 'dieBelowHeight'])
+    expect(Object.keys(params)).toEqual(['respawnAt', 'maxHealth', 'dieBelowHeight', 'respawnDelay', 'protectionSeconds'])
     expect(params.respawnAt.type).toBe('entity')
     expect(params.dieBelowHeight.value).toBe(0)
   })
@@ -240,10 +242,12 @@ describe('the announcer', () => {
     expect(scriptPath(FOLDER, '0')).toBe(`${ASSET_PATH_TOKEN}/scripts/announcer.tsx`)
   })
 
-  it('exposes only how long a message stays and how big it is', () => {
+  it('exposes presentation and a no-code Trigger Area message', () => {
     const { params, error } = getScriptParams(read(`${FOLDER}/scripts/announcer.tsx`))
     expect(error).toBeUndefined()
-    expect(Object.keys(params)).toEqual(['holdSeconds', 'fontSize'])
+    expect(Object.keys(params)).toEqual(['holdSeconds', 'fontSize', 'zone', 'message', 'when'])
+    expect(params.zone.control).toBe('zone')
+    expect(params.when.options).toEqual(['enter', 'exit'])
     expect(params.holdSeconds.value).toBe(4)
   })
 
@@ -287,10 +291,10 @@ describe('the leaderboard', () => {
 
   // boardKey is the whole contract with the rest of the kit: Game Flow reads the
   // same default for its winners line.
-  it('exposes the four settings the guide is written against', () => {
+  it('exposes board sources and themed display settings', () => {
     const { params, error } = getScriptParams(read(`${FOLDER}/scripts/leaderboard.ts`))
     expect(error).toBeUndefined()
-    expect(Object.keys(params)).toEqual(['title', 'boardKey', 'sort', 'rows'])
+    expect(Object.keys(params)).toEqual(['title', 'boardKey', 'sort', 'rows', 'source', 'courseId', 'display', 'position'])
     expect(params.sort.options).toEqual(['desc', 'asc'])
     expect(params.boardKey.value).toBe('leaderboard')
     const flow = getScriptParams(read('game-flow/scripts/game-flow.ts')).params
@@ -338,4 +342,3 @@ describe('the leaderboard', () => {
     expect(isRecord(json) && String(json.text)).toContain('Nothing to show yet — set the board key')
   })
 })
-

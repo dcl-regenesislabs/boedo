@@ -1,4 +1,5 @@
 export { createSceneBuilder } from './builder'
+export { assetPacksStubUpgrades } from './project-vfs'
 export { fetchVerified } from './verified-fetch'
 export type { BuilderInfo, PackagesInUse, SceneBuilder, SceneBuilderOptions } from './builder'
 export { layoutPackages } from './packages/layout'

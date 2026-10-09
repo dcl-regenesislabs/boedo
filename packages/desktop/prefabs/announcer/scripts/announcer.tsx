@@ -1,20 +1,14 @@
-// The server says something; every player sees it. One line, centred near the
-// top, gone a few seconds later.
-//
-// This is the listening half of the ordinary broadcast pair: server code
-// anywhere in the scene calls game.broadcast('announce', { text }) and this
-// piece draws it for every player. It is a moment, not a fact — a player who
-// arrives afterwards never sees it, which is why standings belong in game.state.
-import ReactEcs, { Label, ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
-import { Color4 } from '@dcl/sdk/math'
+import ReactEcs, { ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 import type { Entity } from '@dcl/sdk/ecs'
 import { isServer } from '@dcl/sdk/network'
 import { game } from '~runtime/game'
+import { UI_CANVAS, sceneUiTheme } from '~runtime/uiTheme'
+import { UiNotice } from '~runtime/uiComponents'
+import { onZone } from '~runtime/zoneBus'
+import type { ZoneName } from '~runtime/authoring'
 import { clampHold, toastText } from './pure/toast'
 
 const ANNOUNCE = 'announce'
-const VIRTUAL_CANVAS = { virtualWidth: 1920, virtualHeight: 1080 }
-const BACKDROP = Color4.create(0, 0, 0, 0.65)
 
 export class Announcer {
   private text = ''
@@ -26,13 +20,19 @@ export class Announcer {
     /** How long a message stays up. */
     public holdSeconds: number = 4,
     /** Text size at 1920×1080. */
-    public fontSize: number = 32
+    public fontSize: number = 20,
+    public zone: ZoneName = '',
+    public message: string = 'Welcome!',
+    public when: 'enter' | 'exit' = 'enter'
   ) {}
 
   start(): void {
     if (isServer()) { return }
-    ReactEcsRenderer.addUiRenderer(this.entity, () => this.render(), VIRTUAL_CANVAS)
+    ReactEcsRenderer.addUiRenderer(this.entity, () => this.render(), UI_CANVAS)
     game.onBroadcast(ANNOUNCE, (data: unknown) => this.show(data))
+    if (this.zone !== '') onZone(this.zone, this.when, (event) => {
+      if (event.local) this.show({ text: this.message })
+    })
   }
 
   update(dt: number): void {
@@ -51,29 +51,8 @@ export class Announcer {
 
   private render(): ReactEcs.JSX.Element | null {
     if (this.text === '') return null
-    return (
-      <UiEntity
-        uiTransform={{
-          width: '100%',
-          height: '100%',
-          positionType: 'absolute',
-          alignItems: 'flex-start',
-          justifyContent: 'center'
-        }}
-      >
-        <UiEntity
-          uiTransform={{
-            margin: { top: 96 },
-            padding: { top: 12, bottom: 12, left: 28, right: 28 },
-            borderRadius: 12,
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-          uiBackground={{ color: BACKDROP }}
-        >
-          <Label value={this.text} fontSize={this.fontSize} color={Color4.White()} />
-        </UiEntity>
-      </UiEntity>
-    )
+    return <UiEntity uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', justifyContent: 'center', pointerFilter: 'none' }}>
+      <UiNotice theme={sceneUiTheme()} text={this.text} fontSize={this.fontSize} uiTransform={{ positionType: 'absolute', position: { bottom: 120 }, maxWidth: '90%' }} />
+    </UiEntity>
   }
 }

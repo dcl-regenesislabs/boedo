@@ -317,9 +317,13 @@ export class RateLimiter {
 type StateListener = (changed: Record<string, unknown>) => void
 type PresenceFn = (player: Player) => void | Promise<void>
 export type ZoneClaimKind = 'enter' | 'exit'
+// Only 'outside' is worth a retry: the server's position view lags the
+// client's own trigger edge by up to a position tick.
+export type ZoneRefusal = 'outside' | 'unwatched' | 'limited' | 'busy'
 export interface ZoneClaimReply {
   ok: boolean
   verified: boolean
+  reason?: ZoneRefusal
 }
 
 /** A write for a player whose record is not in memory: what has been queued
@@ -1067,7 +1071,7 @@ export class GameCore {
       // ordinary answer here (the client's zone bus re-claims on the next
       // crossing), so an over-full queue needs no card of its own.
       if (this.preBootZoneClaims.length >= MAX_PREBOOT_REQUESTS) {
-        return Promise.resolve({ ok: false, verified: false })
+        return Promise.resolve({ ok: false, verified: false, reason: 'busy' })
       }
       return new Promise<ZoneClaimReply>((resolve, reject) => {
         this.preBootZoneClaims.push({ zone, kind, player, resolve, reject })
@@ -1083,10 +1087,10 @@ export class GameCore {
     // refused claim for an area nobody listens to is ordinary, not an attack.
     const key = zoneKey(zone)
     if (!this.zoneEnterFns.has(key)) {
-      return Promise.resolve({ ok: false, verified: false })
+      return Promise.resolve({ ok: false, verified: false, reason: 'unwatched' })
     }
     if (!this.zoneLimiter.allow(`zone:${key}`, player, this.ports.now())) {
-      return Promise.resolve({ ok: false, verified: false })
+      return Promise.resolve({ ok: false, verified: false, reason: 'limited' })
     }
     try {
       return Promise.resolve(this.settleZoneClaim(zone, kind, player))
@@ -1114,7 +1118,7 @@ export class GameCore {
     }
     if (!volumes.some((v) => insideZone(v, position, ZONE_SLACK_M))) {
       this.dropZoneMember(key, player)
-      throw new Error(`outside "${zone.trim()}"`)
+      return { ok: false, verified: true, reason: 'outside' }
     }
     this.admitZoneMember(key, player)
     return { ok: true, verified: true }

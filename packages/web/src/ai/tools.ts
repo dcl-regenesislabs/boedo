@@ -7,6 +7,8 @@ export interface BrowserProject {
   write(path: string, bytes: Uint8Array, expected: Uint8Array | null, signal: AbortSignal): Promise<void>
   scene(request: unknown, signal: AbortSignal): Promise<unknown>
   build(signal: AbortSignal): Promise<unknown>
+  playtest?(request: Record<string, unknown>, signal: AbortSignal): Promise<unknown>
+  assets?(request: Record<string, unknown>, signal: AbortSignal): Promise<unknown>
   // a picture of the viewport: from the free camera placed at `from`, or framed on an entity, or as is
   view(request: ViewRequest, signal: AbortSignal): Promise<unknown>
   // after a successful write; answers the entity a new script was attached to
@@ -39,6 +41,14 @@ export function createBrowserTools(project: BrowserProject) {
   return async (call: BrowserToolCall, signal: AbortSignal): Promise<string> => {
     signal.throwIfAborted()
     const { tool, args } = call
+    if (tool === 'playtest') {
+      if (project.playtest === undefined) throw new Error('Playtesting requires an updated editor.')
+      return JSON.stringify(await project.playtest(args, signal))
+    }
+    if (tool === 'asset_request') {
+      if (project.assets === undefined) throw new Error('Asset tools require an updated editor.')
+      return JSON.stringify(await project.assets(args, signal))
+    }
     if (tool === 'list_files') {
       const kind = typeof args.kind === 'string' && (ASSET_KINDS as readonly string[]).includes(args.kind) ? args.kind : null
       const match = typeof args.match === 'string' ? args.match.toLowerCase() : ''

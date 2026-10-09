@@ -41,3 +41,6 @@ text announcements (with the overlay every player sees) and airdrops. What is no
 ported: the DCL Cast presentation-bot flow and the rewards supply counter.
 
 See `docs/PREFABS.md` for the format, the library layout and the known limits.
+
+Prefab runtime tests use `tsconfig.prefab-tests.json` so static imports resolve
+against the same auth-server SDK as the scripts, separately from the desktop shell.

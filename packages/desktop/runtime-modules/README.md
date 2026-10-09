@@ -62,6 +62,17 @@ Rules for modules in this folder:
 | `outcomes` | the sequenced, server-validated gameplay-event ledger |
 | `spawnPoints` | spawn points by name: `requestSpawn('Crate Spawner')` from any script |
 | `zoneBus` | trigger-zone membership, keyed by entity Name |
+| `respawn` | per-player safe destinations and respawn requests; Health & Respawn owns health and the actual move |
+| `pure/runPrediction` | provisional run presentation over server state; correlates local actions, rolls back rejection or expiry, and clears pending work on a new attempt |
+| `runs` | validated starts, ordered checkpoints, pickups, timed finishes and personal restarts |
+| `sceneNames` | unique entity lookup and positions composed through parent transforms |
+| `gameHud` | reusable metrics, progress bars, run HUD and completion screen; React-ECS `.tsx` |
+| `pure/runState` | the run rules: start, ordered checkpoints, pickups, finish and restart, with forged or repeated actions refused |
+| `pure/runBoard` | best time per player for a course leaderboard, recovered and bounded from storage |
+| `uiTheme`, `pure/uiTheme` | the scene's UI Theme palette and `UI_CANVAS`, which keeps HUDs clear of the Explorer's reserved screen space |
+| `uiComponents` | themed React-ECS panels, text, buttons, progress pips and notices; `.tsx` |
+| `statusHud` | a one-line themed status readout at a screen edge; `.tsx` |
+| `authoring` | `ColorHex`, `EntityName(s)` and `ZoneName(s)` parameter types that get pickers in the inspector |
 
 `spawner.ts` reproduces `node_modules/@dcl/sdk-commands/dist/logic/runtime-script.js`
 so a clone's scripts start exactly the way a placed entity's do. That file is
@@ -136,3 +147,10 @@ through a scene-level dependency:
   which may not be placed. A prefab's own scripts write `~runtime/<name>`; a
   script in the creator's `src/scripts/` writes `./runtime/<name>`. Both land on
   the same file.
+
+Shared UI components attach `editor::UiThemeBinding` color roles to their SDK UI
+entities. A filtered transport sends only that metadata to the local renderer.
+The editor uses those roles to preview theme edits while the scene is paused,
+preserving gameplay state, text, layout and HUD visibility. `UI_CANVAS` uses the
+SDK's interactable screen area so every shared HUD respects the Explorer sidebar,
+chat and other reported insets as they resize.

@@ -614,6 +614,7 @@ function syncedComponents(snapshot: PrefabSnapshot): AnyComponent[] {
 // --- script running (runner parity: see pure/scriptInit.ts) ---
 
 function startScript(spec: ScriptSpec, entity: Entity): ScriptRun | null {
+  if (engine.getEntityState(entity) === EntityState.Removed) return null
   const src = scriptSrc(spec.path)
   try {
     const layout = parseScriptLayout(spec.layout)

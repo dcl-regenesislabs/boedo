@@ -11,11 +11,15 @@
     "time"
   ],
   "requiresSdk": "auth-server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "changelog": [
     {
       "version": "1.0.0",
       "notes": "Initial release: the Multiplayer Server's NTP-synced time, identical for every player, shown as 3D text at the item or as a 2D overlay on the player's client."
+    },
+    {
+      "version": "1.1.0",
+      "notes": "Shared UI theme and independent clocks when multiple items use the overlay."
     }
   ],
   "origin": {

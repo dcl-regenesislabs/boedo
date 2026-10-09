@@ -20,8 +20,18 @@ declare global {
 
 let engine: EngineWindow = window
 
+const engineWindowListeners = new Set<(w: Window) => void>()
+
 export function setEngineWindow(w: Window): void {
+  if (w === engine) return
   engine = w as EngineWindow
+  engineWindowListeners.forEach((cb) => cb(w))
+}
+
+// The viewport iframe swaps its window on every navigation.
+export function onEngineWindow(cb: (w: Window) => void): () => void {
+  engineWindowListeners.add(cb)
+  return () => engineWindowListeners.delete(cb)
 }
 
 // Hosted mode: the page that owns the engine hands over a line-based console

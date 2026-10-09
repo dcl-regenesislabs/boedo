@@ -37,6 +37,13 @@ describe('zoneListeners', () => {
     ])
   })
 
+  it('shows a course that lists the zone among ordered checkpoints', () => {
+    const snapshot = { ...scene(), '513': scripted('Run', [['custom/run_progress/scripts/run-progress.tsx', JSON.stringify({ params: {
+      checkpointAreas: { type: 'string', control: 'zones', value: 'Start, Front Hall, Finish' }
+    } })]]) }
+    expect(zoneListeners(snapshot, '512', 'Front Hall', DETECTOR)).toMatchObject([{ entity: 'Run' }])
+  })
+
   it('matches trimmed and case-folded, the way zoneBus does', () => {
     const snapshot: Snapshot = {
       ...scene(),

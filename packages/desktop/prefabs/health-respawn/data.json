@@ -21,8 +21,13 @@
     "code": "game.onEnterArea('Spikes', (player) => damage(player, 25))",
     "next": "Press New script below, write that inside the isServer() block it comes with, and import damage from the health.ts beside this item's own script."
   },
-  "version": "1.1.0",
+  "version": "1.2.1",
   "changelog": [
+    { "version": "1.2.1", "notes": "Guide covers in-bounds respawn destinations, permissions and course playtesting." },
+    {
+      "version": "1.2.0",
+      "notes": "Per-player checkpoint destinations, healing, forced death, death counts, optional respawn delay and protection after respawning."
+    },
     {
       "version": "1.0.0",
       "notes": "Initial release: hit points the server owns in game.state.health, a respawn point picked in the inspector, a \"die below height\" death plane, and a damage() other server code calls."

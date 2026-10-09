@@ -36,6 +36,7 @@ function setup(fetch = async () => new Response(JSON.stringify({ token: 'test-ti
   vi.stubGlobal('location', new URL('http://editor.test'))
   let projectId = 'first'
   const scene = vi.fn(async (_request: unknown, _signal: AbortSignal): Promise<unknown> => ({ id: '512' }))
+  const assets = vi.fn(async () => ({ results: [{ ref: 'builtin:game-flow' }] }))
   const kept = new Map<string, AssistantMemoryRef>()
   const read = vi.fn(async (id: string, wallet: string) => kept.get(`${id}@${wallet}`) ?? null)
   const assistant = createBrowserAssistant({
@@ -45,15 +46,26 @@ function setup(fetch = async () => new Response(JSON.stringify({ token: 'test-ti
       write: async (id, wallet, ref) => { if (ref === null) kept.delete(`${id}@${wallet}`); else kept.set(`${id}@${wallet}`, ref) }
     },
     project: () => ({ id: projectId, tools: {
-      files: () => new Map(), write: async () => {}, scene, build: async () => ({ ok: true }), view: async () => ({})
+      files: () => new Map(), write: async () => {}, scene, assets, build: async () => ({ ok: true }), view: async () => ({})
     } })
   })
   const events: AiEvent[] = []
   assistant.shell.onAiEvent((event) => events.push(event))
-  return { assistant, events, scene, kept, read, switchProject() { projectId = 'second' } }
+  return { assistant, events, scene, assets, kept, read, switchProject() { projectId = 'second' } }
 }
 
 afterEach(() => { Socket.instances = []; vi.unstubAllGlobals() })
+
+it('dispatches asset tools through the signed assistant connection', async () => {
+  const { assistant, assets } = setup()
+  try {
+    const { turnId } = await assistant.shell.aiSend({ provider: 'claude', text: 'Find a round controller' })
+    const ws = Socket.instances[0]
+    ws.receive({ kind: 'call', turnId, callId: 'assets-1', tool: 'asset_request', args: { action: 'search_prefabs', query: 'round' } })
+    await vi.waitFor(() => expect(ws.sent).toContainEqual(expect.objectContaining({ kind: 'result', callId: 'assets-1', ok: true })))
+    expect(assets).toHaveBeenCalledWith({ action: 'search_prefabs', query: 'round' }, expect.any(AbortSignal))
+  } finally { assistant.dispose() }
+})
 
 it('runs each tool call once and refuses requests after the browser project changes', async () => {
   const { assistant, scene, switchProject } = setup()
@@ -153,4 +165,30 @@ it('cancels a turn immediately while New chat reads the key, then forgets before
     expect(socket.sent.slice(1)).toEqual([{ kind: 'stop', turnId }, { kind: 'forget', id: ref?.id }, { kind: 'reset' }])
     expect(socket.readyState).toBe(3)
   } finally { reading.resolve(ref); await forgetting; assistant.dispose() }
+})
+
+it('searches during scene edits, orders imports, and discards a cancelled search result', async () => {
+  const { assistant, scene } = setup()
+  const edit = deferred<void>()
+  const catalog = deferred<{ models: [] }>()
+  scene.mockImplementationOnce(async () => { await edit.promise; return { id: '512' } })
+  scene.mockImplementationOnce(() => catalog.promise)
+  try {
+    const { turnId } = await assistant.shell.aiSend({ provider: 'claude', text: 'Build a tower' })
+    const ws = Socket.instances[0]
+    ws.receive({ kind: 'call', turnId, callId: 'edit', tool: 'scene_request', args: { request: { type: 'batch', requests: [] } } })
+    ws.receive({ kind: 'call', turnId, callId: 'search', tool: 'scene_request', args: { request: { type: 'findModels', query: 'obstacle' } } })
+    ws.receive({ kind: 'call', turnId, callId: 'import', tool: 'scene_request', args: { request: { type: 'placeModel', id: 'spinner', into: 'Spinner' } } })
+    await vi.waitFor(() => expect(scene).toHaveBeenCalledTimes(2))
+    expect(ws.sent.filter(m => m.kind === 'result')).toHaveLength(0)
+    edit.resolve()
+    await vi.waitFor(() => expect(ws.sent).toContainEqual(expect.objectContaining({ kind: 'result', callId: 'import', ok: true })))
+    expect(scene).toHaveBeenCalledTimes(3)
+    await assistant.reset()
+    const next = await assistant.shell.aiSend({ provider: 'claude', text: 'Another scene' })
+    catalog.resolve({ models: [] })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(ws.sent).not.toContainEqual(expect.objectContaining({ kind: 'result', callId: 'search' }))
+    expect(Socket.instances[1].sent).toContainEqual(expect.objectContaining({ kind: 'prompt', turnId: next.turnId }))
+  } finally { edit.resolve(); catalog.resolve({ models: [] }); assistant.dispose() }
 })

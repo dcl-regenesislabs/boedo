@@ -11,17 +11,11 @@ import { countCatalogMatches, matchHint, prefabMatches } from './search-hints'
 import { originDetail, originLabel, originTip, scopeOrigin } from '../prefabs/provenance'
 import { importAvailable, libraryAvailable, userLibraryState } from '../prefabs/library'
 import { unusedBuiltinCopies } from '../prefabs/unused'
-import { consumerStore, ensureConsumersLoaded, refreshConsumers, sceneLayouts } from '../prefabs/consumers'
-import {
-  modesFromCalls,
-  scanSpawnCalls,
-  summariesFromModes,
-  type GuaranteeChip
-} from '../prefabs/guarantees'
-import { instancesOf, sceneInstances, type PlacementInstance } from '../prefabs/placement'
+import { consumerStore, ensureConsumersLoaded, refreshConsumers } from '../prefabs/consumers'
+import { sceneInstances, type PlacementInstance } from '../prefabs/placement'
 import { NO_PREFABS_YET } from '../prefabs/copy'
 import { createdDetail, createdHead } from './prefab-created'
-import { INERT_COMPONENT, type PrefabData } from '../prefabs/format'
+import type { PrefabData } from '../prefabs/format'
 import type { OutdatedPrefab } from '../prefabs/outdated'
 import { PrefabImportDialog } from './PrefabImportDialog'
 import { PrefabUpdateDialog } from './PrefabUpdateDialog'
@@ -94,6 +88,8 @@ function PrefabsTab(props: { onCreatePrefab: () => void; onView: (v: LeftView) =
   const library = useStore(() => prefabStore.library)
   const loading = useStore(() => prefabStore.loading)
   const loaded = useStore(() => prefabStore.loaded)
+  const libraryLoaded = useStore(() => prefabStore.libraryLoaded)
+  const status = useStore(() => state.status)
   const error = useStore(() => prefabStore.error)
   const libraryError = useStore(() => prefabStore.libraryError)
   const busy = useStore(() => state.assetBusy)
@@ -116,7 +112,9 @@ function PrefabsTab(props: { onCreatePrefab: () => void; onView: (v: LeftView) =
   const hasLibrary = libraryAvailable()
   const userLibrary = userLibraryState()
 
-  useEffect(ensurePrefabsLoaded, [])
+  useEffect(() => {
+    if (status === 'ready') ensurePrefabsLoaded()
+  }, [loaded, libraryLoaded, status])
   useEffect(() => {
     if (reveal === null) return
     const t = setTimeout(clearPrefabReveal, REVEAL_MS)
@@ -139,23 +137,15 @@ function PrefabsTab(props: { onCreatePrefab: () => void; onView: (v: LeftView) =
   }, [created])
 
 
-  const emptyScene = useStore(sceneEmptiness) === true
+  const emptiness = useStore(sceneEmptiness)
+  const emptyScene = emptiness === true
   const snapshot = useStore(() => state.snapshot)
-  const scripts = useStore(() => consumerStore.scripts)
   useEffect(ensureConsumersLoaded, [])
   useEffect(() => {
     if (consumerStore.loaded) void refreshConsumers()
   }, [items])
-  const calls = useMemo(() => scanSpawnCalls(scripts), [scripts])
-  const layouts = useMemo(() => sceneLayouts(), [snapshot])
   const instances = useMemo(() => sceneInstances(snapshot), [snapshot])
-  const guaranteesFor = (data: PrefabData): GuaranteeChip[] => {
-    const placed = instancesOf(data, instances).some(
-      (i) => snapshot[i.entityId]?.[INERT_COMPONENT] === undefined
-    )
-    return summariesFromModes(data, modesFromCalls(data, calls, layouts, scripts), !placed)
-  }
-  const unused = unusedBuiltinCopies(items, snapshot)
+  const unused = emptiness === false ? unusedBuiltinCopies(items, snapshot) : []
   const [doomed, setDoomed] = useState<Set<string> | null>(null)
   const [dismissed, setDismissed] = useState(false)
   useEffect(() => {
@@ -314,7 +304,6 @@ function PrefabsTab(props: { onCreatePrefab: () => void; onView: (v: LeftView) =
                   renaming={renaming === card.id}
                   outdated={card.source === 'project' ? outdated.get(card.data.id) : undefined}
                   instances={instances}
-                  guarantees={guaranteesFor(card.data)}
                   doomed={doomed?.has(card.id)}
                   onReview={
                     doomed !== null && reviewable.has(card.id) ? () => toggleDoom(card.id) : undefined
@@ -488,8 +477,6 @@ function PrefabCard(props: {
   outdated?: OutdatedPrefab
   /** every prefab instance in the scene, scanned once for the whole grid */
   instances: PlacementInstance[]
-  /** derived from the code that opens this prefab's pool — never authored */
-  guarantees: GuaranteeChip[]
   /** the running scene predates the last edit, so clones still come from the old bake */
   /** marked for removal in a cleanup review */
   doomed?: boolean
@@ -580,7 +567,6 @@ function PrefabCard(props: {
       <PrefabRuntimeChips
         data={card.data}
         instances={props.instances}
-        guarantees={props.guarantees}
         inProject={card.source === 'project'}
       />
       {detail !== null && (

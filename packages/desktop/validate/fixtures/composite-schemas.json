@@ -65,6 +65,16 @@
     },
     "serializationType": "map"
   },
+  "editor::UiThemeBinding": {
+    "type": "object",
+    "properties": {
+      "value": {
+        "type": "string",
+        "serializationType": "utf8-string"
+      }
+    },
+    "serializationType": "map"
+  },
   "asset-packs::ActionTypes": {
     "type": "object",
     "properties": {

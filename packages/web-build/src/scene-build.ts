@@ -230,7 +230,7 @@ export class SceneBuildSession {
           contents: current().virtualModules['sdk-composite']
         }))
         build.onLoad({ filter: /.*/, namespace: 'sdk-scripts' }, () => ({
-          loader: 'js',
+          loader: 'ts',
           contents: current().virtualModules['sdk-scripts'],
           resolveDir: PROJECT_ROOT
         }))

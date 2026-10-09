@@ -9,7 +9,7 @@
 //
 // Static, not dynamic import(): the identical pattern types the in-app editor's
 // TypeScript libs (script/ts-env.ts).
-const SOURCES = import.meta.glob('../../../desktop/runtime-modules/**/*.ts', {
+const SOURCES = import.meta.glob('../../../desktop/runtime-modules/**/*.{ts,tsx}', {
   eager: true,
   query: '?raw',
   import: 'default'
@@ -28,6 +28,12 @@ for (const [key, text] of Object.entries(SOURCES)) {
 
 export function runtimeMaster(rel: string): string | null {
   return MASTERS[rel] ?? null
+}
+
+export function runtimeMasterPath(rel: string): string {
+  if (rel in MASTERS) return rel
+  const tsx = rel.replace(/\.ts$/, '.tsx')
+  return tsx in MASTERS ? tsx : rel
 }
 
 export function runtimeMasterRels(): string[] {

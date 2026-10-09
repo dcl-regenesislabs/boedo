@@ -40,10 +40,8 @@ export interface PrefabEntry {
 // filter speak in these.
 export type PrefabSource = 'project' | 'user' | 'builtin'
 
-// Prefabs sharing a `group` (the 23 built-in seats) collapse into one browsable
-// card per section, drilled into rather than spread flat across the grid. A text
-// filter searches every prefab, so while one is typed nothing groups — matches
-// show individually, wherever they live.
+// Large collections collapse into one card; small gameplay and UI kits stay visible.
+// A text search always shows individual matches.
 export function groupPrefabCards<T extends { data: PrefabData }>(
   cards: T[],
   grouping: boolean
@@ -59,6 +57,11 @@ export function groupPrefabCards<T extends { data: PrefabData }>(
     const members = groups.get(name)
     if (members === undefined) groups.set(name, [card])
     else members.push(card)
+  }
+  for (const [name, members] of groups) {
+    if (members.length > 8) continue
+    groups.delete(name)
+    singles.push(...members)
   }
   return { groups, singles }
 }
@@ -127,7 +130,21 @@ function recomputeOutdated(): void {
   prefabStore.outdated = computeOutdated(prefabStore.items, masters)
 }
 
+let projectGeneration = 0
+
+export function resetProjectPrefabs(): void {
+  projectGeneration++
+  for (const url of thumbCache.values()) if (url !== null) URL.revokeObjectURL(url)
+  thumbCache.clear()
+  Object.assign(prefabStore, {
+    items: [], loading: false, loaded: false, error: null,
+    reveal: null, dragging: null, created: null, outdated: new Map(),
+    library: [], libraryLoading: false, libraryLoaded: false, libraryError: null, revealLibrary: null
+  })
+}
+
 export async function refreshPrefabs(): Promise<PrefabEntry[]> {
+  const generation = projectGeneration
   prefabStore.loading = true
   try {
     // The Scene tab mounts before boot's probe resolves, so a bare list here
@@ -140,11 +157,13 @@ export async function refreshPrefabs(): Promise<PrefabEntry[]> {
     // one listing for the whole refresh: the folders, their guides and (async)
     // their thumbnails all come out of it
     const files = await dataLayerListFiles()
+    if (generation !== projectGeneration) return []
     const present = new Set(files)
     const items: PrefabEntry[] = []
     for (const folder of prefabFoldersIn(files)) {
       try {
         const { data, composite } = await readPrefabFolder(folder)
+        if (generation !== projectGeneration) return []
         items.push({
           folder,
           data,
@@ -156,17 +175,19 @@ export async function refreshPrefabs(): Promise<PrefabEntry[]> {
         log.warn('prefab folder unreadable', folder, e)
       }
     }
+    if (generation !== projectGeneration) return []
     prefabStore.items = items
     prefabStore.error = null
     prefabStore.loaded = true
     recomputeOutdated()
-    void loadProjectThumbnails(items.map((i) => i.folder), present)
+    void loadProjectThumbnails(items.map((i) => i.folder), present, generation)
     return items
   } catch (e) {
+    if (generation !== projectGeneration) return []
     prefabStore.error = e instanceof Error ? e.message : String(e)
     return prefabStore.items
   } finally {
-    prefabStore.loading = false
+    if (generation === projectGeneration) prefabStore.loading = false
   }
 }
 
@@ -181,7 +202,7 @@ const thumbCache = new Map<string, string | null>()
 // fetched, because a read of a missing file is answered client-side but the dev
 // server still logs the failed RPC as an error, and a scene with a few
 // thumbnail-less prefabs would spam its log on every refresh.
-async function loadProjectThumbnails(folders: string[], present: Set<string>): Promise<void> {
+async function loadProjectThumbnails(folders: string[], present: Set<string>, generation: number): Promise<void> {
   const live = new Set(folders)
   for (const [folder, url] of [...thumbCache]) {
     if (live.has(folder)) continue
@@ -189,16 +210,19 @@ async function loadProjectThumbnails(folders: string[], present: Set<string>): P
     thumbCache.delete(folder)
   }
   for (const folder of folders) {
+    if (generation !== projectGeneration) return
     if (thumbCache.has(folder) || !present.has(`${folder}/thumbnail.png`)) continue
     thumbCache.set(folder, null)
     try {
       const bytes = await dataLayerReadFileBytes(`${folder}/thumbnail.png`)
+      if (generation !== projectGeneration) return
       const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'image/png' }))
       thumbCache.set(folder, url)
     } catch {
       /* vanished between listing and read — the card keeps its glyph */
     }
   }
+  if (generation !== projectGeneration) return
   prefabStore.items = prefabStore.items.map((item) => {
     const thumbnail = thumbCache.get(item.folder)
     return typeof thumbnail === 'string' ? { ...item, thumbnail } : item
@@ -206,22 +230,26 @@ async function loadProjectThumbnails(folders: string[], present: Set<string>): P
 }
 
 export async function refreshLibrary(): Promise<LibraryEntry[]> {
+  const generation = projectGeneration
   if (!libraryAvailable()) {
     prefabStore.libraryLoaded = true
     return []
   }
   prefabStore.libraryLoading = true
   try {
-    prefabStore.library = await listLibrary()
+    const library = await listLibrary()
+    if (generation !== projectGeneration) return []
+    prefabStore.library = library
     prefabStore.libraryError = null
     prefabStore.libraryLoaded = true
     recomputeOutdated()
     return prefabStore.library
   } catch (e) {
+    if (generation !== projectGeneration) return []
     prefabStore.libraryError = e instanceof Error ? e.message : String(e)
     return prefabStore.library
   } finally {
-    prefabStore.libraryLoading = false
+    if (generation === projectGeneration) prefabStore.libraryLoading = false
   }
 }
 

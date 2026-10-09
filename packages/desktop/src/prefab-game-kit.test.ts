@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('~system/EngineApi', () => ({ crdtSendToRenderer: vi.fn(async () => ({ data: [] })) }))
+
 // The three game-kit prefabs booted the way a scene runs them: the real shared
 // `game` module under a mutable isServer, one placed script class, and the
 // engine ticked by hand. The pure halves (flow arithmetic, health map,
@@ -166,6 +168,10 @@ const host = vi.hoisted(() => {
   }
 })
 
+vi.mock('@dcl/sdk/react-ecs', () => ({
+  default: { createElement: (component: unknown, props: unknown, ...children: unknown[]) => ({ component, props, children }) },
+  UiEntity: 'entity', Label: 'label', ReactEcsRenderer: { addUiRenderer: () => {} }
+}))
 vi.mock('@dcl/asset-packs', () => ({ getActionEvents: () => ({ emit: () => {} }) }))
 vi.mock('@dcl/sdk/ecs', () => ({
   engine: host.engine,
@@ -263,10 +269,28 @@ interface HealthModule {
     entity: number,
     respawnAt?: number,
     maxHealth?: number,
-    dieBelowHeight?: number
+    dieBelowHeight?: number,
+    respawnDelay?: number,
+    protectionSeconds?: number
   ) => Script
   damage(player: string, amount: number): void
+  heal(player: string, amount: number): void
+  kill(player: string): void
+  lifeOf(player: string): { dead: boolean; deaths: number }
   healthOf(player: string): number
+}
+
+interface RunsModule {
+  createRun(config: {
+    id: string; startArea: string; finishArea: string; startPosition: { x: number; y: number; z: number }
+    checkpoints: Array<{ area: string; position: { x: number; y: number; z: number } }>; collectibles: string[]
+  }): void
+  runOf(id: string, player: string): { phase: string; checkpoint: number; collected: string[]; bestMs: number | null; attempt: number }
+}
+
+interface RespawnModule {
+  setRespawnPoint(player: string, position: { x: number; y: number; z: number }): void
+  respawnPlayer(player: string): void
 }
 
 interface LeaderboardModule {
@@ -276,12 +300,15 @@ interface LeaderboardModule {
     title?: string,
     boardKey?: string,
     sort?: 'desc' | 'asc',
-    rows?: number
+    rows?: number,
+    source?: 'State key' | 'Run best times',
+    courseId?: string
   ) => Script
 }
 
 interface GameHandle {
   readonly state: Record<string, unknown>
+  readonly saved: { get<T = unknown>(key: string): T | undefined }
   setState(patch: Record<string, unknown>): void
   onRequest(name: string, fn: (data: unknown, player: string) => unknown): void
   newRound(): { number: number }
@@ -598,6 +625,32 @@ describe('Health & Respawn', () => {
     expect((game.state.health as Record<string, number>)['0xada']).toBe(100)
   })
 
+  it('caps healing, delays forced death and protects the next life from damage', async () => {
+    host.setServer(true)
+    await sharedGame()
+    const { HealthRespawn } = await vi.importActual<Pick<HealthModule, 'HealthRespawn'>>('../prefabs/health-respawn/scripts/health-respawn')
+    const api = await vi.importActual<HealthModule>('../prefabs/health-respawn/scripts/health')
+    new HealthRespawn('custom/health_respawn/scripts', 4, 50, 80, 0, 2, 1).start()
+    await boot()
+    join(700, '0xAda')
+    await pump(3)
+    api.damage('0xada', 30)
+    expect(api.healthOf('0xada')).toBe(50)
+    api.heal('0xada', 1000)
+    expect(api.healthOf('0xada')).toBe(80)
+    api.kill('0xada')
+    api.heal('0xada', 1000)
+    expect(api.healthOf('0xada')).toBe(0)
+    await pump(2)
+    expect(api.lifeOf('0xada')).toMatchObject({ dead: true, deaths: 1 })
+    await pump(8)
+    expect(api.lifeOf('0xada')).toMatchObject({ dead: false, deaths: 1, life: 2 })
+    api.damage('0xada', 80)
+    expect(api.healthOf('0xada')).toBe(80)
+    api.kill('0xada')
+    expect(api.healthOf('0xada')).toBe(0)
+  })
+
   // The death plane is the tower's whole failure mode, and 0 is its off switch.
   it('kills a player who falls past the death plane, and leaves them full above it', async () => {
     host.setServer(true)
@@ -642,6 +695,41 @@ describe('Health & Respawn', () => {
     expect(host.moved).toEqual([{ newRelativePosition: { x: 8, y: 1, z: 8 } }])
   })
 
+  it('returns a player to their checkpoint instead of the shared start marker', async () => {
+    host.transform.create(50, { position: { x: 8, y: 1, z: 8 } })
+    const { rig } = await place(50)
+    rig.start()
+    host.tick()
+    host.deliver('game.broadcast', {
+      name: 'respawn', body: JSON.stringify({ position: { x: 12, y: 4, z: 9 } }), to: '0xada'
+    })
+    expect(host.moved).toEqual([{ newRelativePosition: { x: 12, y: 4, z: 9 } }])
+  })
+
+  it('keeps separate checkpoint destinations and clears a leaving player', async () => {
+    host.setServer(true)
+    const game = await sharedGame()
+    const destinations = await vi.importActual<{
+      setRespawnPoint(player: string, position: { x: number; y: number; z: number }): void
+      respawnPlayer(player: string): void
+    }>('../runtime-modules/respawn')
+    const { rig } = await place(50)
+    rig.start()
+    await boot()
+    join(700, '0xAda')
+    join(701, '0xBob')
+    await pump(3)
+    destinations.setRespawnPoint('0xada', { x: 4, y: 5, z: 6 })
+    destinations.setRespawnPoint('0xbob', { x: 7, y: 8, z: 9 })
+    destinations.respawnPlayer('0xada')
+    const message = host.sent.filter((entry) => entry.name === 'game.broadcast').at(-1)
+    expect(message?.opts).toEqual({ to: ['0xada'] })
+    expect(message?.value).toMatchObject({ name: 'respawn', body: JSON.stringify({ position: { x: 4, y: 5, z: 6 } }) })
+    host.identity.values.delete(700)
+    await pump(3)
+    expect(game.state.respawnPoints).toEqual({ '0xbob': { x: 7, y: 8, z: 9 } })
+  })
+
   it('says what to do instead of teleporting nowhere when no point is picked', async () => {
     const said: string[] = []
     const original = console.log
@@ -659,7 +747,118 @@ describe('Health & Respawn', () => {
   })
 })
 
+describe('Run Progress', () => {
+  it('publishes saved best times again when a course starts on a fresh server', async () => {
+    host.setServer(true)
+    host.storage.world.set('serverState:game.saved', { 'run:race:leaderboard': [{ player: '0xada', score: 12.5 }] })
+    const game = await sharedGame()
+    const { createRun } = await vi.importActual<RunsModule>('../runtime-modules/runs')
+    createRun({ id: 'race', startArea: 'Start', finishArea: 'Finish', startPosition: { x: 2, y: 0, z: 4 }, checkpoints: [], collectibles: [] })
+    await boot()
+    expect(game.state['run:race:leaderboard']).toEqual([{ player: '0xada', score: 12.5 }])
+  })
+
+  it.each([true, false])('resets the course destination when health starts first: %s', async (healthFirst) => {
+    host.setServer(true)
+    const game = await sharedGame()
+    const { HealthRespawn } = await vi.importActual<Pick<HealthModule, 'HealthRespawn'>>('../prefabs/health-respawn/scripts/health-respawn')
+    const { createRun } = await vi.importActual<RunsModule>('../runtime-modules/runs')
+    const { setRespawnPoint } = await vi.importActual<RespawnModule>('../runtime-modules/respawn')
+    const health = new HealthRespawn('custom/health_respawn/scripts', 4, 50)
+    if (healthFirst) health.start()
+    createRun({ id: 'race', startArea: 'Start', finishArea: 'Finish', startPosition: { x: 2, y: 3, z: 4 }, checkpoints: [], collectibles: [] })
+    if (!healthFirst) health.start()
+    await boot()
+    join(700, '0xAda')
+    await pump(3)
+    setRespawnPoint('0xada', { x: 10, y: 9, z: 8 })
+    game.newRound()
+    await settle()
+    expect(game.state.respawnPoints).toEqual({ '0xada': { x: 2, y: 3, z: 4 } })
+    expect(game.state.health).toEqual({ '0xada': 100 })
+  })
+
+  it('validates area claims, keeps players independent and deduplicates restart attempts', async () => {
+    host.setServer(true)
+    const game = await sharedGame()
+    const runs = await vi.importActual<{
+      createRun(config: {
+        id: string; startArea: string; finishArea: string; startPosition: { x: number; y: number; z: number }
+        checkpoints: Array<{ area: string; position: { x: number; y: number; z: number } }>; collectibles: string[]
+      }): void
+      runOf(id: string, player: string): { phase: string; checkpoint: number; collected: string[]; bestMs: number | null; attempt: number }
+    }>('../runtime-modules/runs')
+    const names = host.engine.getComponentOrNull('core-schema::Name') ?? host.engine.defineComponent('core-schema::Name')
+    const areas = ['Start', 'Checkpoint', 'Orb', 'Finish']
+    for (const [index, name] of areas.entries()) {
+      names.create(810 + index, { value: name })
+      host.triggerArea.create(810 + index, { mesh: 0 })
+      host.transform.create(810 + index, {
+        position: { x: 4 + index * 5, y: 1, z: 4 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 2, y: 3, z: 2 }
+      })
+    }
+    runs.createRun({
+      id: 'race', startArea: 'Start', finishArea: 'Finish', startPosition: { x: 2, y: 0, z: 4 },
+      checkpoints: [{ area: 'Checkpoint', position: { x: 8, y: 0, z: 4 } }], collectibles: ['Orb']
+    })
+    await boot()
+    join(700, '0xAda')
+    join(701, '0xBob')
+    host.transform.create(700, { position: { x: 30, y: 0, z: 30 } })
+    host.transform.create(701, { position: { x: 30, y: 0, z: 30 } })
+    await pump(3)
+    let call = 0
+    const claim = async (index: number, move = true) => {
+      if (move) host.transform.getMutable(700).position = { x: 4 + index * 5, y: 0, z: 4 }
+      host.deliver('game.rpc.req', {
+        id: `run-area-${++call}`, method: 'game.zone', body: JSON.stringify(JSON.stringify({ zone: areas[index], kind: 'enter' }))
+      }, { from: '0xAda' })
+      await settle()
+      await pump(2)
+    }
+    await claim(0, false)
+    expect(runs.runOf('race', '0xada').phase).toBe('ready')
+    await claim(0)
+    await claim(1)
+    expect(game.state.respawnPoints).toEqual({ '0xada': { x: 8, y: 0, z: 4 } })
+    await claim(3)
+    expect(runs.runOf('race', '0xada').phase).toBe('running')
+    expect(game.state['run:race:leaderboard']).toEqual([])
+    await claim(2)
+    await claim(3)
+    const finished = runs.runOf('race', '0xada')
+    expect(finished.phase).toBe('finished')
+    expect(finished.bestMs).toBeGreaterThan(0)
+    const board = [{ player: '0xada', score: finished.bestMs! / 1000 }]
+    expect(game.state['run:race:leaderboard']).toEqual(board)
+    expect(game.saved.get('run:race:leaderboard')).toEqual(board)
+    expect(runs.runOf('race', '0xbob')).toMatchObject({ phase: 'ready', checkpoint: 0, collected: [] })
+    for (let index = 0; index < 2; index++) {
+      host.deliver('game.rpc.req', {
+        id: `restart-${index}`, method: 'run:race:restart', body: JSON.stringify(JSON.stringify({ attempt: finished.attempt }))
+      }, { from: '0xAda' })
+      await settle()
+    }
+    expect(runs.runOf('race', '0xada')).toMatchObject({ attempt: 2, phase: 'ready', checkpoint: 0, collected: [], bestMs: finished.bestMs })
+    expect(game.state.respawnPoints).toEqual({ '0xada': { x: 2, y: 0, z: 4 } })
+    expect(game.state['run:race:leaderboard']).toEqual(board)
+  })
+})
+
 describe('Leaderboard', () => {
+  it('shows course best times without a custom board writer and sorts fastest first', async () => {
+    await sharedGame()
+    host.transform.create(5, { parent: 4 })
+    host.textShape.create(5, { text: '' })
+    const module = await vi.importActual<LeaderboardModule>('../prefabs/leaderboard/scripts/leaderboard')
+    const board = new module.Leaderboard('', 4, 'Course Times', 'unused', 'desc', 8, 'Run best times', 'race')
+    board.start()
+    expect(String(host.textShape.get(5).text)).toContain('Complete a run')
+    await arrive('run:race:leaderboard', [{ player: 'bo', score: 30 }, { player: 'ana', score: 12.5 }])
+    expect(String(host.textShape.get(5).text)).toContain('1. ana   0:12')
+    expect(String(host.textShape.get(5).text)).toContain('2. bo   0:30')
+  })
+
   async function place(boardKey = 'leaderboard', sort: 'desc' | 'asc' = 'desc'): Promise<Script> {
     const module = await vi.importActual<LeaderboardModule>('../prefabs/leaderboard/scripts/leaderboard')
     return new module.Leaderboard('custom/leaderboard/scripts', 4, 'Best Times', boardKey, sort, 8)

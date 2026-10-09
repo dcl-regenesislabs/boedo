@@ -136,3 +136,29 @@ it.each(['build', 'scene_request'] as const)('allows a slow %s to complete after
   await vi.advanceTimersByTimeAsync(0)
   expect(client.events).toContainEqual({ kind: 'event', event: { kind: 'done', turnId: 'one', ok: true } })
 })
+
+it('searches the catalog alongside a scene edit while keeping imports ordered', async () => {
+  const client = setup({ factory: {
+    providers: async () => [],
+    create: async (_params, call) => ({
+      prompt: async () => { await Promise.all([
+        call('scene_request', { request: { type: 'batch', requests: [] } }),
+        call('scene_request', { request: { type: 'findModels', query: 'obstacle' } }),
+        call('scene_request', { request: { type: 'placeModel', id: 'spinner', into: 'Spinner' } })
+      ]) },
+      abort: async () => {}, dispose() {}, snapshot: () => [], takeUsage: () => ({ cost: 0 })
+    })
+  } })
+  client.send('one')
+  const calls = () => client.events.filter((event) => event.kind === 'call')
+  await vi.waitFor(() => expect(calls()).toHaveLength(2))
+  const type = (call: { args: Record<string, unknown> }) => (call.args.request as { type: string }).type
+  const edit = calls().find(call => type(call) === 'batch')!
+  const search = calls().find(call => type(call) === 'findModels')!
+  client.connection.receive({ kind: 'result', turnId: 'one', callId: edit.callId, ok: true, text: '{}' })
+  await vi.waitFor(() => expect(calls()).toHaveLength(3))
+  const imported = calls().find(call => type(call) === 'placeModel')!
+  client.connection.receive({ kind: 'result', turnId: 'one', callId: imported.callId, ok: true, text: '{}' })
+  client.connection.receive({ kind: 'result', turnId: 'one', callId: search.callId, ok: true, text: '{}' })
+  await client.done('one')
+})

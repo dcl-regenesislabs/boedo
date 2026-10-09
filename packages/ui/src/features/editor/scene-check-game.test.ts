@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { PrefabSnapshot } from '../../prefabs/format'
 import { GAME_CHECK_IDS, GAME_SCENE_CHECKS } from './scene-check-game'
 import { BUILTIN_SCENE_CHECKS } from './scene-check-rules'
-import { check, context, entityScripts, scriptRow } from './scene-check-fixtures'
+import { check, context, data, entityScripts, scriptRow } from './scene-check-fixtures'
 
 const RACE = 'custom/tower/scripts/madness-race.ts'
 const FLOW = 'custom/game-flow/scripts/game-flow.ts'
@@ -136,6 +136,18 @@ describe('a placed item waiting on a broadcast nothing sends', () => {
   const run = check(GAME_CHECK_IDS.unsent)
   const ANNOUNCER = 'custom/announcer/scripts/announcer.tsx'
   const listens = `${IMPORT}start() { game.onBroadcast('announce', (d) => this.show(d)) }`
+
+  it.each([['Welcome Area', 0], ['', 1], ['Missing Area', 1]])('requires a sender unless its local area is configured: %s', (zone, expected) => {
+    const found = run(context({
+      snapshot: scene({
+        '1': entityScripts([scriptRow(ANNOUNCER, { zone: { type: 'string', value: zone }, message: { type: 'string', value: 'Welcome!' } })]),
+        '2': named('Welcome Area')
+      }),
+      prefabs: [{ folder: 'custom/announcer', data: data({ id: 'fb41d8d1-b842-437d-a830-f38379e74743', name: 'Announcer' }), composite: { version: 1, components: [] } }],
+      scripts: { [ANNOUNCER]: listens }
+    }))
+    expect(found).toHaveLength(Number(expected))
+  })
 
   it('names the message and the line that sends it', () => {
     const found = run(

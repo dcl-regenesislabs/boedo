@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { buildSnapshot, installChain } from '../scripts/make-sdk-snapshot.mjs'
-import { mountProject } from './project-vfs'
+import { assetPacksStubUpgrades, mountProject } from './project-vfs'
 import { type ImportKind, Resolver } from './resolver'
 import type { SdkSnapshot } from './snapshot'
 import { Vfs } from './vfs'
@@ -58,6 +58,27 @@ describe('resolving a scene against the SDK snapshot', () => {
       kind: 'file',
       path: '/scene/node_modules/@dcl/asset-packs/dist/index.js'
     })
+  })
+
+  it('adds missing stub entry points once and preserves existing implementations', () => {
+    const files = project({ dependencies: { '@dcl/asset-packs': 'file:./vendor/asset-packs-stub' } })
+    files.set('vendor/asset-packs-stub/package.json', bytes('{"name":"@dcl/asset-packs","version":"0.0.1-stub"}'))
+    const additions = assetPacksStubUpgrades(files)
+    expect([...additions.keys()]).toEqual(['vendor/asset-packs-stub/dist/events.js', 'vendor/asset-packs-stub/dist/events.d.ts'])
+    for (const [path, content] of additions) files.set(path, content)
+    files.set('vendor/asset-packs-stub/dist/events.js', bytes('exports.custom = true'))
+    expect(assetPacksStubUpgrades(files).size).toBe(0)
+    expect(mountProject(snapshot, files).vfs.text('/scene/vendor/asset-packs-stub/dist/events.js')).toBe('exports.custom = true')
+  })
+
+  it('does not repair a real, unknown, or incomplete asset-packs package', () => {
+    const files = project({ dependencies: { '@dcl/asset-packs': 'file:./vendor/asset-packs-stub' } })
+    expect(assetPacksStubUpgrades(files).size).toBe(0)
+    files.set('vendor/asset-packs-stub/package.json', bytes('{"name":"@dcl/asset-packs","version":"7.0.0"}'))
+    expect(assetPacksStubUpgrades(files).size).toBe(0)
+    files.set('vendor/asset-packs-stub/package.json', bytes('{"name":"@dcl/asset-packs","version":"0.0.1-stub"}'))
+    files.delete('vendor/asset-packs-stub/dist/index.js')
+    expect(assetPacksStubUpgrades(files).size).toBe(0)
   })
 })
 

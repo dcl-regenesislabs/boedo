@@ -106,8 +106,8 @@ new secret is needed, and the Docker image includes the same snapshot.
 The skill reader is a Well-Known Component injected into the agent factory. It
 reads only the packaged document map, never arbitrary paths on the server. These
 skills add SDK knowledge; they do not add shell, network, MCP, image download,
-file-storage or publishing tools. Assets must already be imported into the browser
-project. Desktop-only workflows are omitted, and the web prompt adapts script paths
+file-storage or publishing tools. The browser's asset tool imports catalog models and
+library prefabs; other external assets require the creator's import. Desktop-only workflows are omitted, and the web prompt adapts script paths
 and entity edits to the editor's own tools.
 
 Source pin, license and update instructions: [service skills](../packages/service/skills/README.md).
@@ -122,8 +122,12 @@ closes sessions and cancels pending browser calls before stopping HTTP and drain
 the purge job. Configuration, logging, health probes and metrics use the shared
 components; see the [service README](../packages/service/README.md).
 
-- `list_files`, `read_file`: readable project text, excluding hidden paths,
-  credentials, dependencies and build output. Reads are limited to 256 KiB each.
+- `list_files`: project paths filtered by kind and name, including models and media.
+- `read_file`: readable project text, excluding hidden paths, credentials, dependencies
+  and build output. Reads are limited to 256 KiB each.
+- `asset_request`: search and import library prefabs, or inspect a project model's bounds
+  and resources. Imports require edit mode. Catalog models go through `scene_request`
+  `findModels` and `placeModel`; a `findModels` search runs alongside queued scene edits.
 - `write_file`: source code under `src/`, excluding generated runtime directories.
   An edit must supply the revision returned by a read; creating a file requires
   `revision: null` and an absent path. A concurrent change rejects the write.
@@ -135,9 +139,16 @@ components; see the [service README](../packages/service/README.md).
   a script, set script parameters, or place an existing prefab. These use the same
   editor actions as the UI, with undo and autosave. Component replacement requires
   the previously inspected value. Mutations require edit mode.
-- `build`: compile the current browser project and return diagnostics. The creator
-  presses Play to run it. There is no shell, package installation, deletion or
-  publishing tool.
+- `build`: compile the current browser project, run the bundle once and return compiler
+  diagnostics plus scene/client/server errors. This does not simulate a full playthrough.
+- `view`: capture the viewport, optionally framing an entity or setting the camera pose.
+  There is no shell, package installation, deletion or publishing tool.
+- `playtest`: start or stop Play, read the player's position, HUD and runtime errors,
+  walk with the movement controller, hold movement/jump keys, or click a viewport
+  position. Each movement or wait lasts at most five seconds. Stop restores the
+  authored scene; playtest actions do not grant progress or teleport the player.
+  A client reload can retain multiplayer server progress. Use the game's restart
+  control and verify its initial HUD before testing a fresh attempt.
 - `read_skill`: server-side, read-only SDK guidance from the bundled library, with
   at most 16,000 characters per page or 20 search matches. This never requests a
   browser file and cannot read credentials or private project storage.
@@ -194,6 +205,11 @@ disconnects while usage is being recorded.
 
 ## Validation
 
+The browser also handles `asset_request`: `inspect_model` (project path), `search_prefabs` (query, offset), and
+`import_prefab` (exact library/project ref). Imports require edit mode and do not place entities. A prefab import
+returns the actual project folder and guide; `inspect_model` returns transformed static bounds, animation names and
+resource warnings. The service does not download assets or hold a project filesystem.
+
 Assistant limit and timeout regression tests (no model calls):
 
 ```bash
@@ -227,3 +243,45 @@ fake engine host; real-engine gates remain in bevy-web's `react-web/e2e/`.
 Implementation: `packages/service/src/ai/` runs the agent and transport;
 `packages/web/src/ai/` handles tools and scene actions;
 `packages/contract/src/assistant.ts` defines their messages.
+
+### Real preview checks with the running service
+
+Open a project in a local Chromium preview with remote debugging enabled. Keep the
+service running with its existing OAuth session. The harness attaches to that browser;
+it does not load credential files, restart the service or close the browser.
+
+```bash
+npm run validate:preview -w @dcl-editor/web -- --cdp http://127.0.0.1:9222 --out /tmp/preview-check
+# Optional model run, through the open assistant panel and its selected provider:
+npm run validate:preview -w @dcl-editor/web -- --cdp http://127.0.0.1:9222 --prompt /tmp/game-prompt.txt --timeout 600
+```
+
+The default run makes no model calls. It checks engine connectivity and three consecutive
+engine screenshots, failing early on nearly black captures. Use a lit scene for this check.
+This catches the WebGPU screenshot regression before an assistant spends a turn debugging
+scene content. Pass `--frame` if the engine page does not use `/app.html`.
+
+Add `--scenario /tmp/game-checks.json` to replay gameplay in the current scene state:
+
+```json
+{"steps":[{"name":"Initial HUD","hud":["ORBS","CHECKPOINT"],"durationMs":300},{"name":"Walk to first platform","keys":["w"],"durationMs":500,"position":{"x":2,"y":3,"z":4,"tolerance":1}}]}
+```
+
+Use coordinates and HUD strings observed in your saved fixture; the example is only the
+format. Each step requires an assertion; `notHud` rejects forbidden HUD text.
+Optional `hidden` and `shown` lists assert entity
+visibility, including propagation to child meshes. Keys are dispatched to the engine canvas and use normal player physics;
+`click: {x,y}` uses viewport pixels. `walk: {x,y,z}` targets a world position; add
+`jump: true` to steer a physical jump relative to the camera. `toward: {x,y,z}`
+holds camera-relative movement keys toward that world point for `durationMs`, useful
+for walking off a known ledge regardless of the camera orientation. `settleMs` waits
+after input before checking the landing or HUD. Durations are bounded to five seconds and held keys release on failure.
+The harness never teleports the player. Start Play before replaying movement checks.
+
+Output is a small pass/fail summary. `report.json` contains timings, tool counts and
+observed gameplay state; screenshots are saved only on failure. An assistant finishing
+its turn does **not** prove the game works: the report separately counts gameplay assertions.
+The [Sky Lantern Run fixture](../packages/web/validate/fixtures/sky-lantern-run-acceptance/README.md)
+is a scene from one blank-scene prompt with complete, restart and incomplete-run replays: import its
+`scene.zip`, start Play, and pass each JSON file as `--scenario`. Jump steering accounts for momentum;
+aim at platform centres and inspect failed movement before changing the authored scene.

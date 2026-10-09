@@ -284,6 +284,7 @@ interface GameModule {
     onPlayerJoin(fn: (player: string) => void | Promise<void>): void
     onPlayerLeave(fn: (player: string) => void | Promise<void>): void
     onEnterArea(zone: string, fn: (player: string) => void | Promise<void>): void
+    onLocalAreaEnter(zone: string, fn: (result: Promise<boolean>) => void): () => void
     positionOf(player: string): { x: number; y: number; z: number } | null
     every(seconds: number, fn: () => void | Promise<void>): void
     readonly round: RoundTuple
@@ -749,6 +750,36 @@ describe('broadcasts on a client', () => {
 // published, not the ones this copy happened to register for. That is what lets
 // game.onEnterArea live inside if (isServer()) like every other hook.
 describe('the client watches every placed Trigger Area', () => {
+  it('notifies local presentation before the claim resolves and returns its validation result', async () => {
+    const bus = await vi.importActual<ZoneBusModule>('../runtime-modules/zoneBus')
+    const { game } = await loadGame()
+    host.tick()
+    host.components.get('runtime::Heartbeat')!.create(600, { beat: 111 })
+    host.tick()
+    host.tick()
+    bus.publishZone('Orb', 810, () => [])
+    host.tick()
+    let immediate = false
+    let result: boolean | undefined
+    const stop = game.onLocalAreaEnter('Orb', (validation) => {
+      immediate = true
+      void validation.then((accepted) => { result = accepted })
+    })
+    bus.emitZone('Orb', 'enter', host.engine.PlayerEntity, 810)
+    expect(immediate).toBe(true)
+    expect(result).toBeUndefined()
+    await settle()
+    const claim = host.sent.find((message) => message.name === 'game.rpc.req')!.value as { id: string }
+    host.deliver('game.rpc.res', { id: claim.id, ok: true, body: JSON.stringify({ ok: true, verified: true }) })
+    await settle()
+    expect(result).toBe(true)
+    stop()
+    immediate = false
+    bus.emitZone('Orb', 'exit', host.engine.PlayerEntity, 810)
+    bus.emitZone('Orb', 'enter', host.engine.PlayerEntity, 810)
+    expect(immediate).toBe(false)
+  })
+
   it('claims a crossing for an area no script on this copy registered for', async () => {
     const bus = await vi.importActual<ZoneBusModule>('../runtime-modules/zoneBus')
     await loadGame() // a client: isServer() is false, so the scene's onEnterArea never ran here
@@ -770,6 +801,65 @@ describe('the client watches every placed Trigger Area', () => {
     )
     expect(claim).toBeDefined()
     expect(JSON.parse((claim!.value as { body: string }).body)).toBe(JSON.stringify({ zone: 'Start', kind: 'enter' }))
+  })
+
+  it.each([false, true])('retries a stale-position refusal only while the same visit continues (exit=%s)', async (leave) => {
+    const bus = await vi.importActual<ZoneBusModule>('../runtime-modules/zoneBus')
+    const { game } = await loadGame()
+    host.tick()
+    host.components.get('runtime::Heartbeat')!.create(600, { beat: 111 })
+    host.tick()
+    host.tick()
+    let inside = false
+    let validation: boolean | undefined
+    game.onLocalAreaEnter('Orb', (result) => { void result.then((accepted) => { validation = accepted }) })
+    bus.publishZone('Orb', 810, () => inside ? [host.engine.PlayerEntity] : [])
+    host.tick()
+    inside = true
+    bus.emitZone('Orb', 'enter', host.engine.PlayerEntity, 810)
+    await settle()
+    const claims = () => host.sent.filter(message => message.name === 'game.rpc.req' && JSON.parse(JSON.parse((message.value as { body: string }).body)).kind === 'enter')
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const claim = claims().at(-1)!.value as { id: string }
+      host.deliver('game.rpc.res', { id: claim.id, ok: true, body: JSON.stringify({ ok: false, verified: true, reason: 'outside' }) })
+      await settle()
+      if (leave && attempt === 0) {
+        inside = false
+        bus.emitZone('Orb', 'exit', host.engine.PlayerEntity, 810)
+      }
+      host.tick(0.3)
+      await settle()
+    }
+    expect(claims()).toHaveLength(leave ? 1 : 4)
+    expect(validation).toBe(false)
+    host.tick(1)
+    await settle()
+    expect(claims()).toHaveLength(leave ? 1 : 4)
+  })
+
+  it('does not retry a crossing of an area no server script listens to', async () => {
+    const bus = await vi.importActual<ZoneBusModule>('../runtime-modules/zoneBus')
+    const { game } = await loadGame()
+    host.tick()
+    host.components.get('runtime::Heartbeat')!.create(600, { beat: 111 })
+    host.tick()
+    host.tick()
+    let validation: boolean | undefined
+    game.onLocalAreaEnter('Banner', (result) => { void result.then((accepted) => { validation = accepted }) })
+    let inside = false
+    bus.publishZone('Banner', 810, () => inside ? [host.engine.PlayerEntity] : [])
+    host.tick()
+    inside = true
+    bus.emitZone('Banner', 'enter', host.engine.PlayerEntity, 810)
+    await settle()
+    const claims = () => host.sent.filter(message => message.name === 'game.rpc.req' && (message.value as { method: string }).method === 'game.zone')
+    const claim = claims().at(-1)!.value as { id: string }
+    host.deliver('game.rpc.res', { id: claim.id, ok: true, body: JSON.stringify({ ok: false, verified: false, reason: 'unwatched' }) })
+    await settle()
+    expect(validation).toBe(false)
+    host.tick(1)
+    await settle()
+    expect(claims()).toHaveLength(1)
   })
 
   it('ignores another avatar crossing — only this player can claim their own crossing', async () => {
@@ -848,8 +938,7 @@ describe('presence, zones and intervals on the server', () => {
     const refused = host.sent.find(
       (message) => message.name === 'game.rpc.res' && (message.value as { id: string }).id === 'z1'
     )
-    expect((refused?.value as { ok: boolean }).ok).toBe(false)
-    expect(JSON.parse((refused?.value as { body: string }).body)).toContain('outside "Vault"')
+    expect(JSON.parse((refused?.value as { body: string }).body)).toEqual({ ok: false, verified: true, reason: 'outside' })
 
     // the same claim from inside the volume is admitted and fires the callback
     host.transform.getMutable(820).position = { x: 9, y: 1, z: 8 }

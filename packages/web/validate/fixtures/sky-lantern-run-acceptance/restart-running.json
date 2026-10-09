@@ -1,0 +1,31 @@
+{
+  "steps": [
+    {
+      "name": "Restart resets an active run",
+      "click": {
+        "x": 1350,
+        "y": 859
+      },
+      "settleMs": 4000,
+      "hud": [
+        "Cross the start to begin",
+        "0:00.0",
+        "0 / 5",
+        "0 / 3"
+      ],
+      "position": {
+        "x": 1.8,
+        "y": 3,
+        "z": 3,
+        "tolerance": 0.6
+      },
+      "shown": [
+        547,
+        548,
+        549,
+        550,
+        551
+      ]
+    }
+  ]
+}

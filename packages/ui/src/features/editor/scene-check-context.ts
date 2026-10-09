@@ -89,10 +89,11 @@ export async function collectSceneCheckContext(): Promise<SceneCheckContext | nu
   const { prefabs, scripts } = await readProject()
   const baseline = provenanceBaseline()
   return {
-    snapshot: authoredOnly(state.snapshot, (id) => isRuntimeEntity(id, baseline)),
+    snapshot: authoredOnly(state.snapshot, (id) => Number(id) >= 512 && isRuntimeEntity(id, baseline)),
     prefabs,
     scripts,
-    gameConfig: findGameConfig(state.snapshot)?.value ?? null
+    gameConfig: findGameConfig(state.snapshot)?.value ?? null,
+    parcels: state.scene?.parcels
   }
 }
 

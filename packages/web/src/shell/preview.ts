@@ -73,6 +73,7 @@ export interface Preview {
   readonly files: Map<string, Uint8Array>
   // first build: true when the realm serves this project's current files
   start(): Promise<boolean>
+  flush(): Promise<boolean>
   // a build from before a failed one is still being served
   published(): Promise<boolean>
   changed(path: string): void
@@ -171,7 +172,9 @@ export function createPreviews(options: {
     const realmUrl = previewRealmUrl(options.pageDir, realmId)
     const dirty = new Set<string>()
     let timer: ReturnType<typeof setTimeout> | null = null
-    let running = false
+    let running: Promise<boolean> | null = null
+    let initial = true
+    let lastOk = false
     let stopped = false
     // what the worker held after this project's last mount
     let mountedHere: string | null = null
@@ -234,31 +237,29 @@ export function createPreviews(options: {
       }
     }
 
-    async function drain(): Promise<void> {
-      if (running || stopped) return
-      running = true
-      try {
-        while (dirty.size > 0 && !stopped) {
-          const paths = [...dirty]
+    function drain(): Promise<boolean> {
+      if (stopped) return Promise.resolve(false)
+      if (running !== null) return running
+      running = (async () => {
+        while ((initial || dirty.size > 0) && !stopped) {
+          const paths = initial ? [] : [...dirty]
+          initial = false
           dirty.clear()
-          await cycle(paths)
+          lastOk = await cycle(paths)
         }
-      } finally {
-        running = false
-      }
+        return lastOk && !stopped
+      })().finally(() => { running = null })
+      return running
     }
 
     return {
       id,
       files,
-      async start() {
-        running = true
-        try {
-          return await cycle([])
-        } finally {
-          running = false
-          if (dirty.size > 0) void drain()
-        }
+      start: drain,
+      flush() {
+        if (timer !== null) clearTimeout(timer)
+        timer = null
+        return drain()
       },
       async published() {
         const stored = await (await caches.open(PREVIEW_CACHE_NAME)).match(previewManifestUrl(realmUrl))

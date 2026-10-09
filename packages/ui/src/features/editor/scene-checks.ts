@@ -16,6 +16,7 @@ import { log } from '../../log'
 import type { PrefabComposite, PrefabData, PrefabSnapshot } from '../../prefabs/format'
 import type { GameConfigValue } from '../../gameconfig/normalize'
 import { BUILTIN_SCENE_CHECKS } from './scene-check-rules'
+import type { ParcelCoord } from '@scene/bridge-protocol'
 
 // 'blocker'      — the scene is wired wrong; it also blocks Play
 // 'play-blocker' — correct to author, wrong to run right now (unsaved drift)
@@ -35,6 +36,7 @@ export interface SceneCheckContext {
   /** every project script's text, keyed by project-relative path */
   scripts: Record<string, string>
   gameConfig: GameConfigValue | null
+  parcels?: ParcelCoord[]
 }
 
 export interface SceneFinding {

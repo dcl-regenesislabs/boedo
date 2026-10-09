@@ -1,7 +1,7 @@
-import { Entity, TextShape } from '@dcl/sdk/ecs'
+import { Entity, TextShape, VisibilityComponent } from '@dcl/sdk/ecs'
 import { isServer } from '@dcl/sdk/network'
 import { initTimeSync, getServerTime, isTimeSyncReady } from '~runtime/timeSync'
-import { mountClockHud, setClockHudText } from './clock-hud'
+import { mountStatusHud } from '~runtime/statusHud'
 
 // Displays the Multiplayer Server's clock, NTP-synced, identical for every
 // player — as floating 3D text, or as a 2D overlay on the player's client. Both
@@ -14,6 +14,7 @@ function pad(n: number): string {
 
 export class ServerClock {
   private accum = 0
+  private time = '--:--:--'
 
   constructor(
     public src: string,
@@ -21,7 +22,7 @@ export class ServerClock {
     /** Label above the time */ public label: string = 'SERVER TIME',
     /** Show in UTC instead of each viewer's timezone */ public utc: boolean = true,
     /** How the clock is shown */ public display: '3D text' | '2D UI' = '3D text',
-    /** Where the 2D UI sits in the player's view */ public position: 'top' | 'top left' | 'top right' | 'bottom' = 'top'
+    /** For "2D UI": where the clock sits on screen. */ public position: 'top' | 'top left' | 'top right' | 'bottom' = 'top'
   ) {}
 
   private get onScreen(): boolean {
@@ -32,9 +33,9 @@ export class ServerClock {
     initTimeSync()
     if (isServer()) return
     if (this.onScreen) {
-      // the 3D text becomes the overlay — remove the placed shape
+      VisibilityComponent.createOrReplace(this.entity, { visible: false })
       TextShape.deleteFrom(this.entity)
-      mountClockHud(this.entity, this.position)
+      mountStatusHud(this.entity, this.position, () => ({ label: this.label, value: this.time }))
     }
     this.render('--:--:--')
   }
@@ -57,7 +58,7 @@ export class ServerClock {
 
   private render(time: string): void {
     if (this.onScreen) {
-      setClockHudText(this.label, time)
+      this.time = time
       return
     }
     TextShape.createOrReplace(this.entity, {

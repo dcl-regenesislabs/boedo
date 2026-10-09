@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('~system/EngineApi', () => ({ crdtSendToRenderer: vi.fn(async () => ({ data: [] })) }))
+
 // Tower of Madness, booted the way a scene runs it.
 //
 // The scripts under test are the fixture's own — the very files
@@ -150,6 +152,10 @@ const host = vi.hoisted(() => {
   }
 })
 
+vi.mock('@dcl/sdk/react-ecs', () => ({
+  default: { createElement: (component: unknown, props: unknown, ...children: unknown[]) => ({ component, props, children }) },
+  UiEntity: 'entity', Label: 'label', ReactEcsRenderer: { addUiRenderer: () => {} }
+}))
 vi.mock('@dcl/asset-packs', () => ({ getActionEvents: () => ({ emit: () => {} }) }))
 vi.mock('@dcl/sdk/ecs', () => ({
   engine: host.engine,

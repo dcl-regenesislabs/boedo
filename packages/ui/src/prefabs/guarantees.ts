@@ -73,16 +73,6 @@ const PLANNED_LABELS = [
 
 export const PLANNED_GUARANTEE = `${PLANNED_LABELS.join(' · ')}.`
 
-export const PENDING_LABEL = 'Not used yet'
-
-// The gesture has to name an item the creator can actually reach: the Spawner is
-// ungrouped and ungated, so it exists in every project.
-const PENDING_CHIP: GuaranteeChip = {
-  tone: 'info',
-  label: PENDING_LABEL,
-  tip: 'Tip: nothing brings this into the game yet. Pick it in a Spawner’s “spawn” setting and it appears while you play.'
-}
-
 const CHIPS: Record<SpawnMode, GuaranteeChip[]> = {
   server: [
     {
@@ -157,35 +147,6 @@ const CHIPS: Record<SpawnMode, GuaranteeChip[]> = {
       tip: 'The server owns and checks the health number. Where the health bar sits it does not.'
     }
   ]
-}
-
-// One chip per mode for the card grid, where four clauses would not fit. The
-// verbatim promise moves into the tooltip rather than being shortened.
-// Each summary restates the mode's HEADLINE clause and must carry that clause's
-// tone: the card and the sheet are two views of one statement, and tinting them
-// apart once made a client-side mode read as a server promise.
-const SUMMARY: Record<SpawnMode, GuaranteeChip> = {
-  server: {
-    tone: 'server',
-    label: 'Server-owned',
-    tip: 'One copy on the Multiplayer Server, synced to every player. The server rejects what a player’s own client writes.'
-  },
-  planned: { tone: 'info', label: 'Planned spawns', tip: PLANNED_GUARANTEE },
-  seeded: {
-    tone: 'client',
-    label: 'Spawned per player',
-    tip: 'On this player’s client · nothing synced.'
-  },
-  layout: {
-    tone: 'info',
-    label: 'Same for every player',
-    tip: 'Every player’s client builds the same items in the same places from the round’s seed, with zero messages.'
-  },
-  perPlayer: {
-    tone: 'info',
-    label: 'One per player',
-    tip: 'One per player · on this player’s client · HP server-owned.'
-  }
 }
 
 interface Bindings {
@@ -512,23 +473,5 @@ export function guaranteeChips(input: GuaranteeInput): GuaranteeChip[] {
 }
 
 export function chipsFromModes(data: PrefabData, modes: SpawnMode[]): GuaranteeChip[] {
-  if (modes.length === 0) return [PENDING_CHIP]
   return chipsForModes(modes, (mode) => CHIPS[mode])
-}
-
-/** One chip per resolved mode — the card grid, where the full row does not fit. */
-export function guaranteeSummaries(input: GuaranteeInput): GuaranteeChip[] {
-  return summariesFromModes(input.data, spawnModesFor(input))
-}
-
-// `orphan` = the prefab's only presence is spawn-only or unplaced, so if nothing
-// spawns it, it never appears in the game at all — that earns the hint. A placed
-// bench that nothing spawns is a bench; saying "not used yet" on it is noise.
-export function summariesFromModes(data: PrefabData, modes: SpawnMode[], orphan = true): GuaranteeChip[] {
-  if (modes.length === 0) return orphan ? [PENDING_CHIP] : []
-  // The sync-mode pills ("Spawned per player", "Planned spawns"…) named
-  // mechanism, not consequence — no creator did anything differently after
-  // reading one. The only chip that changes what a creator does is the nudge
-  // that nothing brings the prefab into the game yet.
-  return []
 }

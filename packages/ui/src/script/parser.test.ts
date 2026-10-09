@@ -28,6 +28,23 @@ describe('getScriptParams', () => {
     })
   })
 
+  it('gives authoring string aliases pickers without changing stored values', () => {
+    const { params } = getScriptParams(`export class Theme {
+      constructor(public src: string, public entity: Entity,
+        public accent: ColorHex = '#55AAFF', public start: ZoneName = 'Start',
+        public checkpoints: ZoneNames = 'One, Two', public spawn: EntityName = 'Spawn',
+        public visuals: EntityNames = '', public ordinary: string = 'hello') {}
+    }`)
+    expect(params.accent).toMatchObject({ type: 'string', control: 'color', value: '#55AAFF' })
+    expect(params.start.control).toBe('zone')
+    expect(params.checkpoints).toMatchObject({ control: 'zones', value: 'One, Two' })
+    expect(params.spawn.control).toBe('entityName')
+    expect(params.visuals.control).toBe('entityNames')
+    expect(params.ordinary.control).toBeUndefined()
+    const merged = mergeLayout({ params }, { params: { accent: { type: 'string', value: '#123456' } } })
+    expect(merged.params.accent).toMatchObject({ control: 'color', value: '#123456' })
+  })
+
   it('parses functional scripts (export function start)', () => {
     const { params } = getScriptParams(`
       import { Entity } from '@dcl/sdk/ecs'

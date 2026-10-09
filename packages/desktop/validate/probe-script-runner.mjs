@@ -490,7 +490,7 @@ async function main() {
   await sleep(5000)
   const played = await evalIn(`(() => {
     const sh = document.getElementById('editor-ui-host').shadowRoot
-    const btn = sh.querySelector('button[data-tip="Run the scene"]')
+    const btn = sh.querySelector('button[data-tip^="Run the scene ("]')
     if (!btn) return false
     btn.click()
     return true

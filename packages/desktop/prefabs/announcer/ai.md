@@ -5,8 +5,11 @@ claims-messages: announce
 
 # Announcer — AI guide
 
-One line on every player's client, for a few seconds. The server says it; every
-client shows it.
+A themed message for a few seconds. For a no-code local message, place a Trigger Area, then place Announcer.
+Choose the area in Zone, edit Message, and choose enter or exit. Play and walk into the area: this player's
+message appears immediately. Hold Seconds controls duration. UI Theme controls its palette.
+
+The same prefab also receives server announcements for shared game moments.
 
 The project copy is normally custom/announcer/ — check what is on disk, a second
 copy is custom/announcer_2/.
@@ -22,6 +25,10 @@ countdown. Those are facts and belong in `game.state` with a board or a sign
 reading them.
 
 ## API
+
+- `zone`: choose a Trigger Area, or leave empty for server announcements only.
+- `message`: the text shown locally when this player crosses that area.
+- `when`: enter or exit.
 
 There is nothing to import. The channel is one broadcast name every script
 already has:

@@ -7,7 +7,7 @@ export const ASSISTANT_ID = /^[a-zA-Z0-9-]{1,80}$/
 export const ASSISTANT_PROTOCOL = 'dcl-assistant-v1'
 export const ASSISTANT_TICKET_PREFIX = 'dcl-ticket.'
 
-export type BrowserToolName = 'list_files' | 'read_file' | 'write_file' | 'scene_request' | 'build' | 'view'
+export type BrowserToolName = 'list_files' | 'read_file' | 'write_file' | 'scene_request' | 'asset_request' | 'build' | 'view' | 'playtest'
 export interface BrowserToolCall {
   kind: 'call'
   turnId: string
@@ -17,6 +17,11 @@ export interface BrowserToolCall {
   // the assistant's own words for this step, shown as the turn's running status
   label?: string
 }
+
+export function isCatalogSearch(tool: BrowserToolName, args: Record<string, unknown>): boolean {
+  return tool === 'scene_request' && object(args.request) && args.request.type === 'findModels'
+}
+
 /** A conversation the service keeps encrypted between sessions; only the browser holds `key`. */
 export interface AssistantMemoryRef {
   id: string

@@ -146,7 +146,8 @@ export function transitiveModules(entryText: string, read: (rel: string) => stri
   const seen = new Set<string>()
   const queue = runtimeImportsOf(entryText)
   while (queue.length > 0) {
-    const rel = queue.shift() as string
+    let rel = queue.shift() as string
+    if (read(rel) === null && rel.endsWith('.ts') && read(`${rel}x`) !== null) rel += 'x'
     if (seen.has(rel)) continue
     const text = read(rel)
     if (text === null) throw new Error(`no master for runtime module '${rel}'`)

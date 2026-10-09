@@ -33,6 +33,7 @@ import {
   subtreeOf
 } from './scene-check-model'
 import type { SceneCheck, SceneCheckContext, SceneCheckPrefab, SceneFinding } from './scene-checks'
+import { sceneBoundsCheck } from './scene-check-bounds'
 
 export const CHECK_IDS = {
   shadowing: 'config-shadowing',
@@ -366,6 +367,7 @@ const prefabRuntimeImport: SceneCheck = (ctx) => {
 }
 
 export const BUILTIN_SCENE_CHECKS: ReadonlyArray<readonly [string, SceneCheck]> = [
+  ['outside-scene-bounds', sceneBoundsCheck],
   [CHECK_IDS.shadowing, configShadowing],
   [CHECK_IDS.serverPool, serverPoolMultiEntity],
   [CHECK_IDS.bespokeScript, bespokeScriptOnInstance],

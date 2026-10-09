@@ -286,8 +286,8 @@ async function main() {
       return [...sh.querySelectorAll('.eui-prefab-card')].some((e) => e.textContent.includes(${JSON.stringify(label)}))
     })()`), 60000, 1000)
 
-  await cardReady('Trigger Zone')
-  if (!(await evalIn(clickWhere('.eui-prefab-card', 'Trigger Zone')))) fail('place', 'Trigger Zone card click failed')
+  await cardReady('Trigger Area')
+  if (!(await evalIn(clickWhere('.eui-prefab-card', 'Trigger Area')))) fail('place', 'Trigger Area card click failed')
   await sleep(6000)
 
   const zoneId = await waitFor('trigger zone in the scene', () => evalIn(`(() => {

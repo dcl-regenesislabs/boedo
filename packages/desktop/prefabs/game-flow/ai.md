@@ -55,6 +55,12 @@ Params of the prefab's script — set them in the placePrefab request:
   it with `game.newRound()`, and the sign hides a clock it does not own).
 - `boardKey`: the `game.state` key the winners line is read from (default
   `'leaderboard'`). Point a Leaderboard at the same key.
+- `display`: `3D text` or `2D UI`. The screen timer uses UI Theme and includes
+  the lobby countdown, current round and intermission. No custom HUD is needed.
+- `position`: top, top left, top right or bottom, for the screen timer.
+
+For an individual obstacle-course timer use Run Progress. Game Flow owns shared
+rounds and restarts everyone on a new round; do not add it merely to show a stopwatch.
 
 ## Ending a round from a script
 

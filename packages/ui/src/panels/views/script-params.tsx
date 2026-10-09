@@ -16,6 +16,7 @@ import { prefabStore, refreshPrefabs } from '../prefab-store'
 import { NO_SPAWNABLES_YET } from '../../prefabs/copy'
 import { paramHint } from './param-visibility'
 import { hasSpawnablePrefabs, prefabRefOptions, refOf, refsOf } from './prefab-options'
+import { NamedEntityPicker } from './named-entity-picker'
 
 // Numbers are plain text inputs, not type="number": a native number field renders
 // its value through the OS locale, so 0.3 shows as "0,3" wherever the decimal mark
@@ -61,7 +62,7 @@ export function ParamField(props: {
               }}
             />
           )}
-          {param.type === 'string' && (
+          {param.type === 'string' && param.control === undefined && (
             <TextInput
               key={String(param.value)}
               defaultValue={param.value as string}
@@ -72,6 +73,18 @@ export function ParamField(props: {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
               }}
             />
+          )}
+          {param.type === 'string' && param.control === 'color' && <>
+            <input type="color" className="eui-color-swatch" aria-label={`${name} color`} value={String(param.value)} onChange={(e) => onChange(e.target.value)} />
+            <TextInput key={String(param.value)} defaultValue={String(param.value)} aria-label={`${name} hex`}
+              onBlur={(e) => {
+                if (/^#[\da-f]{6}$/i.test(e.target.value)) onChange(e.target.value.toUpperCase())
+                else e.target.value = String(param.value)
+              }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />
+          </>}
+          {param.type === 'string' && param.control !== undefined && param.control !== 'color' && (
+            <NamedEntityPicker name={name} value={String(param.value)} multiple={param.control === 'entityNames' || param.control === 'zones'}
+              zones={param.control === 'zone' || param.control === 'zones'} onChange={onChange} />
           )}
           {param.type === 'boolean' && (
             <Toggle size="sm" checked={param.value === true} onChange={(v) => onChange(v)} />

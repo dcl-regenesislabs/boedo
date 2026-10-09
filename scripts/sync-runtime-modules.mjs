@@ -85,7 +85,7 @@ export function importSpecifiers(text) {
 }
 
 function withTs(rel) {
-  return rel.endsWith('.ts') ? rel : `${rel}.ts`
+  return /\.tsx?$/.test(rel) ? rel : `${rel}.ts`
 }
 
 // Resolve `spec` (relative to `fromRel`, itself a path relative to some root) and
@@ -117,7 +117,8 @@ export function transitiveModules(entries, read) {
   const seen = new Set()
   const queue = [...entries]
   while (queue.length > 0) {
-    const rel = queue.shift()
+    let rel = queue.shift()
+    if (read(rel) == null && rel.endsWith('.ts') && read(`${rel}x`) != null) rel += 'x'
     if (seen.has(rel)) continue
     const text = read(rel)
     if (text === null || text === undefined) {

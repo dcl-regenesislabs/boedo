@@ -13,9 +13,10 @@ second copy is custom/server_clock_2/.
 
 ## When to use
 
-Any shared deadline or shared elapsed time: a round timer, a countdown, a daily
-event, a scoreboard's "started at". Also just to show the time. Needs an
-scene with a Multiplayer Server (data.json requiresSdk: auth-server).
+Show the current server time, or reuse its synchronization module for a custom
+shared deadline. For a ready-made round countdown use Game Flow with display
+"2D UI". For a player's elapsed course time use Run Progress. This prefab shows
+clock time; it does not start or end rounds. Needs a Multiplayer Server scene.
 
 ## API
 
@@ -39,6 +40,9 @@ Params of the prefab's script — set them in the placePrefab request:
 - position: where the 2D overlay sits — 'top' (default), 'top left', 'top right'
   or 'bottom'. Ignored for '3D text'.
 
+The overlay uses UI Theme. Multiple placed clocks keep their own label, time and
+position; choose different corners so they remain visible.
+
 ## Shared deadlines
 
 Express a deadline as an absolute server timestamp, share THAT, and derive the
@@ -61,7 +65,6 @@ countdown locally every frame:
 
 ## Example
 
-"Show a 60-second round timer everyone sees the same": place Server Clock (or
-call initTimeSync() in a script of your own), store endsAt as a server timestamp
-when the round starts, and render Math.ceil((endsAt - getServerTime()) / 1000)
-in update() while isTimeSyncReady().
+"Show a 60-second round timer everyone sees the same": place Game Flow with
+roundSeconds 60, countdownSeconds 3 and display "2D UI". Place UI Theme to choose
+its palette. Use Server Clock separately if the scene also needs the time of day.

@@ -58,9 +58,7 @@ afterEach(() => {
 })
 
 describe('writeScriptParamValues', () => {
-  // The whole reason this entry point exists: the gesture knows the entity it
-  // just right-clicked, and coercion by name can never resolve one.
-  it('writes an entity param, which coercion by name refuses', async () => {
+  it('writes an entity param already resolved by an inspector gesture', async () => {
     const problems: string[] = []
     const applied = await writeScriptParamValues('600', { when: 'when clicked', clickable: 512 }, problems)
     expect(problems).toEqual([])
@@ -109,6 +107,16 @@ describe('writeScriptParamValues', () => {
 describe('setScriptParams', () => {
   const prefabs: PrefabRefChoice[] = [{ id: 'z1', name: 'Zombie Basic', folder: 'custom/zombie_basic' }]
 
+  it('rejects an invalid theme color instead of saving an unusable palette', async () => {
+    place({ accent: { type: 'string', control: 'color', value: '#FF2D55' } })
+    const problems: string[] = []
+    await setScriptParams('600', { accent: 'red-ish' }, [], problems)
+    expect(writes).toHaveLength(0)
+    expect(problems[0]).toContain('#RRGGBB')
+    await setScriptParams('600', { accent: '#12aB90' }, [], [])
+    expect(paramsOf(rows(writes[0].json)[0]).accent.value).toBe('#12aB90')
+  })
+
   it('coerces a scalar against the declared type', async () => {
     const problems: string[] = []
     await setScriptParams('600', { atMostAtOnce: '5' }, prefabs, problems)
@@ -123,11 +131,30 @@ describe('setScriptParams', () => {
     expect(problems[0]).toContain('only accepts "when clicked", "when a player enters"')
   })
 
-  it('refuses an entity param by name, which is what writeScriptParamValues is for', async () => {
+  it.each(['Start Spawn', '544', 544])('wires an entity parameter from %s', async (reference) => {
+    state.snapshot = { ...state.snapshot, '544': { 'core-schema::Name': { value: 'Start Spawn' } } }
     const problems: string[] = []
-    await setScriptParams('600', { clickable: 'Front Door' }, prefabs, problems)
+    expect(await setScriptParams('600', { clickable: reference }, prefabs, problems)).toEqual(['clickable'])
+    expect(problems).toEqual([])
+    expect(paramsOf(rows(writes[0].json)[0]).clickable.value).toBe(544)
+  })
+
+  it('refuses missing or ambiguous entity references without changing the script', async () => {
+    state.snapshot = { ...state.snapshot,
+      '544': { 'core-schema::Name': { value: 'Start Spawn' } },
+      '545': { 'core-schema::Name': { value: 'Start Spawn' } }
+    }
+    const problems: string[] = []
+    await setScriptParams('600', { clickable: 'Start Spawn' }, prefabs, problems)
+    await setScriptParams('600', { clickable: 999 }, prefabs, problems)
     expect(writes).toHaveLength(0)
-    expect(problems[0]).toContain('is an entity picker, which only the inspector can set')
+    expect(problems[0]).toContain('ambiguous')
+    expect(problems[1]).toContain('does not exist')
+  })
+
+  it('clears an entity reference with zero', async () => {
+    await setScriptParams('600', { clickable: 0 }, prefabs, [])
+    expect(paramsOf(rows(writes[0].json)[0]).clickable.value).toBe(0)
   })
 
   it('resolves a prefab param from the name the assistant saw', async () => {

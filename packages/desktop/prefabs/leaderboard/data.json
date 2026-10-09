@@ -1,7 +1,7 @@
 {
   "id": "493daede-2afd-4c10-9c0d-6aefb25629a8",
   "name": "Leaderboard",
-  "description": "Shows one of your game's boards — point it at the game.state key your game writes the rows to. Works with: Game Flow.",
+  "description": "Show game scores or automatic Run Progress best times on a 3D panel or themed screen overlay.",
   "category": "custom",
   "group": "Multiplayer Server",
   "tags": [
@@ -13,12 +13,7 @@
     "board"
   ],
   "requiresSdk": "auth-server",
-  "drivenBy": {
-    "rule": "This panel only paints what it reads — the server writes the rows into the synced state key named in Board Key, and every client draws them in order.",
-    "code": "game.setState({ leaderboard: [{ player, score }] })",
-    "next": "Press New script below and write that line inside the isServer() block it comes with, using the same key you set in Board Key above."
-  },
-  "version": "1.1.0",
+  "version": "1.2.0",
   "changelog": [
     {
       "version": "1.0.0",
@@ -27,6 +22,10 @@
     {
       "version": "1.1.0",
       "notes": "The placed panel's Script card now shows the setState line that writes the rows it paints, under its own settings."
+    },
+    {
+      "version": "1.2.0",
+      "notes": "Themed screen overlay and automatic persisted best times from Run Progress."
     }
   ],
   "origin": {

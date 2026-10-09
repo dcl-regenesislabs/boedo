@@ -154,9 +154,11 @@ describe('per-prefab AI guides', () => {
       'game-flow',
       'health-respawn',
       'leaderboard',
+      'run-progress',
       'server-clock',
       'spawner',
-      'trigger-zone'
+      'trigger-zone',
+      'ui-theme'
     ])
   })
 
@@ -254,9 +256,12 @@ describe('per-prefab AI guides', () => {
       const scripts = new URL(`${folder}/scripts/`, PREFABS_ROOT)
       const sources = [
         ...filesUnder(scripts).map((rel) => readFileSync(new URL(rel, scripts), 'utf8')),
-        ...runtimeSpecifiers(folder).map((spec) =>
-          readFileSync(new URL(`${spec.slice('~runtime/'.length)}.ts`, MASTERS), 'utf8')
-        )
+        ...runtimeSpecifiers(folder).map((spec) => {
+          const rel = spec.slice('~runtime/'.length)
+          const file = filesUnder(MASTERS).find((name) => name === `${rel}.ts` || name === `${rel}.tsx`)
+          if (file === undefined) throw new Error(`Missing runtime module ${spec}`)
+          return readFileSync(new URL(file, MASTERS), 'utf8')
+        })
       ].join('\n')
       for (const tokens of Object.values(frontMatter(guide(folder)).claims)) {
         for (const token of tokens) {

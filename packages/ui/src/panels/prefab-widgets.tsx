@@ -8,7 +8,6 @@ import { Chip, LinkButton } from '../ds'
 import { useStore } from '../core/store'
 import { IconPlus, IconPrefab } from '../icons'
 import type { PrefabData } from '../prefabs/format'
-import type { GuaranteeChip } from '../prefabs/guarantees'
 import type { OutdatedPrefab } from '../prefabs/outdated'
 import {
   instancesOf,
@@ -115,8 +114,7 @@ export function PrefabRuntimeChips(props: {
   data: PrefabData
   /** every prefab instance in the scene, scanned once for the whole grid */
   instances: PlacementInstance[]
-  guarantees: GuaranteeChip[]
-  /** a card for a copy this project owns; a library master has no placement or guarantees yet */
+  /** a card for a copy this project owns; a library master has no placement yet */
   inProject: boolean
 }): JSX.Element | null {
   // Every prefab is spawnable, so saying so on every card says nothing. What a
@@ -136,19 +134,13 @@ export function PrefabRuntimeChips(props: {
           tone={count === 0 ? 'soon' : 'default'}
           tip={
             count === 0
-              ? 'No copy of this is in your scene. Your game can still spawn it — drag it in if you want one from the start.'
+              ? 'Click the card or drag it into the scene to place a copy.'
               : 'Copies of this prefab that are in your scene right now.'
           }
         >
-          {count === 0 ? 'Not in the scene' : `${count} in the scene`}
+          {count === 0 ? 'Ready to place' : `${count} in the scene`}
         </Chip>
       )}
-      {props.inProject &&
-        props.guarantees.map((chip) => (
-          <Chip key={chip.label} size="xs" tone={chip.tone} tip={chip.tip}>
-            {chip.label}
-          </Chip>
-        ))}
     </div>
   )
 }

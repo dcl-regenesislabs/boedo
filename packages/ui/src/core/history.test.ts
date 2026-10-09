@@ -36,7 +36,9 @@ import {
   redo,
   canUndo,
   canRedo,
-  isHistorySuppressed
+  isHistorySuppressed,
+  withHistorySuppressed,
+  clearHistory
 } from './history'
 import { type EntityRestore } from '@scene/inspector'
 
@@ -109,4 +111,15 @@ describe('undoing an entity delete', () => {
     expect(restored).toHaveLength(2)
     expect(s.live).toBe('901')
   })
+})
+
+it('keeps an outer creation gesture suppressed when an inner placement finishes', async () => {
+  clearHistory()
+  await withHistorySuppressed(async () => {
+    await withHistorySuppressed(async () => {})
+    pushHistory([{ entityId: '512', name: 'Name', after: { value: 'Message' } }])
+    expect(isHistorySuppressed()).toBe(true)
+    expect(canUndo()).toBe(false)
+  })
+  expect(isHistorySuppressed()).toBe(false)
 })

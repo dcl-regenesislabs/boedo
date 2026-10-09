@@ -714,7 +714,7 @@ folder there with a `data.json`). To add one, follow the
 
 ### The Multiplayer Server kit
 
-Five prefabs. All but the Spawner are
+Six prefabs. All but the Spawner are
 `requiresSdk: "auth-server"`; only Health & Respawn needs a scene permission,
 and the folder facts are guarded by
 `packages/ui/src/prefabs/builtin-kit.test.ts`. All but the Spawner carry
@@ -727,7 +727,7 @@ lands in any scene with a prefab). None imports another's
 folder — they meet on `globalThis` keys, `game.state` keys and message names,
 listed in `packages/desktop/runtime-modules/README.md`.
 
-**The game kit** — Game Flow, Health & Respawn, Announcer and Leaderboard are
+**The game kit** — Game Flow, Health & Respawn, Run Progress, Announcer and Leaderboard are
 built on `runtime-modules/game.ts`: they share the project's one copy of the
 `game` closure, they talk to each other only through `game.state` keys and `game.broadcast` /
 `game.onRequest` names, and their own contracts are guarded by
@@ -760,17 +760,35 @@ project copy filed to the library cannot vanish with it.
   drives nothing. Params: `roundSeconds`, `countdownSeconds`,
   `intermissionSeconds`, `minPlayers`, `endsWhen` (`timer` / `script`),
   `boardKey`.
-- **health-respawn** ("Health & Respawn") — hit points the game owns, in
-  `game.state.health` (`{wallet: points}`), so any screen can draw a bar or count
-  who is alive with a plain read. Other GREEN code hurts a player through the
-  exported `damage(player, amount)`; the 2 Hz sweep in the game notices a zero —
-  or a player below `dieBelowHeight`, the death plane, off at 0 — whispers
-  `respawn` to that one player with `{to}`, and refills them. Only that player's
-  own screen can move their avatar, which is why the respawn is a whisper and not
-  a broadcast; `respawnAt` is an entity Pick and its Transform position is read
-  straight, so the point belongs at the scene root. Params: `respawnAt`,
-  `maxHealth`, `dieBelowHeight`. The one kit prefab with a permission:
-  `ALLOW_TO_MOVE_PLAYER_INSIDE_SCENE`.
+- **health-respawn** ("Health & Respawn") — server-owned hit points in
+  `game.state.health` and death/life state in `game.state.healthLife`. Server
+  scripts can damage, heal or kill a player. The sweep detects lethal damage or
+  falling below `dieBelowHeight`, counts each death once, waits `respawnDelay`,
+  then refills health and targets that player's client with a respawn message.
+  The shared `respawn` module can supply a personal checkpoint destination;
+  otherwise the client uses `respawnAt`. `protectionSeconds` prevents damage and
+  repeated fall deaths while the server catches up with the move. Params:
+  `respawnAt`, `maxHealth`, `dieBelowHeight`, `respawnDelay`, `protectionSeconds`.
+  Requires `ALLOW_TO_MOVE_PLAYER_INSIDE_SCENE`.
+- **run-progress** ("Run Progress") — independently timed courses, backed by
+  server-validated Trigger Area entries. Ordered checkpoints, one pickup per
+  collectible, a finish that requires every goal, personal best time and a
+  personal restart all share `runtime/runs.ts`. Health & Respawn performs the
+  moves, while `runtime/gameHud.tsx` draws controls, progress and results.
+  Local entries predict HUD progress and hide collected visuals immediately;
+  server state confirms them, and rejection or expiry rolls them back.
+  Keep custom-script visuals on plain entities and name them in `collectibleVisuals`
+  so updating a Trigger Area cannot remove them.
+  Configure named areas and safe markers in its inspector; static geometry
+  stays authored and editable. The bundled moving-platform script animates an
+  authored platform from the shared clock. Its guide describes the setup and
+  the playthrough needed to verify the route.
+- **ui-theme** ("UI Theme") — one per scene: an accent color and Dark/Light
+  appearance that Run Progress, Announcer and the 2D displays of Game Flow,
+  Server Clock and Leaderboard draw with, through `runtime/uiTheme.ts` and
+  `runtime/uiComponents.tsx`. Edits preview while paused. Custom HUDs reuse the
+  same palette and pass `UI_CANVAS` so they keep clear of the Explorer's
+  reserved screen space. Params: `accentColor`, `appearance`.
 - **announcer** ("Announcer") — one line on every player's client for a few
   seconds, drawn with `@dcl/sdk/react-ecs`. It registers the single blue handler
   for the `announce` name; green code anywhere calls

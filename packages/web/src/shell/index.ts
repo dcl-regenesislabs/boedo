@@ -24,7 +24,7 @@ import type {
 } from '@dcl-editor/contract'
 import { TRASH_DAYS, copySuffix, object } from '@dcl-editor/contract'
 import { contentCid } from '@dcl-editor/contract/cid'
-import { LOCK_FILE, PREVIEW_CACHE_NAME, PREVIEW_STORAGE_CACHE_NAME, fetchVerified, lockedKey, parseLock } from '@dcl-editor/web-build'
+import { LOCK_FILE, PREVIEW_CACHE_NAME, PREVIEW_STORAGE_CACHE_NAME, assetPacksStubUpgrades, fetchVerified, lockedKey, parseLock } from '@dcl-editor/web-build'
 import { notify } from '@scene/reactive'
 import { hostV1 } from '@ui/engine/hosted'
 import { persistReady } from '@ui/core/persist'
@@ -35,7 +35,10 @@ import { state } from '@scene/state'
 import { browserSceneRequest } from '../ai/scene'
 import { sameBytes } from '../ai/tools'
 import { captureView } from '../ai/view'
+import { createAssetRequests } from '../ai/assets'
 import { runFreshBuild } from '@ui/actions/verify-build'
+import { flushPendingSave } from '@ui/core/autosave'
+import { playtest } from '../ai/playtest'
 import { externalDependencies } from '../archive/dependencies'
 import { createPublisher } from '../publish/publish'
 import { publishWorlds } from '../publish/worlds'
@@ -50,6 +53,7 @@ import { runtimeTypes, sceneTemplates, templateFiles } from './bundled'
 import { type ProjectFiles, createPrefabLibrary, parseRef } from './prefab-library'
 import { type Preview, browserSecret, createPreviews, previewMachineId } from './preview'
 import { relayServerLogs } from './server-logs'
+import { waitForPreviewLayout } from './preview-layout'
 import { createUserPrefabs } from './user-prefabs'
 import { fileIntegrity } from '../workers'
 import {
@@ -78,6 +82,15 @@ const MAX_NAME = 100
 const SIGN_IN_FOR_LIBRARY = 'Sign in to keep prefabs in your own library. The built-in prefabs work without it.'
 
 const describe = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+
+function previewReady(scene: RawSceneJson, realmUrl: string): ServersReady {
+  return {
+    realm: realmUrl.replace(/\/$/, ''), systemScene: '',
+    position: scene.scene?.base ?? scene.scene?.parcels?.[0] ?? '0,0',
+    spawn: spawnWorldPosition(scene),
+    spawnPoints: JSON.stringify(Array.isArray(scene.spawnPoints) ? scene.spawnPoints : [])
+  }
+}
 
 export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
   const store = new ProjectStore(browserBackend())
@@ -181,26 +194,37 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
         tools: {
           files: () => open.files,
           write: (path, bytes, expected, signal) => writeFile(open.id, path, bytes, { expected, signal }),
+          assets: createAssetRequests({
+            files: () => open.files,
+            write: (path, bytes, expected, signal) => writeFile(open.id, path, bytes, { expected, signal })
+          }),
           scene: (request, signal) =>
             browserSceneRequest(request, signal, async (settings) => {
               const layout = (raw: ReturnType<typeof parseSceneJson>) => JSON.stringify([raw?.scene?.parcels, raw?.scene?.base])
+              await flushPendingSave()
               const before = layout(parseSceneJson(await readFile(open.id, 'scene.json')))
               await editSceneJson(open.id, (raw) => applyAssistantSettings(raw, settings))
               const raw = parseSceneJson(await readFile(open.id, 'scene.json'))
               const moved = layout(raw) !== before
-              if (moved) {
-                relaunch = { id: open.id, done: false, timer: undefined }
-                // the editor's bounds follow the new parcels at once; the engine's follow the relaunch
-                if (state.scene !== undefined) state.scene = { ...state.scene, parcels: (raw?.scene?.parcels ?? []).map((p) => ({ x: Number(p.split(',')[0]), y: Number(p.split(',')[1]) })) }
+              const parcels = raw?.scene?.parcels ?? []
+              const live = state.scene?.parcels.map(p => `${p.x},${p.y}`).sort().join(';')
+              if (moved || live !== [...parcels].sort().join(';')) {
+                if (!(await open.flush())) throw new Error('The scene did not build. Fix the code and retry sceneSettings to load the new parcels.')
+                signal.throwIfAborted()
+                const realmId = await previewIdOf(open.id)
+                ready = previewReady(raw ?? {}, previews.realmUrl(realmId))
+                await waitForPreviewLayout(parcels, () => {
+                  for (const listener of readyListeners) listener(ready!)
+                }, signal)
               }
               return {
                 requiredPermissions: raw?.requiredPermissions ?? [], spawnPoints: raw?.spawnPoints ?? [],
-                parcels: raw?.scene?.parcels ?? [], base: raw?.scene?.base ?? null,
-                ...(moved ? { note: 'The scene relaunches with these parcels when this turn ends; until then pictures show only the old parcels, so build on and look at the whole tower on the next turn.' } : {})
+                parcels, base: raw?.scene?.base ?? null, previewReady: true
               }
             }),
           written: scriptAttacher(),
           view: (request, signal) => captureView(request, signal),
+          playtest,
           build: async (signal) => {
             signal.throwIfAborted()
             await fileWrites
@@ -324,24 +348,6 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
     notify()
   }
   void probeAssistant()
-  // new parcels feed the engine's launch: relaunch once the turn is over and its chat is kept,
-  // since relaunching mid-turn cuts the assistant off and before the save loses what it said
-  let relaunch: { id: string; done: boolean; timer: ReturnType<typeof setTimeout> | undefined } | null = null
-  function relaunchNow(): void {
-    if (relaunch === null) return
-    const { id, timer } = relaunch
-    clearTimeout(timer)
-    relaunch = null
-    let still = false
-    try { still = project().id === id } catch { still = false }
-    if (still) void transition((mine) => open(id, mine))
-  }
-  assistant.shell.onAiEvent((event) => {
-    if (event.kind !== 'done' || relaunch === null) return
-    relaunch.done = true
-    // no chat to keep (no account, or it failed to save): relaunch anyway
-    relaunch.timer = setTimeout(relaunchNow, 3000)
-  })
   // signing in or out changes whose copy the projects are compared with
   let signedInAs = wallet()
   const accountPoll = setInterval(() => {
@@ -408,7 +414,13 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
         fail('This scene is open in another tab. Close it there to edit it here.')
         return
       }
-      const files = await store.readAll(id).catch((error: unknown) => {
+      const files = await store.readAll(id).then(async (files) => {
+        for (const [path, bytes] of assetPacksStubUpgrades(files)) {
+          await writeFile(id, path, bytes)
+          files.set(path, bytes)
+        }
+        return files
+      }).catch((error: unknown) => {
         store.close(id)
         throw error
       })
@@ -440,13 +452,7 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
         return
       }
       const scene = parseSceneJson(preview.files.get('scene.json')) ?? {}
-      ready = {
-        realm: realmUrl.replace(/\/$/, ''),
-        systemScene: '',
-        position: scene.scene?.base ?? scene.scene?.parcels?.[0] ?? '0,0',
-        spawn: spawnWorldPosition(scene),
-        spawnPoints: JSON.stringify(Array.isArray(scene.spawnPoints) ? scene.spawnPoints : [])
-      }
+      ready = previewReady(scene, realmUrl)
       stopServerLogs = relayServerLogs((line) => host.engineConsole(line), log)
       for (const listener of readyListeners) listener(ready)
     } catch (error) {
@@ -552,10 +558,7 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
         return {
           owner: `${id}@${signedIn.toLowerCase()}`,
           load: () => store.transcript(id, signedIn),
-          save: async (messages) => {
-            await store.setTranscript(id, signedIn, messages)
-            if (relaunch?.done === true && relaunch.id === id) relaunchNow()
-          }
+          save: (messages) => store.setTranscript(id, signedIn, messages)
         }
       }
     }),

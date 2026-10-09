@@ -1,5 +1,5 @@
 import { object } from '@dcl-editor/contract'
-import { state, componentKey, isUiEntity } from '@scene/state'
+import { state, componentKey, isUiEntity, isRuntimeEntity, provenanceBaseline } from '@scene/state'
 import { buildFromSchema, getSchema, type ComponentSchema } from '@scene/schema'
 import { cmd } from '@ui/engine/cmd'
 import { entityName, NAME_COMPONENT } from '@scene/custom-components'
@@ -128,7 +128,16 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
   if (request.type === 'check') {
     // the editor's own scene checks, as the Scene checks card shows them
     const findings = await refreshSceneChecks()
+    const baseline = provenanceBaseline()
+    const authored = Object.entries(state.snapshot).filter(([id]) => Number(id) >= 512 && !isRuntimeEntity(id, baseline))
+    const models = authored.filter(([, c]) => object(c.GltfContainer) && typeof c.GltfContainer.src === 'string')
     return {
+      visuals: {
+        modelEntities: models.length,
+        modelPaths: [...new Set(models.map(([, c]) => (c.GltfContainer as { src: string }).src))],
+        primitiveEntities: authored.filter(([, c]) => c.MeshRenderer !== undefined).length
+      },
+      liveParcels: state.scene?.parcels ?? [],
       findings: findings.map((f) => ({
         level: f.level, title: f.title, detail: f.detail,
         ...(f.entityId === undefined ? {} : { entity: entityName(state.snapshot, f.entityId) ?? f.entityId })

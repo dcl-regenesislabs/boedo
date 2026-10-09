@@ -13,7 +13,7 @@ const { setValue, deleteValue, status } = vi.hoisted(() => {
 vi.mock('@scene/state', () => ({
   state: { snapshot: { '512': {} }, frozen: true, selected: new Set(), editStatus: status, activeEntity: null, schemas: new Map() },
   componentKey: (id: string, name: string) => `${id}:${name}`,
-  isUiEntity: () => false
+  isUiEntity: () => false, isRuntimeEntity: () => false, provenanceBaseline: () => null
 }))
 vi.mock('@scene/custom-components', () => ({ entityName: () => 'Box', NAME_COMPONENT: 'core::Name' }))
 vi.mock('@ui/engine/cmd', () => ({ cmd: { componentSchema: () => Promise.reject(new Error('no engine')) } }))
@@ -40,6 +40,7 @@ describe('assistant scene requests', () => {
 
   it('answers check with the editor\'s findings, naming the entity each one is about', async () => {
     expect(await browserSceneRequest({ type: 'check' }, new AbortController().signal)).toEqual({
+      visuals: { modelEntities: 0, modelPaths: [], primitiveEntities: 0 }, liveParcels: [],
       findings: [{ level: 'blocker', title: 'Nothing picked', detail: 'Pick a prefab', entity: 'Box' }]
     })
   })
@@ -73,4 +74,3 @@ describe('assistant scene requests', () => {
     expect(deleteValue).toHaveBeenCalledTimes(1)
   })
 })
-

@@ -1,4 +1,4 @@
-import { ASSISTANT_ID, ASSISTANT_PROTOCOL, ASSISTANT_TICKET_PREFIX, object } from '@dcl-editor/contract'
+import { ASSISTANT_ID, ASSISTANT_PROTOCOL, ASSISTANT_TICKET_PREFIX, isCatalogSearch, object } from '@dcl-editor/contract'
 import type { AiEvent, AiProviderInfo, AiSendParams, AssistantClientMessage, AssistantMemoryRef, BrowserToolCall, EditorShell } from '@dcl-editor/contract'
 import type { HostFetchInit } from '@ui/engine/hosted'
 import { createBrowserTools } from './tools'
@@ -47,7 +47,9 @@ export function createBrowserAssistant(options: {
     switch (call.tool) {
       case 'write_file': return null
       case 'read_file': return { tool: 'Read', detail: typeof call.args.path === 'string' ? call.args.path : '' }
+      case 'asset_request': return { tool: 'Assets', detail: String(call.args.action ?? '') }
       case 'build': return { tool: 'Build', detail: 'Scene' }
+      case 'playtest': return { tool: 'Playtest', detail: String(call.args.action ?? '') }
       case 'scene_request':
         if (request.type === 'batch' && Array.isArray(request.requests)) return { tool: 'Scene', detail: `${request.requests.length} changes` }
         if (request.type === 'sceneSettings') return { tool: 'Scene', detail: 'Settings' }
@@ -111,12 +113,18 @@ export function createBrowserAssistant(options: {
     if (!object(message)) return
     if (message.kind === 'failure' && typeof message.message === 'string') { finish(false, message.message); return }
     if (message.kind === 'call' && typeof message.turnId === 'string' && typeof message.callId === 'string' &&
-      ASSISTANT_ID.test(message.callId) && ['list_files', 'read_file', 'write_file', 'scene_request', 'build', 'view'].includes(String(message.tool)) && object(message.args)) {
+      ASSISTANT_ID.test(message.callId) && ['list_files', 'read_file', 'write_file', 'scene_request', 'asset_request', 'build', 'view', 'playtest'].includes(String(message.tool)) && object(message.args)) {
       const { label, ...rest } = message as unknown as Omit<BrowserToolCall, 'label'> & { label?: unknown }
       const call: BrowserToolCall = typeof label === 'string' ? { ...rest, label } : rest
       if (active === null || active.id !== call.turnId || active.calls.has(call.callId)) return
       active.calls.add(call.callId)
-      toolQueue = toolQueue.then(() => runTool(call)).catch(() => finish(false, 'The browser tool failed.'))
+      const parallel = isCatalogSearch(call.tool, call.args)
+      const result = (parallel ? Promise.resolve() : toolQueue)
+        .then(() => runTool(call)).catch((error: unknown) => {
+          console.error('[assistant] browser tool failed', call.tool, error)
+          if (active?.id === call.turnId) finish(false, 'The browser tool failed.')
+        })
+      if (!parallel) toolQueue = result
       return
     }
     if (message.kind !== 'event' || !object(message.event)) return

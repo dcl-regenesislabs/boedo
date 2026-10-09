@@ -1,0 +1,27 @@
+{
+  "id": "8ea22784-81dd-4d60-b0ae-54fef4852fb7",
+  "name": "Run Progress",
+  "description": "Timed runs with per-player checkpoints, collectibles, finish conditions, restart and a configurable HUD.",
+  "category": "custom",
+  "group": "Multiplayer Server",
+  "tags": [
+    "course",
+    "race",
+    "checkpoint",
+    "collectible",
+    "timer",
+    "hud",
+    "restart"
+  ],
+  "requiresSdk": "auth-server",
+  "version": "1.0.0",
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "notes": "Timed course runs with per-player checkpoints, collectible goals, restart, best times, a persisted leaderboard and a themed HUD."
+    }
+  ],
+  "origin": {
+    "source": "builtin"
+  }
+}

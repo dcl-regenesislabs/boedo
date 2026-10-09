@@ -1,32 +1,53 @@
 
-/* Docked workspace (editor-app bundle only — the in-page editor keeps the
-   floating 12px layout from base.css). A solid topbar spans the top and the
-   panels anchor flush to the window edges; --topbar-h is the single source for
-   every offset that used to hardcode 46/54/58px, --edge-pad zeroes the float
-   inset the resize handles compute against. */
-.eui-root { --topbar-h: 52px; --edge-pad: 0px; }
-.eui-left, .eui-right-col, .eui-left-resize, .eui-right-resize { top: var(--topbar-h); bottom: 0; }
-.eui-left { left: 0; }
+/* Docked workspace: the desktop editor-app's root carries .eui-docked. A solid topbar
+   spans the top and the panels anchor flush to the window edges; --topbar-h is the
+   single source for every offset, --edge-pad zeroes the float inset the resize
+   handles compute against. In the web editor the panels keep base.css's floating
+   layout, over the world, below the topbar. */
+.eui-root { --topbar-h: 52px; }
+.eui-root:not(.eui-docked) .eui-left, .eui-root:not(.eui-docked) .eui-right-col,
+.eui-root:not(.eui-docked) .eui-left-resize, .eui-root:not(.eui-docked) .eui-right-resize {
+  top: calc(var(--topbar-h) + 12px);
+}
+/* web: the inspector and the assistant are one floating card, split by a divider;
+   with both minimized it shrinks to their two headers so the world shows below */
+.eui-root:not(.eui-docked) .eui-right-col {
+  gap: 0; pointer-events: auto; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--divider);
+  border-radius: var(--r-panel); box-shadow: var(--shadow-panel);
+}
+.eui-root:not(.eui-docked) .eui-right-col > .eui-panel,
+.eui-root:not(.eui-docked) .eui-right-col > .eui-ai-panel:not(.studio) {
+  border: 0; border-radius: 0; box-shadow: none; animation: none;
+}
+.eui-root:not(.eui-docked) .eui-right-col > .eui-ai-panel:not(.studio) { border-top: 1px solid var(--divider); }
+.eui-root:not(.eui-docked) .eui-right-col:not(:has(> .eui-panel:not(.min), > .eui-ai-panel:not(.min))) { bottom: auto; }
+.eui-docked { --edge-pad: 0px; }
+.eui-docked .eui-left, .eui-docked .eui-right-col, .eui-docked .eui-left-resize, .eui-docked .eui-right-resize { top: var(--topbar-h); bottom: 0; }
+.eui-docked .eui-left { left: 0; }
 /* The dock IS the surface: full height whatever its panels do, so minimizing
    both leaves a title bar over its own column rather than two bars floating in
    the viewport. It draws the edge and takes the clicks; the panels inside are
    transparent partitions of it. */
-.eui-right-col {
+.eui-docked .eui-right-col {
   right: 0; gap: 0; pointer-events: auto;
   background: var(--paper); border-left: 1px solid var(--divider);
 }
 /* flush panels: square corners, no float chrome, no borders of their own —
    the column owns the outer edge, each panel only its top divider */
-.eui-left, .eui-right-col > .eui-panel, .eui-ai-panel { border-radius: 0; box-shadow: none; animation: none; }
-.eui-left { border-width: 0 1px 0 0; }
-.eui-right-col > .eui-panel { border: 0; }
-.eui-ai-panel { border-left: 0; }
+.eui-docked .eui-left, .eui-docked .eui-right-col > .eui-panel, .eui-docked .eui-ai-panel { border-radius: 0; box-shadow: none; animation: none; }
+.eui-docked .eui-left { border-width: 0 1px 0 0; }
+/* the docks fill the band under the auto-hidden topbar with its colour, so hiding it
+   leaves no strip of 3D view above them and nothing moves when it reappears */
+.eui-docked .eui-left, .eui-docked .eui-right-col { box-shadow: 0 calc(0px - var(--topbar-h)) 0 var(--paper); }
+.eui-docked .eui-right-col > .eui-panel { border: 0; }
+.eui-docked .eui-ai-panel { border-left: 0; }
 .eui-toolbar { top: calc(var(--topbar-h) + 10px); }
 .eui-boot { top: calc(var(--topbar-h) + 10px); }
 /* docked tab strip: full-bleed tabs over a hairline, not a floating card's
    rounded top edge */
-.eui-left-tabs { gap: 0; padding: 0; border-bottom: 1px solid var(--divider); }
-.eui-ltab { padding: 12px 0; border-radius: 0; margin-bottom: -1px; }
+.eui-docked .eui-left-tabs { gap: 0; padding: 0; border-bottom: 1px solid var(--divider); }
+.eui-docked .eui-ltab { padding: 12px 0; border-radius: 0; margin-bottom: -1px; }
 
 /* ---- scene loading / engine-init overlay ----
    A full-window surface: it owns the whole window to say one short sentence, so
@@ -75,6 +96,20 @@
   display: flex; align-items: center; gap: 10px; padding: 0 12px;
   background: var(--paper); border-bottom: 1px solid var(--divider);
   font-family: var(--font-family);
+}
+@media (hover: hover) and (pointer: fine) {
+  .eui-topbar {
+    opacity: 0; pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+  /* status the creator must always see keeps the bar up */
+  .eui-topbar.near, .eui-topbar:hover, .eui-topbar:focus-within,
+  .eui-topbar:has(.eui-ctx, [role="dialog"], [role="alert"], .eui-sync-conflict, .eui-topbar-publish.busy, .eui-update-dot) {
+    opacity: 1; pointer-events: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .eui-topbar { transition: none; }
 }
 .eui-topbar-home, .eui-topbar-btn {
   display: flex; align-items: center; justify-content: center;

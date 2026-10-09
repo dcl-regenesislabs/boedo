@@ -75,6 +75,7 @@ export async function toggleSceneUi(auto = false): Promise<void> {
 // After a restart the scene redraws its UI from code — the hide is gone and the
 // saved values point at entity ids that may no longer exist.
 export function resetSceneUi(): void {
+  hideGeneration++
   saved.clear()
   sceneUi.hidden = false
   autoHidden = false
@@ -87,6 +88,7 @@ export function resetSceneUi(): void {
 let userOverride = false
 
 export async function releaseAutoHiddenSceneUi(): Promise<void> {
+  hideGeneration++
   if (userOverride || !autoHidden || !sceneUi.hidden) return
   autoHidden = false
   await toggleSceneUi(true)
@@ -96,11 +98,13 @@ export async function releaseAutoHiddenSceneUi(): Promise<void> {
 // with it hidden. UI roots only exist once the scene's code has run, so poll
 // briefly rather than racing it.
 let autoHidden = false
+let hideGeneration = 0
 export function autoHideSceneUi(): void {
   if (userOverride || autoHidden || sceneUi.hidden) return
+  const generation = ++hideGeneration
   let tries = 0
   const tick = (): void => {
-    if (userOverride || autoHidden || sceneUi.hidden) return
+    if (generation !== hideGeneration || !state.frozen || userOverride || autoHidden || sceneUi.hidden) return
     if (uiRoots().length > 0) {
       autoHidden = true
       void toggleSceneUi(true)

@@ -20,7 +20,7 @@ import { playerPosition, sceneLocalPosition } from './playerPositions'
 import { interval } from './schedule'
 import { knowsSpawnable, pool, snapshotRootComponent, spawnableName, type Pool } from './spawner'
 import { getServerTime, initTimeSync } from './timeSync'
-import { onZone, zoneNames as publishedZones } from './zoneBus'
+import { isInZone, onZone, zoneNames as publishedZones } from './zoneBus'
 import { createRng, type Rng } from './pure/rng'
 import { zoneKey } from './pure/zoneRegistry'
 import {
@@ -152,6 +152,7 @@ interface GameDriver {
   flush: FlushDebouncer
   /** client: zone keys already subscribed on the zone bus */
   watchedZones: Set<string>
+  localAreaFns: Map<string, Set<(result: Promise<boolean>) => void>>
   /** server: dt accumulator for the 4 Hz zone sweep */
   sweepAccum: number
   /** client: prefab → its seeded-layout plan, rebuilt per round */
@@ -210,6 +211,7 @@ function createDriver(): GameDriver {
     dirtyPlayers: new Map<Player, Record<string, unknown>>(),
     flush: new FlushDebouncer(),
     watchedZones: new Set<string>(),
+    localAreaFns: new Map(),
     sweepAccum: 0,
     layouts: new Map<string, LayoutSpec>(),
     lifeSaid: null,
@@ -351,7 +353,7 @@ function makePorts(self: () => GameDriver): CorePorts {
 
 function savedStore(d: GameDriver): ServerState<Record<string, unknown>> {
   if (d.saved === null) {
-    d.saved = serverState<Record<string, unknown>>({ key: SAVED_STORE_KEY, defaults: () => ({}), persist: true })
+    d.saved = serverState<Record<string, unknown>>({ key: SAVED_STORE_KEY, defaults: () => ({}), persist: true, preserveUnknownFields: true })
   }
   return d.saved
 }
@@ -526,20 +528,36 @@ function watchZone(d: GameDriver, zone: string): void {
   const key = zoneKey(zone)
   if (key === '' || d.watchedZones.has(key)) return
   d.watchedZones.add(key)
+  let visit = 0
   onZone(zone, 'any', (event) => {
     if (!event.local) return
-    void claimZone(d, zone, event.kind)
+    const current = ++visit
+    const result = claimZone(d, zone, event.kind, () => current === visit && isInZone(zone))
+    if (event.kind === 'enter') {
+      for (const fn of d.localAreaFns.get(key) ?? []) fn(result)
+    }
   })
 }
 
-// A refused claim is an answer (outside, or an area no script listens to) — the
-// server-side callback simply never fires; there is nothing to surface.
-async function claimZone(d: GameDriver, zone: string, kind: 'enter' | 'exit'): Promise<void> {
+// Trigger edges can arrive before the server's lower-frequency avatar position.
+async function claimZone(d: GameDriver, zone: string, kind: 'enter' | 'exit', stillInside: () => boolean, retries = 3): Promise<boolean> {
+  let reply: unknown
   try {
-    await sendRequest(d, ZONE_REQUEST, JSON.stringify({ zone, kind }))
-  } catch {
-    // refused or transport down — deliberately quiet
+    reply = await sendRequest(d, ZONE_REQUEST, JSON.stringify({ zone, kind }))
+  } catch (e) {
+    console.error(`[runtime] zone claim "${zone}" failed:`, e)
+    return false
   }
+  if (typeof reply !== 'object' || reply === null) return false
+  if ('ok' in reply && reply.ok === true) return true
+  const stale = 'reason' in reply && reply.reason === 'outside'
+  if (!stale || kind !== 'enter' || retries === 0 || !stillInside()) return false
+  return new Promise((resolve) => {
+    const stop = interval(0.25, () => {
+      stop()
+      resolve(stillInside() ? claimZone(d, zone, kind, stillInside, retries - 1) : false)
+    })
+  })
 }
 
 function armTick(d: GameDriver): void {
@@ -797,6 +815,15 @@ export const game = {
    */
   onEnterArea(zone: string, fn: (player: Player) => void | Promise<void>): void {
     driver().core.onEnterArea(zone, fn)
+  },
+  /** Local presentation only. The promise resolves after server area validation, not game-rule acceptance. */
+  onLocalAreaEnter(zone: string, fn: (result: Promise<boolean>) => void): () => void {
+    const d = driver()
+    const key = zoneKey(zone)
+    const listeners = d.localAreaFns.get(key) ?? new Set()
+    listeners.add(fn)
+    d.localAreaFns.set(key, listeners)
+    return () => { listeners.delete(fn) }
   },
   /** Feet, about 10 times per second — for generous checks only. */
   positionOf(player: Player): Vec3 | null {

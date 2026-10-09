@@ -78,6 +78,9 @@ function useElementHeight(el: HTMLElement | null): number {
 }
 
 export function App(): JSX.Element {
+  const phase = useStore(getBootPhase)
+  const viewport = useStore(isViewportReady)
+  const ready = phase === 'ready'
   const frozen = useStore(() => state.frozen)
   const playEditWarn = useStore(() => state.playEditWarn)
   const deleteConfirm = useStore(() => state.deleteConfirm)
@@ -117,14 +120,14 @@ export function App(): JSX.Element {
   // full-screen from inside this same column and survives the dock being hidden.
   const rightCol = (
     <>
-      <div ref={setColEl} className="eui-right-col" style={{ width: rightWidth }} hidden={!rightOpen && aiMode !== 'studio'}>
-        {rightOpen && <InspectorPanel min={inspectorMin} onToggleMin={() => setInspectorMin(!inspectorMin)} />}
-        {rightOpen && splitShown && (
+      <div ref={setColEl} className="eui-right-col" style={{ width: rightWidth }} hidden={(!rightOpen && aiMode !== 'studio') || (!ready && !studioHere)}>
+        {ready && rightOpen && <InspectorPanel min={inspectorMin} onToggleMin={() => setInspectorMin(!inspectorMin)} />}
+        {ready && rightOpen && splitShown && (
           <Splitter label="Resize inspector and assistant" value={dockHeight} min={DOCK_MIN_H} max={dockMax} onChange={setAiHeight} />
         )}
-        {studioHere && <AiPanel shown={rightOpen} fill={inspectorMin} height={dockHeight} />}
+        {studioHere && <AiPanel shown={rightOpen} fill={!ready || inspectorMin} height={dockHeight} />}
       </div>
-      {rightOpen && <RightResize width={rightWidth} onResize={setRightWidth} />}
+      {rightOpen && (ready || studioHere) && <RightResize width={rightWidth} onResize={setRightWidth} />}
     </>
   )
   const showPrefabs = (): void => {
@@ -152,14 +155,10 @@ export function App(): JSX.Element {
     setLeftView('scene')
   }, [renamePending])
 
-  const phase = useStore(() => getBootPhase())
-  const viewport = useStore(isViewportReady)
-  // The assistant needs nothing from the editor scene — and a scene too broken to
-  // attach is exactly when the creator needs it, to fix the code that is breaking
-  // it. So the dock comes up alongside the boot pill, without the inspector.
-  if (phase !== 'ready') {
-    return (
-      <>
+  return (
+    <>
+      {rightCol}
+      {!ready ? (
         <div className="eui-boot">
           {phase === 'waiting-engine'
             ? 'Editor — waiting for engine…'
@@ -167,60 +166,49 @@ export function App(): JSX.Element {
               ? 'Attaching editor tools…'
               : 'Editor — waiting for scene…'}
         </div>
-        {studioHere && (
-          <>
-            <div className="eui-right-col" style={{ width: rightWidth }} hidden={!rightOpen && aiMode !== 'studio'}>
-              <AiPanel shown={rightOpen} fill height={dockHeight} />
+      ) : (
+        <>
+          <PrefabDropLayer />
+          <Toolbar
+            leftOpen={leftOpen}
+            rightOpen={rightOpen}
+            onToggleLeft={() => setLeftOpen(!leftOpen)}
+            onToggleRight={toggleRightPanel}
+            onShortcuts={() => setShortcutsOpen(true)}
+          />
+          {leftOpen &&
+            (leftView === 'scene' ? (
+              <HierarchyPanel
+                width={leftWidth}
+                onNewEntity={() => setNewEntityOpen(true)}
+                onCreatePrefab={() => setCreatePrefab(true)}
+                onView={setLeftView}
+              />
+            ) : leftView === 'prefabs' ? (
+              <PrefabsPanel
+                width={leftWidth}
+                onView={setLeftView}
+                onCreatePrefab={() => setCreatePrefab(true)}
+              />
+            ) : (
+              <AssetsPanel width={leftWidth} onView={setLeftView} />
+            ))}
+          {leftOpen && <LeftResize width={leftWidth} onResize={setLeftWidth} />}
+          {!frozen && (
+            <div className="eui-play-frame" aria-hidden>
+              <span className="eui-play-badge">● PLAYING — changes won’t be saved</span>
             </div>
-            {rightOpen && <RightResize width={rightWidth} onResize={setRightWidth} />}
-          </>
-        )}
-      </>
-    )
-  }
-
-  return (
-    <>
-      <PrefabDropLayer />
-      <Toolbar
-        leftOpen={leftOpen}
-        rightOpen={rightOpen}
-        onToggleLeft={() => setLeftOpen(!leftOpen)}
-        onToggleRight={toggleRightPanel}
-        onShortcuts={() => setShortcutsOpen(true)}
-      />
-      {leftOpen &&
-        (leftView === 'scene' ? (
-          <HierarchyPanel
-            width={leftWidth}
-            onNewEntity={() => setNewEntityOpen(true)}
-            onCreatePrefab={() => setCreatePrefab(true)}
-            onView={setLeftView}
-          />
-        ) : leftView === 'prefabs' ? (
-          <PrefabsPanel
-            width={leftWidth}
-            onView={setLeftView}
-            onCreatePrefab={() => setCreatePrefab(true)}
-          />
-        ) : (
-          <AssetsPanel width={leftWidth} onView={setLeftView} />
-        ))}
-      {leftOpen && <LeftResize width={leftWidth} onResize={setLeftWidth} />}
-      {rightCol}
-      {!frozen && (
-        <div className="eui-play-frame" aria-hidden>
-          <span className="eui-play-badge">● PLAYING — changes won’t be saved</span>
-        </div>
+          )}
+          <Toast />
+          {newEntityOpen && <NewEntityDialog onClose={() => setNewEntityOpen(false)} />}
+          {createPrefab && (
+            <CreatePrefabDialog onClose={() => setCreatePrefab(false)} />
+          )}
+          {playEditWarn && <PlayEditWarningDialog />}
+          {deleteConfirm !== null && <DeleteEntityDialog />}
+          {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}
+        </>
       )}
-      <Toast />
-      {newEntityOpen && <NewEntityDialog onClose={() => setNewEntityOpen(false)} />}
-      {createPrefab && (
-        <CreatePrefabDialog onClose={() => setCreatePrefab(false)} />
-      )}
-      {playEditWarn && <PlayEditWarningDialog />}
-      {deleteConfirm !== null && <DeleteEntityDialog />}
-      {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}
     </>
   )
 }

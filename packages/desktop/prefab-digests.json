@@ -4,8 +4,8 @@
     "digest": "7ea2a6f281d01189ce5bbd013825e0c6ff5bba6608c5e977859d273ef7c76b8d"
   },
   "announcer": {
-    "version": "1.1.0",
-    "digest": "9ceb1f4c32dc496e49593d940726adbefb4939d3cdc661ac17f9776736156d2b"
+    "version": "1.2.0",
+    "digest": "b07d394253c6673aa8fbfa84141ad4f9caf9ae3f2c9ed51519a7356b4592d289"
   },
   "black-chair": {
     "version": "1.1.0",
@@ -32,12 +32,12 @@
     "digest": "02940dd0afc30f595f215e0880ca10b5e1f9848829f0496419806d5f104d298e"
   },
   "game-flow": {
-    "version": "1.0.0",
-    "digest": "b91d5c59b456836147684b2599797780ffc19a726e4c62eef50d372480b78e3b"
+    "version": "1.1.0",
+    "digest": "b4f2af9d259366ea76eef5cb1ac146b05cd42c478e186970b404ef1ad06616c2"
   },
   "health-respawn": {
-    "version": "1.1.0",
-    "digest": "b04ca2358f0dce17ea4e55893443d9e1136d37192a975048484891480075d10c"
+    "version": "1.2.1",
+    "digest": "0ecc88c566b69e3e6143294a58bd5db9f35a5703920115b8540dea337ab10a1b"
   },
   "high-stool": {
     "version": "1.1.0",
@@ -48,8 +48,8 @@
     "digest": "0711512393d3f93d1b1a7d709493e770da633e06baf5ba7e87c399cdc0fb2551"
   },
   "leaderboard": {
-    "version": "1.1.0",
-    "digest": "49fb3b0ee8c5d17a91c59e6656095ad371de1e6b12edfaefc43d688d739eefde"
+    "version": "1.2.0",
+    "digest": "6e3031461cd23e0f51e06a083ee91d0d6a0dd04694378c5c374820b91c678b87"
   },
   "loveseat": {
     "version": "1.1.0",
@@ -62,6 +62,10 @@
   "outdoor-chair": {
     "version": "1.1.0",
     "digest": "90fc9953c2c3c085854c9ba2d547208155b3ecfd5c8fdde80558dd644511ffad"
+  },
+  "run-progress": {
+    "version": "1.0.0",
+    "digest": "9768af5f30cc64038981e5871cf70a5499b6404b2dc602a42642b636943a5199"
   },
   "rustic-bench": {
     "version": "1.1.0",
@@ -76,8 +80,8 @@
     "digest": "ac49da1c8e7f1f2ccba87b1d7a34d7beecd7a85a2fa3431afb8d104f22d6a2b0"
   },
   "server-clock": {
-    "version": "1.0.0",
-    "digest": "b7b825e4f767a6b80701fface754325b9f5f818b66bf85fdcaa0f9ae20ce02ac"
+    "version": "1.1.0",
+    "digest": "b5e19527c715250c18ec1f2a8924fcb51227b4a2001341b6502f5f7875add8c1"
   },
   "simple-chair": {
     "version": "1.1.0",
@@ -112,8 +116,12 @@
     "digest": "da0dada2b219065d6c91e7b677eea32d2ccf3ad798a100058f9b0ab1b00a97fc"
   },
   "trigger-zone": {
-    "version": "1.1.0",
-    "digest": "e56e209f28f303bede74851ec16ff3ac30d9a5c74d038080a256320ceb66e31b"
+    "version": "1.1.1",
+    "digest": "ea879e29a7cb08806535872537c06e03c1d202db8288103e3fae330f84c1f404"
+  },
+  "ui-theme": {
+    "version": "1.0.0",
+    "digest": "db49be589724b6dc6b8e014367bed889384de4314ed19cdd16de58a5978aa89b"
   },
   "video-screen": {
     "version": "1.0.0",

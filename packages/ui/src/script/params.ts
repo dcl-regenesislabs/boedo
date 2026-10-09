@@ -1,17 +1,4 @@
-// Setting script params from outside the inspector: the assistant's turn-end
-// requests, and the right-click gestures that place a prefab already configured.
-//
-// Two entry points, one write. `setScriptParams` takes the loose JSON scalars a
-// request file carries and coerces each one against the param's declared type;
-// `writeScriptParamValues` takes values that are already the right type and skips
-// coercion entirely — which is the only way to reach an `entity` param, since
-// coercion refuses those by name (an entity id is not something the assistant can
-// resolve from a sentence, but a gesture that just clicked the entity knows it).
-//
-// Both funnel into one pass: parse each Script row's layout once, fold every
-// param into it, and make a SINGLE component write. That matters beyond
-// tidiness — one write is one undo step, so a gesture that sets four params is
-// one ⌘Z, not four.
+// Batch parameter changes into one component write and one undo step.
 import { state, componentKey } from '@scene/state'
 import { entityName } from '@scene/custom-components'
 import { SCRIPT_COMPONENT } from '@scene/allowed-components'
@@ -30,6 +17,18 @@ function labelOf(entityId: string): string {
 function coerceRef(value: ParamValue, prefabs: PrefabRefChoice[]): { id: string } | { problem: string } {
   if (typeof value !== 'string') return { problem: 'expects one prefab name, not a list' }
   return resolvePrefabRef(value, prefabs)
+}
+
+function coerceEntity(value: ParamValue): Coerced {
+  if (value === 0 || value === '0' || value === '') return { value: 0 }
+  if (typeof value !== 'string' && typeof value !== 'number') return { problem: 'expects an entity name or ID' }
+  const ref = String(value).trim()
+  const matches = state.snapshot[ref] !== undefined ? [ref] : Object.keys(state.snapshot).filter((id) =>
+    entityName(state.snapshot, id)?.trim().toLowerCase() === ref.toLowerCase())
+  if (matches.length === 0) return { problem: `references an entity that does not exist: "${ref}"` }
+  if (matches.length > 1) return { problem: `references an ambiguous entity name: "${ref}"; use its ID` }
+  const id = Number(matches[0])
+  return Number.isSafeInteger(id) && id > 0 ? { value: id } : { problem: 'references an invalid entity ID' }
 }
 
 // A request carries JSON scalars; a param carries a declared type. Coerce where
@@ -53,7 +52,12 @@ function coerce(param: ScriptParam, value: ParamValue, prefabs: PrefabRefChoice[
       return { problem: `only accepts ${(param.options ?? []).map((o) => `"${o}"`).join(', ')}` }
     }
     case 'string':
+      if (param.control === 'color' && (typeof value !== 'string' || !/^#[\da-f]{6}$/i.test(value))) {
+        return { problem: 'expects a color in #RRGGBB format' }
+      }
       return { value: Array.isArray(value) ? value.join(', ') : String(value) }
+    case 'entity':
+      return coerceEntity(value)
     case 'prefab': {
       const resolved = coerceRef(value, prefabs)
       return 'problem' in resolved ? resolved : { value: resolved.id }
@@ -70,8 +74,7 @@ function coerce(param: ScriptParam, value: ParamValue, prefabs: PrefabRefChoice[
       return { value: ids }
     }
     default:
-      // entity / action refs point at other entities — not settable by name
-      return { problem: 'is an entity picker, which only the inspector can set' }
+      return { problem: 'is an action picker, which only the inspector can set' }
   }
 }
 
@@ -137,7 +140,7 @@ async function applyParams<V>(
   return Object.keys(values).filter((name) => !missing.has(name))
 }
 
-/** Coerces by name (prefab refs resolve, entity refs are refused), then writes. */
+/** Resolves typed values and references, then writes. */
 export async function setScriptParams(
   entityId: string,
   values: Record<string, ParamValue>,
@@ -147,14 +150,7 @@ export async function setScriptParams(
   return applyParams(entityId, values, (param, value) => coerce(param, value, prefabs), problems)
 }
 
-/**
- * Values that are already the type the param declares, written as given.
- *
- * The caller has resolved everything a name could not: an `entity` param takes
- * the entity id it just clicked, an `enum` takes one of its own options. Nothing
- * is guessed here, which is exactly why this path can write what `setScriptParams`
- * has to refuse.
- */
+/** Values already resolved by an inspector gesture, written as given. */
 export async function writeScriptParamValues(
   entityId: string,
   values: Record<string, ScriptParam['value']>,

@@ -11,9 +11,10 @@
 // rather than fighting it, and in that mode the round length is only a ceiling —
 // when the ceiling fires it goes out through game.newRound() too, so a round
 // never ends down two different paths. See ai.md in this folder.
-import { TextShape, type Entity } from '@dcl/sdk/ecs'
+import { TextShape, VisibilityComponent, type Entity } from '@dcl/sdk/ecs'
 import { isServer } from '@dcl/sdk/network'
 import { game } from '~runtime/game'
+import { mountStatusHud } from '~runtime/statusHud'
 import {
   advanceFlow,
   asFlowFact,
@@ -61,7 +62,10 @@ export class GameFlow {
     /** Who ends a round: this clock, or your own script calling game.newRound(). */
     public endsWhen: 'timer' | 'script' = 'timer',
     /** The game.state key the winners come from — the key a Leaderboard shows. */
-    public boardKey: string = 'leaderboard'
+    public boardKey: string = 'leaderboard',
+    public display: '3D text' | '2D UI' = '3D text',
+    /** For "2D UI": where the round timer sits on screen. */
+    public position: 'top' | 'top left' | 'top right' | 'bottom' = 'top'
   ) {}
 
   private get config(): FlowConfig {
@@ -97,11 +101,20 @@ export class GameFlow {
         this.publish()
       })
       game.every(TICK_S, () => this.tick())
+      return
+    }
+    if (this.display === '2D UI') {
+      VisibilityComponent.createOrReplace(this.entity, { visible: false })
+      TextShape.deleteFrom(this.entity)
+      mountStatusHud(this.entity, this.position, () => {
+        const [label, value = '', detail] = this.text().split('\n')
+        return { label, value, detail }
+      })
     }
   }
 
   update(dt: number): void {
-    if (isServer()) { return }
+    if (isServer() || this.display === '2D UI') { return }
     this.accum += dt
     if (this.accum < PAINT_S) return
     this.accum = 0
@@ -152,9 +165,13 @@ export class GameFlow {
     game.setState({ [FLOW_KEY]: fact })
   }
 
-  private paint(): void {
+  private text(): string {
     const fact = asFlowFact(game.state[FLOW_KEY])
-    const text = panelText(fact, game.now(), this.endsWhen === 'timer', this.config.minPlayers)
+    return panelText(fact, game.now(), this.endsWhen === 'timer', this.config.minPlayers)
+  }
+
+  private paint(): void {
+    const text = this.text()
     if (text === this.painted) return
     this.painted = text
     TextShape.createOrReplace(this.entity, {

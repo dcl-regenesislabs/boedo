@@ -59,6 +59,7 @@ import { initAutoSave, markDirty, clearDirty, flushPendingSave, hasPendingSave }
 import { noteCodeOrigin, refreshCodeMove, resetCodeOrigins } from '../panels/code-move-offer'
 import { clearPendingCodeMove, runStudioChord } from '../panels/ai-store'
 import { revealInTree } from '../panels/reveal'
+import { resetProjectPrefabs } from '../panels/prefab-store'
 import { resetSceneUi, autoHideSceneUi } from '../engine/scene-ui'
 import { reassertSceneAudio, toggleSceneAudio } from '../engine/audio'
 import { uiPlay, uiPause } from '../actions/playback'
@@ -69,6 +70,7 @@ import { SCRIPT_COMPONENT } from '@scene/allowed-components'
 import type { Snapshot } from '@scene/state'
 import { setSceneBaseCorner } from '@scene/world-origin'
 import { startDevSceneReload, notifyDevSceneReady } from './dev-hmr'
+import { startThemePreview } from '../engine/theme-preview'
 import '../engine/gizmo-debug'
 import { installCameraGestures } from '../engine/camera-gestures'
 
@@ -148,10 +150,15 @@ function resetSession(): void {
   notify()
 }
 
+let stopThemePreview: (() => void) | undefined
+
 // Leave the project without leaving the page: stop announcing, stop listening.
 export function stopBoot(): void {
+  stopThemePreview?.()
+  stopThemePreview = undefined
   bootRun++
   stopBus()
+  resetProjectPrefabs()
 }
 
 // announce until the scene answers with scene-ready
@@ -174,6 +181,8 @@ export async function boot(): Promise<void> {
   const run = ++bootRun
   if (wired) resetSession()
   setSceneBaseCorner(baseParcelCorner())
+  stopThemePreview?.()
+  stopThemePreview = startThemePreview()
   pageTrace('page boot')
   while (!engineReady()) {
     await new Promise((r) => setTimeout(r, 250))

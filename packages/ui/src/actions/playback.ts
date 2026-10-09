@@ -1,7 +1,7 @@
 // Transport: play / pause / step, and the composite save that has to happen
 // before the scene starts running.
 import { state } from '@scene/state'
-import { pauseScene, playScene, stepScene, saveCompositeDirect } from '@scene/inspector'
+import { pauseScene, playScene, stepScene, saveCompositeDirect, reloadSnapshot } from '@scene/inspector'
 import { type CameraMode } from '@scene/bridge-protocol'
 import { cmd } from '../engine/cmd'
 import { flushPendingSave } from '../core/autosave'
@@ -21,7 +21,9 @@ import { uiSetCamera } from './selection'
 let prePlayCam: CameraMode | null = null
 
 export const uiPause = async (): Promise<void> => {
+  const wasPlaying = !state.frozen
   await run(pauseScene(), false)
+  if (wasPlaying && state.frozen) await reloadSnapshot()
   autoHideSceneUi() // back to editing: the HUD stops being the game again
   if (prePlayCam !== null) {
     uiSetCamera(prePlayCam)

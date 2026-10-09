@@ -45,7 +45,9 @@ export function stringParams(layout: string | undefined): string[] {
   for (const param of Object.values(params)) {
     if (param.type !== 'string' || typeof param.value !== 'string') continue
     const trimmed = param.value.trim()
-    if (trimmed !== '') values.push(trimmed)
+    if (param.control === 'entityNames' || param.control === 'zones') {
+      values.push(...trimmed.split(',').map((v) => v.trim()).filter(Boolean))
+    } else if (trimmed !== '') values.push(trimmed)
   }
   return values
 }

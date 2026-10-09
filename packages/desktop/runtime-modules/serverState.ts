@@ -50,13 +50,15 @@ export interface ServerStateOptions<T extends object> {
   key: string
   defaults: () => T
   persist?: boolean
+  /** Keep dynamic dictionary entries in addition to fields declared by defaults. */
+  preserveUnknownFields?: boolean
 }
 
 export function serverState<T extends object>(options: ServerStateOptions<T>): ServerState<T> {
   assertServer(`serverState('${options.key}')`)
   claimStoreKey(claimedKeys(), options.key)
 
-  const store = new ServerStore<T>({ key: options.key, defaults: options.defaults })
+  const store = new ServerStore<T>({ key: options.key, defaults: options.defaults, preserveUnknownFields: options.preserveUnknownFields })
   const persist = options.persist === true
   const storageKey = `${STORAGE_PREFIX}${options.key}`
 

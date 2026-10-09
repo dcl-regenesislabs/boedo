@@ -35,7 +35,7 @@ import { GAME_CONFIG_PATH } from '../gameconfig/generate'
 import { isRecord, substituteAssetPath, type PrefabComposite } from './format'
 import { prefabFoldersIn, readPrefabFolder } from './storage'
 import { healInertArtifacts } from './heal-inert'
-import { runtimeMaster } from './runtime-masters'
+import { runtimeMaster, runtimeMasterPath } from './runtime-masters'
 import {
   importSpecifiers,
   isVendoredCopy,
@@ -135,7 +135,7 @@ function shippedMasters(entries: string[]): Record<string, string> {
   const masters: Record<string, string> = {}
   const queue = [...entries]
   while (queue.length > 0) {
-    const rel = queue.shift() as string
+    const rel = runtimeMasterPath(queue.shift() as string)
     if (rel in masters) continue
     const text = runtimeMaster(rel)
     if (text === null) continue

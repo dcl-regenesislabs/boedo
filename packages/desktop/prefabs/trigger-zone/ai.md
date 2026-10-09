@@ -4,9 +4,8 @@ prefab: trigger-zone
 
 # Trigger Area — AI guide
 
-An invisible named volume that knows who is standing in it. Other scripts react
-to it BY NAME through the bus module in the project's shared runtime — nothing is
-wired, and a reacting script pasted into another scene keeps working.
+An invisible named volume. Scripts react to its name through the shared runtime
+bus; the same reaction works in another scene.
 
 ## When to use
 
@@ -97,10 +96,12 @@ reactions. Decide by what the reaction acts on:
   working for everybody. The prefab owns those callbacks; you consume the bus.
 - DON'T hand-roll proximity (distance loops against the player). The prefab
   exists so you never do.
-- The volume IS the entity's Transform scale in metres, so the scale gizmo is the
-  resize tool. Neither you nor the editor can measure a model's bounding box —
-  place the area NEAR the object at a sensible size and say in one line to drag
-  the scale handles to fit. Never claim you fitted it.
+- The volume IS the entity's Transform scale in metres. For a model, use
+  `asset_request inspect_model` and account for its scale, rotation and pivot.
+  Fit the area to the interaction space and verify entry/exit in play. Bounds
+  exclude animation; leave clearance for moving models and avatar height.
+- Keep the whole volume and its movement range inside the active parcels.
+  Resize with sceneSettings first and wait for its successful preview result.
 - Detection is client-side only: the headless server has no avatar colliders, so
   an area never fires there. Fine for doors, lights, sound, ambience. When an area
   gates something valuable (a reward, a score, a paid area) put the decision in a
@@ -109,6 +110,11 @@ reactions. Decide by what the reaction acts on:
   client-trusted rather than implying it is safe.
 
 ## Example
+
+For a course, read the Run Progress and Health & Respawn guides too. Use Run
+Progress's start/checkpoint/finish references and its local feedback. Do not add
+a second score or checkpoint owner to the areas. Use the inspector's message
+action for a local notice; the server still validates progression and rewards.
 
 "Make the door open when someone walks up": placePrefab trigger-zone named
 "Front Door Area" (4×3×4 at the doorway, who: 'any player'), then a script on

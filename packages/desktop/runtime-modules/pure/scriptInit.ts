@@ -69,7 +69,8 @@ export function resolveScriptParams(layout: ScriptLayout, makeAction: (ref: Acti
     const value = param.value
     // the runner's exact test: type 'action' AND a truthy object value
     if (param.type === 'action' && value !== null && typeof value === 'object') {
-      return makeAction(asActionRef(value))
+      const ref = asActionRef(value)
+      return ref.entity && ref.action ? makeAction(ref) : undefined
     }
     return value
   })

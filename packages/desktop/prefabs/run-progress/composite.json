@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "components": [
+    { "name": "core-schema::Name", "data": { "0": { "json": { "value": "Run Progress" } } } },
+    { "name": "asset-packs::Script", "data": { "0": { "json": { "value": [
+      { "path": "{assetPath}/scripts/run-progress.tsx", "priority": 0, "layout": "{\"params\":{},\"actions\":[]}" }
+    ] } } } }
+  ]
+}

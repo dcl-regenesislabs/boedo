@@ -7,10 +7,12 @@
 // The panel is ordinary scene content: swap board-panel.glb for your own model
 // and keep (or restyle) the text child — the script writes only its `text`, so
 // font, size and colour stay exactly as authored.
-import { TextShape, Transform, engine, type Entity } from '@dcl/sdk/ecs'
+import { TextShape, Transform, VisibilityComponent, engine, type Entity } from '@dcl/sdk/ecs'
 import { isServer } from '@dcl/sdk/network'
 import { game } from '~runtime/game'
 import { boardRows, clampRows, renderPanel } from './pure/board'
+import { runBoardKey } from '~runtime/pure/runBoard'
+import { mountLeaderboardHud } from './leaderboard-hud'
 
 const EMPTY = 'Nothing to show yet — set the board key the server writes to.'
 
@@ -23,25 +25,44 @@ export class Leaderboard {
     public entity: Entity,
     /** The panel's title. */
     public title: string = 'Leaderboard',
-    /** The game.state key this board shows. The server writes the rows there. */
+    /** For "State key": the game.state key containing the server's scores. */
     public boardKey: string = 'leaderboard',
-    /** Which score wins: highest keeps points, lowest keeps best times. */
+    /** For "State key": highest keeps points, lowest keeps best times. */
     public sort: 'desc' | 'asc' = 'desc',
     /** How many places the panel lists. */
-    public rows: number = 8
+    public rows: number = 8,
+    public source: 'State key' | 'Run best times' = 'State key',
+    /** For "Run best times": match the Course Id on Run Progress. */
+    public courseId: string = 'course',
+    public display: '3D panel' | '2D UI' = '3D panel',
+    /** For "2D UI": the side of the screen. */
+    public position: 'left' | 'right' = 'right'
   ) {}
 
   start(): void {
     if (isServer()) { return }
+    if (this.display === '2D UI') {
+      VisibilityComponent.createOrReplace(this.entity, { visible: false, propagateToChildren: true })
+      mountLeaderboardHud(this.entity, this.position, () => this.content())
+      return
+    }
     this.panel = this.findPanel()
     game.onStateChange(() => this.repaint())
     this.repaint()
   }
 
   private repaint(): void {
+    const content = this.content()
     this.paint(
-      renderPanel(this.title, boardRows(game.state[this.boardKey], this.sort, clampRows(this.rows)), this.sort, EMPTY)
+      renderPanel(content.title, content.rows, content.sort, content.empty)
     )
+  }
+
+  private content() {
+    const runs = this.source === 'Run best times'
+    const sort: 'asc' | 'desc' = runs ? 'asc' : this.sort
+    return { title: this.title, sort, rows: boardRows(game.state[runs ? runBoardKey(this.courseId) : this.boardKey], sort, clampRows(this.rows)),
+      empty: runs ? 'Complete a run to set the first time.' : EMPTY }
   }
 
   // The text lives on a child so the model can be replaced without touching it.

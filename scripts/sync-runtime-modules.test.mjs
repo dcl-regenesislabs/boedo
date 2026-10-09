@@ -109,6 +109,11 @@ describe('runtimeImportsOf', () => {
 })
 
 describe('transitiveModules', () => {
+  it('keeps shared HUD modules as TSX when resolving extensionless imports', () => {
+    const ui = { 'hud.tsx': "import './widgets/meter'", 'widgets/meter.tsx': 'export const Meter = () => null' }
+    expect(transitiveModules(['hud.ts'], (rel) => ui[rel] ?? null)).toEqual(['hud.tsx', 'widgets/meter.tsx'])
+  })
+
   const masters = {
     'zoneBus.ts': "import { ZoneRegistry } from './pure/zoneRegistry'",
     'rpc.ts': "import { PendingMap } from './pure/pending'\nimport { ZoneRegistry } from './pure/zoneRegistry'",
@@ -159,9 +164,11 @@ describe('the built-in prefabs', () => {
       'game-flow',
       'health-respawn',
       'leaderboard',
+      'run-progress',
       'server-clock',
       'spawner',
-      'trigger-zone'
+      'trigger-zone',
+      'ui-theme'
     ])
   })
 })

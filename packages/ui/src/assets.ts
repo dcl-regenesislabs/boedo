@@ -151,16 +151,43 @@ export async function ensureContentMapped(rel: string): Promise<void> {
   }
 }
 
+const MAX_MODEL_BYTES = 50 * 1024 * 1024
+
+// streamed, so an oversized or lying content-length can't fill memory first
+async function readCapped(res: Response, max: number): Promise<Uint8Array> {
+  if (Number(res.headers.get('content-length')) > max || res.body === null) throw new Error('model exceeds the 50 MB file limit')
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      size += value.byteLength
+      if (size > max) throw new Error('model exceeds the 50 MB file limit')
+      chunks.push(value)
+    }
+  } finally {
+    await reader.cancel()
+    reader.releaseLock()
+  }
+  const bytes = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length }
+  return bytes
+}
+
 // Download a catalog asset into the project and register it with the live
 // scene's content map — no entity is created. Returns the project-relative path.
 export async function importCatalogFile(asset: ModelAsset): Promise<string> {
   if (dataLayerAvailable() !== true) {
     throw new Error('model import needs the scene server running with --data-layer')
   }
+  if (new URL(asset.url).origin !== OPENDCL_ORIGIN) throw new Error('model is not on the catalog CDN')
   const rel = modelRelPath(asset)
   const res = await fetch(opendclUrl(asset.url) as string)
   if (!res.ok) throw new Error(`model download failed: HTTP ${res.status}`)
-  const bytes = new Uint8Array(await res.arrayBuffer())
+  const bytes = await readCapped(res, MAX_MODEL_BYTES)
   await dataLayerSaveFileBytes(rel, bytes)
   await ensureContentMapped(rel)
   return rel

@@ -261,7 +261,7 @@ const serviceServer = await getUnderlyingServer(serviceProgram.components.server
 const serviceOrigin = `http://127.0.0.1:${serviceServer.address().port}`
 service = createFakeService({ hash: contentCid, baseUrl: `${serviceOrigin}/svc` })
 
-const browser = await chromium.launch()
+const browser = await chromium.launch({ args: process.env.SMOKE_CDP_PORT ? [`--remote-debugging-port=${process.env.SMOKE_CDP_PORT}`] : [] })
 const problems = []
 
 // A page with the fake host and the editor loaded into it. `signedIn`: a v1 host
@@ -452,8 +452,9 @@ async function openEditor(context, { signedIn = false, openProject = null } = {}
           toPage({ type: 'rpc-reply', id: data.msg.id, ok: true, result: null })
         }
         if (data.msg.type !== 'init') return
-        const hash = (await window.__manifest()).entity.id
-        const scene = { hash, title: 'Smoke scene', parcels: [{ x: 0, y: 0 }], isPortable: false, isBroken: false, isBlocked: false, isSuper: false, sdkVersion: '7' }
+        const { entity } = await window.__manifest()
+        const parcels = entity.metadata.scene.parcels.map(p => { const [x, y] = p.split(',').map(Number); return { x, y } })
+        const scene = { hash: entity.id, title: 'Smoke scene', parcels, isPortable: false, isBroken: false, isBlocked: false, isSuper: false, sdkVersion: '7' }
         toPage({ type: 'scene-found', scene })
         toPage({ type: 'scene-ready', scene, frozen: false, tool: 'select', orientGlobal: false, pivotEach: false, selected: [], active: null })
       }
@@ -479,6 +480,33 @@ const shot = async (name, of = page) => {
 }
 const uiOf = (of) => of.locator('#editor-container > #editor-ui-host')
 const homeOf = (of) => of.locator('#create-body #editor-ui-host')
+const topbarOpacity = (of, opacity) => of.waitForFunction((opacity) => {
+  const bar = document.querySelector('#editor-container > #editor-ui-host')?.shadowRoot?.querySelector('.eui-topbar')
+  return bar && getComputedStyle(bar).opacity === opacity
+}, opacity)
+const revealTopbar = async (of) => {
+  await of.mouse.move(720, 2)
+  await topbarOpacity(of, '1')
+}
+async function checkTopbar(of) {
+  const editor = uiOf(of)
+  await of.locator('#viewport').focus()
+  await of.mouse.move(720, 500)
+  await topbarOpacity(of, '0')
+  assert.equal(await editor.locator('.eui-topbar').evaluate(el => getComputedStyle(el).pointerEvents), 'none')
+  await of.keyboard.press('Tab')
+  await topbarOpacity(of, '1')
+  await of.locator('#viewport').focus()
+  await topbarOpacity(of, '0')
+  await revealTopbar(of)
+  await editor.getByRole('button', { name: 'Settings', exact: true }).click()
+  await of.mouse.move(720, 500)
+  await topbarOpacity(of, '1')
+  await editor.getByRole('button', { name: 'Scene settings…', exact: true }).waitFor()
+  await editor.locator('.eui-topbar-scrim').click({ position: { x: 720, y: 500 } })
+  await topbarOpacity(of, '0')
+  ok('topbar hides at rest, reveals at the edge or with Tab, and stays open for menus')
+}
 const ui = uiOf(page)
 const home = homeOf(page)
 // Import is a menu where the browser can also pick a folder
@@ -490,6 +518,7 @@ const importZip = async (of, file) => {
   await (await chooser).setFiles(file)
 }
 const backToScenes = async (of = page) => {
+  await revealTopbar(of)
   await uiOf(of).locator('.eui-topbar-home').click()
   await homeOf(of).locator('.eui-create').waitFor()
 }
@@ -502,6 +531,7 @@ const until = async (what, done) => {
 // type at the top of src/index.ts in the code editor and save
 const saveCode = async (of, text) => {
   const view = uiOf(of)
+  await revealTopbar(of)
   await view.getByRole('button', { name: 'Code', exact: true }).click()
   await view.locator('.cm-content').click()
   await of.keyboard.press('ControlOrMeta+Home')
@@ -609,6 +639,7 @@ async function checkGuestEditor() {
   assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.id, gap), 'viewport')
   await page.mouse.click(gap.x, gap.y)
   assert.equal(await page.evaluate(() => window.__smoke.canvasClicks), 1, 'the gap click reached the canvas')
+  await revealTopbar(page)
   const bar = await ui.locator('.eui-topbar-title').boundingBox()
   await page.mouse.click(bar.x + 4, bar.y + 4)
   assert.equal(await page.evaluate(() => window.__smoke.canvasClicks), 1, 'a click on the top bar stays in the editor')
@@ -637,6 +668,7 @@ async function checkGuestEditor() {
 
   // 9. the code editor: a save that cannot build says where, the fix clears it, and
   // the scene is restarted by its id each time
+  await revealTopbar(page)
   await ui.getByRole('button', { name: 'Code', exact: true }).click()
   await ui.locator('.cm-content').click()
   await page.keyboard.press('ControlOrMeta+Home')
@@ -680,6 +712,7 @@ async function checkGuestEditor() {
   // the in-tab server copy: its console in the logs as desktop shows its Multiplayer Server's, its data in Storage
   const reloadsBeforeServer = await reloads()
   await page.evaluate(() => window.__smoke.serverLog.push('[1.00] Log: [server] round 1 starts', '[1.10] Log: the copy warms up'))
+  await revealTopbar(page)
   await ui.getByRole('button', { name: 'Show build / server logs' }).click()
   const logTab = (name) => ui.locator('.eui-logs-tabs button', { hasText: name })
   await logTab('Game').click()
@@ -771,6 +804,7 @@ async function checkGuestEditor() {
   const announced = () => page.evaluate(() => window.__smoke.bus.filter((type) => type === 'init').length)
   await home.locator('.eui-create-card', { hasText: 'Smoke scene' }).first().click()
   await ui.locator('.eui-toolbar').waitFor()
+  await revealTopbar(page)
   await ui.locator('.eui-topbar-menu-wrap button[data-tip="Settings"]').click()
   await ui.getByRole('button', { name: 'Back to Decentraland' }).click()
   await page.waitForFunction(() => window.__smoke.exits === 1)
@@ -819,6 +853,7 @@ async function checkGuestEditor() {
   assert.ok(!Object.keys(await page.evaluate((id) => window.__projectFiles(id), packedId)).some((file) => file.includes('node_modules')), 'no package file among the project files')
   registryUp = false
   await ui.locator('.eui-toolbar').waitFor()
+  await revealTopbar(page)
   await ui.getByRole('button', { name: 'Code', exact: true }).click()
   await ui.locator('.cm-content').click()
   await page.keyboard.press('ControlOrMeta+Home')
@@ -882,13 +917,14 @@ async function checkSignedEditor() {
   await oneHome.getByRole('button', { name: 'Create scene' }).click()
   await one.locator('.eui-toolbar').waitFor({ timeout: 120_000 })
   await one.locator('.eui-topbar .eui-autosave', { hasText: 'Synced' }).waitFor()
+  await checkTopbar(first)
   await shot('4-synced', first)
   const [sharedId] = await first.evaluate(() => window.__idsOf('Shared scene'))
   const manifestPut = service.log.findIndex((line) => line.startsWith(`PUT /projects/${sharedId}/manifest`))
   assert.ok(manifestPut > 0 && service.log.slice(0, manifestPut).some((line) => line.startsWith('PUT /uploads/')), service.log.join(' | '))
   ok(`signed in, a new scene is copied to the account: ${service.log.filter((line) => line.startsWith('PUT /uploads/')).length} files, then the manifest`)
 
-  await one.locator('.eui-ai-input').fill('Read src/index.ts, prepend exactly "// assistant browser round trip" on its own line, and leave the rest unchanged. Write it and verify with the build tool. Finish by saying exactly: Updated the browser project and verified its build.', { timeout: 30_000 })
+  await one.locator('.eui-ai-input').fill('First expand the scene to 2×2 parcels (0,0; 1,0; 0,1; 1,1), with base 0,0, and wait for the preview. Read src/index.ts, prepend exactly "// assistant browser round trip" on its own line, and leave the rest unchanged. Write it and verify with the build tool. Finish by saying exactly: Updated the browser project and verified its build.', { timeout: 30_000 })
   await one.locator('.eui-ai-input').press('Enter')
   await one.locator('.eui-ai-msg.assistant .eui-ai-text').filter({ hasText: 'Updated the browser project and verified its build.' }).waitFor({ timeout: 120_000 })
   const source = await first.evaluate(async (id) => {
@@ -899,7 +935,13 @@ async function checkSignedEditor() {
   assert.ok(source.startsWith('// assistant browser round trip\n'), 'the assistant wrote the file in browser storage')
   await one.locator('.eui-topbar .eui-autosave', { hasText: 'Synced' }).waitFor()
   await shot('5-assistant', first)
-  ok('assistant: signed connection → WebSocket → browser read/write/build → streamed chat, with no server workspace')
+  const expanded = await first.evaluate(async () => ({
+    opens: window.__smoke.openPreview.length,
+    parcels: (await window.__manifest()).entity.metadata.scene.parcels
+  }))
+  assert.ok(expanded.opens >= 2, 'the assistant reopens the preview during its turn')
+  assert.deepEqual([...expanded.parcels].sort(), ['0,0', '0,1', '1,0', '1,1'])
+  ok('assistant: resize → preview reload → continued browser read/write/build → streamed chat, with no server workspace')
 
   if (!process.env.ASSISTANT_LIVE_AUTH) {
     const walletMemory = path.join(assistantData, 'memory', WALLET.toLowerCase())
@@ -930,7 +972,10 @@ async function checkSignedEditor() {
     ok('assistant memory survives a service restart and reopening the browser project')
 
     for (const studio of [false, true]) {
-      if (studio) await one.getByRole('button', { name: 'Code', exact: true }).click()
+      if (studio) {
+        await revealTopbar(first)
+        await one.getByRole('button', { name: 'Code', exact: true }).click()
+      }
       await one.getByRole('button', { name: 'New chat', exact: true }).click()
       await one.locator('.eui-ai-confirm').getByRole('button', { name: 'Yes', exact: true }).click()
       await until('New chat deleting the encrypted conversation', () => memoryFiles().length === 0)
@@ -995,6 +1040,7 @@ async function checkSignedEditor() {
   ok('a change on both browsers is a conflict; "Keep both" keeps the other version and saves this one as a new scene')
 
   // publish to a world: built in the page, confirmed and signed by the host, accepted and served
+  await revealTopbar(first)
   await one.locator('.eui-topbar-publish').click()
   await one.locator('.eui-publish-modal').getByText(WORLD).click()
   await shot('7-publish-pick', first)
@@ -1027,6 +1073,7 @@ async function checkSignedEditor() {
   await first.evaluate(() => (window.__smoke.guest = true))
   await one.getByText('Guest', { exact: true }).waitFor()
   await one.locator('.eui-ai-chat').waitFor({ state: 'detached', timeout: 10_000 })
+  await revealTopbar(first)
   await one.locator('.eui-topbar-publish').click()
   await one.locator('.eui-publish-modal').getByText('Sign in to publish').waitFor()
   await one.getByText('You are in Decentraland as a guest.', { exact: false }).waitFor()
@@ -1065,7 +1112,11 @@ try {
   console.error(`service: ${JSON.stringify(service.log.slice(-12))}`)
   console.error(`worlds: ${JSON.stringify(worlds.log.slice(-12))} registry: ${JSON.stringify(registryRequests)}`)
   for (const [n, other] of browser.contexts().flatMap((c) => c.pages()).entries()) {
-    console.error(`page ${n}: ${JSON.stringify(await other.evaluate(() => ({ signed: window.__smoke.signed, text: document.querySelector('#create-body #editor-ui-host')?.shadowRoot?.querySelector('.eui-create')?.textContent?.slice(0, 400) })).catch(() => null))}`)
+    console.error(`page ${n}: ${JSON.stringify(await other.evaluate(() => ({
+      signed: window.__smoke.signed, previews: window.__smoke.openPreview,
+      text: document.querySelector('#editor-container > #editor-ui-host')?.shadowRoot?.querySelector('.eui-root')?.innerText?.slice(-2500)
+        ?? document.querySelector('#create-body #editor-ui-host')?.shadowRoot?.querySelector('.eui-create')?.textContent?.slice(0, 400)
+    })).catch(() => null))}`)
     await shot(`failure-${n}`, other).catch(() => {})
   }
   console.log('smoke: FAIL')

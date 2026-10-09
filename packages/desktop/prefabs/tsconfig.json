@@ -25,6 +25,6 @@
   // The runtime-module masters are typechecked here too, against the auth-server pin
   // user scenes compile under. With no carried copies left this is the only place the
   // masters and the prefab scripts that import them are checked against each other.
-  "include": ["*/scripts/**/*.ts", "*/scripts/**/*.tsx", "../runtime-modules/**/*.ts"],
+  "include": ["*/scripts/**/*.ts", "*/scripts/**/*.tsx", "../runtime-modules/**/*.ts", "../runtime-modules/**/*.tsx"],
   "extends": "@dcl/sdk/types/tsconfig.ecs7.json"
 }

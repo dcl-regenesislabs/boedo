@@ -1,17 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { prefabFolders, readPrefabFile } from './builtin-fixtures'
 import {
-  PENDING_LABEL,
   PLANNED_GUARANTEE,
   chipsFromModes,
   guaranteeChips,
-  guaranteeSummaries,
   modesFromCalls,
   scanSpawnCalls,
   scriptLayouts,
   spawnCallsIn,
-  spawnModesFor,
-  summariesFromModes
+  spawnModesFor
 } from './guarantees'
 import type { PrefabData } from './format'
 
@@ -334,20 +331,8 @@ describe('guaranteeChips', () => {
     expect(chips.map((c) => c.tone)).toEqual(['info', 'client', 'client', 'server'])
   })
 
-  it('says pending, and nothing else, when no consumer opens a pool', () => {
-    const chips = guaranteeChips({ data: zombie, scripts: {}, layouts })
-    expect(chips.map((c) => c.label)).toEqual([PENDING_LABEL])
-  })
-
-  it('speaks creator language out of pending — no API names, an example instead', () => {
-    const [pending] = guaranteeChips({ data: zombie, scripts: {}, layouts })
-    expect(pending.tip).toContain('Pick it in a Spawner')
-    expect(pending.tip).not.toContain('spawner.plan')
-    expect(pending.tip).not.toContain('pool')
-  })
-
-  it('renders chips for a prefab without spawn overrides — every prefab is spawnable', () => {
-    expect(guaranteeChips({ data: plain, scripts: { 'a.ts': waveDirector }, layouts }).length).toBeGreaterThan(0)
+  it('shows no clauses when no consumer opens a pool', () => {
+    expect(guaranteeChips({ data: zombie, scripts: {}, layouts })).toEqual([])
   })
 
   it('reads per-player as one per player, on this player’s client, HP server-owned', () => {
@@ -391,32 +376,6 @@ describe('guaranteeChips', () => {
         expect(chip.tip.length).toBeGreaterThan(20)
       }
     }
-  })
-})
-
-describe('guaranteeSummaries', () => {
-  // The sync-mode pills are gone on purpose: they named mechanism and no
-  // creator acted on them. The card keeps exactly one behavioural nudge.
-  it('shows nothing for a prefab something already spawns', () => {
-    const chips = guaranteeSummaries({ data: zombie, scripts: { 'a.ts': waveDirector }, layouts })
-    expect(chips).toEqual([])
-  })
-
-  it('keeps the pending nudge when nothing brings the prefab into the game', () => {
-    expect(summariesFromModes(zombie, []).map((c) => c.label)).toEqual([PENDING_LABEL])
-  })
-
-  // The nudge points at a Spawner's "spawn" setting, which on top of a written
-  // layout would add a SECOND, per-player spawn path — so it must not appear on
-  // a prefab a round already lays out.
-  it('never says “not used yet” about a prefab a game.layout call brings in', () => {
-    const input = { data: arena, scripts: { [TOWER]: towerBuilder }, layouts: towerLayouts }
-    expect(guaranteeSummaries(input)).toEqual([])
-    expect(guaranteeChips(input).map((c) => c.label)).not.toContain(PENDING_LABEL)
-  })
-
-  it('stays quiet for a placed copy nothing spawns — a bench is just a bench', () => {
-    expect(summariesFromModes(zombie, [], false)).toEqual([])
   })
 })
 
@@ -506,17 +465,14 @@ describe('creator copy only names items the creator can reach', () => {
     return found
   }
 
-  // Every string this module can put in front of a creator: the four modes'
-  // chips, their card summaries, and the pending nudge nothing spawns.
+  // Every string this module can put in front of a creator.
   function everyChipString(): string[] {
     const out = [PLANNED_GUARANTEE]
     for (const mode of ['server', 'planned', 'seeded', 'layout', 'perPlayer'] as const) {
-      for (const chip of [...chipsFromModes(zombie, [mode]), ...summariesFromModes(zombie, [mode])]) {
+      for (const chip of chipsFromModes(zombie, [mode])) {
         out.push(chip.label, chip.tip)
       }
     }
-    for (const chip of summariesFromModes(zombie, [])) out.push(chip.label, chip.tip)
-    for (const chip of guaranteeChips({ data: zombie, scripts: {}, layouts })) out.push(chip.label, chip.tip)
     return out
   }
 
@@ -529,11 +485,6 @@ describe('creator copy only names items the creator can reach', () => {
     }
   })
 
-  it('points the pending nudge at an item, so the guard has something to catch', () => {
-    const [pending] = guaranteeChips({ data: zombie, scripts: {}, layouts })
-    expect(namedItems(pending.tip)).toContain('Spawner')
-    expect(shownPrefabNames()).toContain('Spawner')
-  })
 })
 
 describe('modesFromCalls', () => {

@@ -98,6 +98,15 @@ describe('ownership of a file under runtime/', () => {
 })
 
 describe('transitive closure', () => {
+  it('preserves TSX extensions for shared HUDs and their dependencies', () => {
+    const ui: Record<string, string> = {
+      'hud.tsx': "import { Meter } from './widgets/meter'; export const Hud = () => <Meter />",
+      'widgets/meter.tsx': 'export const Meter = () => null'
+    }
+    expect(transitiveModules("import { Hud } from './runtime/hud'", (rel) => ui[rel] ?? null))
+      .toEqual(['hud.tsx', 'widgets/meter.tsx'])
+  })
+
   it('follows a module into its own dependencies', () => {
     const entry = "import { pool } from './runtime/spawner'"
     expect(transitiveModules(entry, read)).toEqual([

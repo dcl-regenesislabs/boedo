@@ -31,6 +31,28 @@ export function readProjectJson(files: ProjectFiles, path: string): Record<strin
 
 const topLevelPackage = (path: string): string | undefined => /^node_modules\/((?:@[^/]+\/)?[^/]+)\//.exec(path)?.[1]
 
+export function assetPacksStubUpgrades(files: ProjectFiles): Map<string, Uint8Array> {
+  const additions = new Map<string, Uint8Array>()
+  const project = readProjectJson(files, 'package.json')
+  const spec = isRecord(project?.dependencies) ? project.dependencies[ASSET_PACKS] : undefined
+  if (typeof spec !== 'string' || !spec.startsWith('file:')) return additions
+  const absolute = join(PROJECT_ROOT, spec.slice('file:'.length))
+  if (!absolute.startsWith(`${PROJECT_ROOT}/`)) return additions
+  const dir = absolute.slice(PROJECT_ROOT.length + 1)
+  const stub = readProjectJson(files, `${dir}/package.json`)
+  if (stub?.name !== ASSET_PACKS || stub.version !== '0.0.1-stub' || !files.has(`${dir}/dist/index.js`)) return additions
+  const encoder = new TextEncoder()
+  // Older editor starters expose the same event registry only at the package root.
+  for (const [file, source] of Object.entries({
+    'events.js': "'use strict'\nmodule.exports = require('./index')\n",
+    'events.d.ts': "export { getActionEvents, getTriggerEvents } from './index'\n"
+  })) {
+    const path = `${dir}/dist/${file}`
+    if (!files.has(path)) additions.set(path, encoder.encode(source))
+  }
+  return additions
+}
+
 export function mountProject(snapshot: SdkSnapshot, files: ProjectFiles, packages?: MountedPackages): MountedProject {
   const packageJson = readProjectJson(files, 'package.json') ?? {}
   const dependencies = {
@@ -62,6 +84,7 @@ export function mountProject(snapshot: SdkSnapshot, files: ProjectFiles, package
     // a frozen package is not mixed with a copy the project carries in its own node_modules
     if (!vfs.has(absolute) && !(owner !== undefined && packages?.topLevel.has(owner))) vfs.set(absolute, bytes)
   }
+  for (const [path, bytes] of assetPacksStubUpgrades(files)) vfs.set(join(PROJECT_ROOT, path), bytes)
 
   const aliases: Record<string, string> = {}
   for (const [name, target] of Object.entries(snapshot.meta.aliases)) aliases[name] = join(PROJECT_ROOT, target)
