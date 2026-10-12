@@ -64,6 +64,8 @@ export type PageToSceneMessage =
       showLinks?: boolean
       snap?: boolean
       showSpawnAreas?: boolean
+      // init's baseCorner again: a scene instance started after boot never got init
+      baseCorner?: { x: number; z: number }
     }
   // scene.json's spawnPoints — read by the desktop shell, drawn by the scene
   | { type: 'spawn-points'; points: unknown[] }

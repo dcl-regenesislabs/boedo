@@ -128,6 +128,13 @@ async function tick(): Promise<void> {
   notifyChanges()
 }
 
+// Without the world origin the gizmo never leaves 0,0,0 and draws its centre handle as a disc.
+function adoptBaseCorner(corner: { x: number; z: number }): void {
+  setSceneBaseCorner(corner)
+  // a snapshot pulled before the page said where the scene sits
+  if (state.status === 'ready' && !('5' in state.snapshot)) state.snapshot = withWorldOrigin({ ...state.snapshot })
+}
+
 async function handle(msg: PageToSceneMessage): Promise<void> {
   switch (msg.type) {
     case 'init':
@@ -136,11 +143,7 @@ async function handle(msg: PageToSceneMessage): Promise<void> {
       // The page attaches its listener after our first steps have already run,
       // and BroadcastChannel doesn't buffer — so hand it the whole trace.
       replayTrace()
-      if (msg.baseCorner !== undefined) {
-        setSceneBaseCorner(msg.baseCorner)
-        // a snapshot pulled before the page said where the scene sits
-        if (state.status === 'ready' && !('5' in state.snapshot)) state.snapshot = withWorldOrigin({ ...state.snapshot })
-      }
+      if (msg.baseCorner !== undefined) adoptBaseCorner(msg.baseCorner)
       break
     case 'set-tool':
       setActiveAction(msg.tool)
@@ -151,6 +154,7 @@ async function handle(msg: PageToSceneMessage): Promise<void> {
       if (msg.showLinks !== undefined) state.showLinks = msg.showLinks
       if (msg.snap !== undefined) state.snap = msg.snap
       if (msg.showSpawnAreas !== undefined) state.showSpawnAreas = msg.showSpawnAreas
+      if (msg.baseCorner !== undefined) adoptBaseCorner(msg.baseCorner)
       break
     case 'spawn-points':
       state.spawnPoints = msg.points as SpawnPointSpec[]

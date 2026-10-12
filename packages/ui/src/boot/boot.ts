@@ -583,7 +583,8 @@ function handleSceneMessage(msg: SceneToPageMessage): void {
         orientGlobal: state.orientGlobal,
         pivotEach: state.pivotEach,
         showLinks: state.showLinks,
-        snap: state.snap
+        snap: state.snap,
+        baseCorner: baseParcelCorner()
       })
       // and for the mute: the engine's persisted master volume may disagree
       // with the editor's flag (fresh boot, cleared storage) — restate it

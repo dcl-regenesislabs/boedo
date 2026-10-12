@@ -13,6 +13,7 @@ import { cmd } from '../engine/cmd'
 import { editorSceneHash } from '../engine/hosted'
 import { state } from '@scene/state'
 import { sendSpawnPoints } from '../spawn-points'
+import { baseParcelCorner } from './launch-params'
 
 let watchdog: ReturnType<typeof setTimeout> | null = null
 
@@ -32,7 +33,8 @@ export function notifyDevSceneReady(): boolean {
     pivotEach: state.pivotEach,
     showLinks: state.showLinks,
     snap: state.snap,
-    showSpawnAreas: state.showSpawnAreas
+    showSpawnAreas: state.showSpawnAreas,
+    baseCorner: baseParcelCorner()
   })
   // the fresh instance defaults to frozen:false and an empty spawn list — the
   // spawn personas are gated on both, so without these a dev session that
