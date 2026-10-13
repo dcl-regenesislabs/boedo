@@ -240,7 +240,9 @@ run in a sandbox with no network) and saves the script next to it in `models/src
 edits and rebuilds it. Built models can move (a looping clip plays on its own) and share a library of 21
 photo-scanned materials (stone, brick, wood, metal, grass, snow and more, with relief; CC0 from ambientCG)
 stored once in `models/materials/` as `T_<Name>_D.jpg` / `T_<Name>_N.jpg`; each costs the scene two textures, so a build that would go over the
-parcels' texture limit is refused. When the choice is yours, the chat shows catalog cards you can
+parcels' texture limit is refused. For sound it has a library of 25 CC0 sounds from Kenney (coin, jump, win, door,
+explosion, a few loops and more; credits in `packages/ui/src/sounds/CREDITS.md`), each copied into
+`assets/audio/` the first time a game uses it and played with an AudioSource. When the choice is yours, the chat shows catalog cards you can
 turn around in 3D, beside a "Build it in code" card; a model it built shows in its reply with a 3D view and
 **Make changes**, and Assets has a **Create with AI** tile to start one. The toolbar's gauge button opens **Scene insights**: the
 engine's frame rate, the scene against its parcel limits, deploy size, each model's triangles, and warnings.

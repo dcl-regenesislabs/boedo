@@ -12,7 +12,8 @@ import { inspectModel } from '@ui/model-info'
 import { announceBuiltModel } from '@ui/features/ai/built-models'
 import { buildCodeModel, overBudget, MODEL_BUDGET } from './code-model'
 import { MATERIAL_MAPS, materialFile } from '@ui/three/materials'
-import { materialBytes } from './library-files'
+import { materialBytes, soundBytes } from './library-files'
+import { SOUNDS, isSoundName, soundInfo, soundProjectPath } from '@ui/sounds'
 import { modelImagePath, sceneBudget, sceneTextures } from '@ui/scene-budget'
 import { isFlatModel, searchModels } from './model-search'
 import { sendToScene } from '@ui/engine/bus'
@@ -167,6 +168,14 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     return { models: searchModels(assets, request.query, limit).map(describe), total: assets.length }
   }
   if (!state.frozen) throw new Error('Stop Play before changing the scene.')
+  if (request.type === 'addSound') {
+    if (!isSoundName(request.name)) throw new Error(`addSound needs name, one of: ${SOUNDS.join(', ')}.`)
+    const path = soundProjectPath(request.name)
+    if (!(await dataLayerReadFileBytes(path).then(() => true, () => false))) await dataLayerSaveFileBytes(path, await soundBytes(request.name))
+    await ensureContentMapped(path)
+    const { durationSeconds, loop } = soundInfo(request.name)
+    return { path, durationSeconds, loop }
+  }
   if (request.type === 'placeModel') {
     if (typeof request.id !== 'string') throw new Error('placeModel needs the id of a findModels result.')
     await loadModelCatalog()
