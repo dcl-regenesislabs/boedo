@@ -86,6 +86,14 @@ export type SceneSettingsEditor = (settings: AssistantSceneSettings) => Promise<
 
 const MAX_BATCH = 200
 
+// A batch answers what the request did, not the components it just wrote: echoing them back
+// filled the conversation with the assistant's own input. inspect reads them when needed.
+function brief(result: unknown): unknown {
+  if (!object(result)) return result
+  const { components: _components, value: _value, ...rest } = result
+  return rest
+}
+
 export async function browserSceneRequest(request: unknown, signal: AbortSignal, settings?: SceneSettingsEditor): Promise<unknown> {
   signal.throwIfAborted()
   if (!object(request)) throw new Error('Invalid scene request.')
@@ -98,7 +106,7 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     for (const item of request.requests) {
       if (object(item) && item.type === 'batch') throw new Error('Batches do not nest.')
       try {
-        results.push({ ok: true, result: await browserSceneRequest(item, signal, settings) })
+        results.push({ ok: true, result: brief(await browserSceneRequest(item, signal, settings)) })
       } catch (e) {
         signal.throwIfAborted()
         results.push({ ok: false, error: e instanceof Error ? e.message : String(e) })

@@ -76,6 +76,15 @@ describe('assistant scene requests', () => {
     expect(JSON.parse(String((setValue.mock.calls as unknown[][]).at(-1)?.[3]))).toMatchObject({ position: { x: 1, y: 3.5, z: 1 }, scale: { x: 1, y: 1, z: 1 } })
   })
 
+  it('answers a batch with what each request did, not the components it wrote', async () => {
+    state.snapshot['512'] = { Transform: { position: { x: 1, y: 0.5, z: 1 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 }, parent: 0 } }
+    const answer = await browserSceneRequest(
+      { type: 'batch', requests: [{ type: 'setComponent', to: '512', component: 'Transform', patch: { position: { y: 2 } } }] },
+      new AbortController().signal
+    )
+    expect(answer).toEqual({ results: [{ ok: true, result: { id: '512', component: 'Transform' } }] })
+  })
+
   it('moves an entity by an offset in one request', async () => {
     state.snapshot['512'] = { Transform: { position: { x: 1, y: 0.5, z: 1 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 }, parent: 0 } }
     expect(await browserSceneRequest({ type: 'move', to: '512', by: { y: 2 } }, new AbortController().signal)).toEqual({ id: '512', position: { x: 1, y: 2.5, z: 1 } })

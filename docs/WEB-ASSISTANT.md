@@ -157,6 +157,8 @@ components; see the [service README](../packages/service/README.md).
   authored scene; playtest actions do not grant progress or teleport the player.
   A client reload can retain multiplayer server progress. Use the game's restart
   control and verify its initial HUD before testing a fresh attempt.
+  The assistant plays only when the creator asks it to play or test something;
+  otherwise `build` and `check` are its verification and the creator plays.
 - `read_skill`: server-side, read-only SDK guidance from the bundled library, with
   at most 16,000 characters per page or 20 search matches. This never requests a
   browser file and cannot read credentials or private project storage.
