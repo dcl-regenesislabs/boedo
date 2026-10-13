@@ -38,7 +38,7 @@ describe('a build reply the model script may have forged', () => {
 })
 
 describe('a built model against its budget', () => {
-  it('is refused for a texture that is not a power of two', () => {
+  it('lists a texture that is not a power of two with the sizes to use', () => {
     expect(overBudget({ triangles: 10, materials: 1, textures: 1, largestTexture: 300 }, ['300x150 is not a power of two']))
       .toEqual(['300x150 is not a power of two; use 64/128/256/512'])
   })

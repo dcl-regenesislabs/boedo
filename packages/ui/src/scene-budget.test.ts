@@ -56,7 +56,7 @@ describe('scene budget over the project files', () => {
     expect((await sceneTextures()).used).toBe(2)
   })
 
-  it('measures the files a deployment carries against 200 a parcel', async () => {
+  it('holds the files the host counts for a deployment to 200 a parcel', async () => {
     setPublishedSize(async () => ({ bytes: 0, files: 201 }))
     const budget = await sceneBudget()
     setPublishedSize(null)

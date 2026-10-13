@@ -66,7 +66,8 @@ describe('a model build', () => {
     knob.position.y = 1
     parts[1].add(knob)
     const wheel = Object.assign(new THREE.Mesh(box, material), { name: 'Wheel' })
-    const other = [0, 1, 2, 3].map(() => new THREE.Mesh(box, new THREE.MeshBasicMaterial()))
+    const few = new THREE.MeshBasicMaterial()
+    const other = [0, 1, 2, 3].map(() => new THREE.Mesh(box, few))
     const group = new THREE.Group().add(...parts)
     root.add(group, wheel, ...other)
     const clip = new THREE.AnimationClip('Spin', 1, [new THREE.NumberKeyframeTrack('Wheel.position[x]', [0], [0])])
