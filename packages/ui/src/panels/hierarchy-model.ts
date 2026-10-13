@@ -13,9 +13,9 @@ import { entityName } from '@scene/custom-components'
 import { INERT_COMPONENT } from '../prefabs/format'
 import { log } from '../log'
 
-// SDK7 reserves the first block of ids for the engine and the player. Entity ids
-// are version-packed — (index & 0xffff) | (version << 16) — so a recycled id is
-// >= 65536 and never falls below this bound by accident.
+// SDK7 reserves the first block of ids for the engine and the players. Entity ids
+// are version-packed — (index & 0xffff) | (version << 16) — so compare the index:
+// a player who leaves and rejoins comes back as e.g. 65573, still reserved slot 37.
 export const RESERVED_ENTITIES = 512
 
 export interface HierarchyModel {
@@ -65,7 +65,7 @@ function underUi(snapshot: Snapshot, id: string): boolean {
 export function isEngineEntity(snapshot: Snapshot, id: string): boolean {
   const n = Number(id)
   if (!Number.isFinite(n)) return true
-  return n < RESERVED_ENTITIES
+  return (n & 0xffff) < RESERVED_ENTITIES
 }
 
 // Editor bookkeeping (inspector::Nodes, inspector::TransformConfig). Never scene

@@ -84,6 +84,15 @@ describe('buildHierarchyModel', () => {
     expect(withEngine.staticRoots).toEqual(['512'])
   })
 
+  it('keeps a version-bumped player entity out of the code shelf', () => {
+    // a rejoining player reuses reserved slot 37 with version 1: 37 | (1 << 16)
+    const avatar = String(37 + 65536)
+    const snapshot: Snapshot = { [avatar]: { AvatarBase: {}, PlayerIdentityData: {}, Transform: {} }, '512': named('Bench') }
+    const m = buildHierarchyModel(snapshot, { '512': named('Bench') }, false)
+    expect(m.codeRoots).toEqual([])
+    expect(m.counts.code).toBe(0)
+  })
+
   it('classifies UI as code even when the baseline claims it is authored', () => {
     // /crdt_initial is captured after the scene's code has run, so UI nodes can
     // appear in the baseline. Ui* is excluded from what can be saved
