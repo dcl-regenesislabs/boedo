@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { browserSceneRequest } from './scene'
 import { state } from '@scene/state'
 import { loadModelCatalog, type ModelAsset } from '@ui/assets'
+import { inspectModel } from '@ui/model-info'
+import { sceneTextures } from '@ui/scene-budget'
+import { buildCodeModel } from './code-model'
 
 const { setValue, deleteValue, status } = vi.hoisted(() => {
   const status = new Map<string, string>()
@@ -25,6 +28,8 @@ vi.mock('@ui/assets', () => ({ importCatalogFile: vi.fn(), loadModelCatalog: vi.
 vi.mock('@ui/engine/bus', () => ({ sendToScene: vi.fn() }))
 vi.mock('./code-model', () => ({ buildCodeModel: vi.fn(async () => { throw new Error('built') }), overBudget: () => [], MODEL_BUDGET: {} }))
 vi.mock('@ui/ai/requests', () => ({ runRequestText: vi.fn() }))
+vi.mock('@ui/model-info', async (real) => ({ ...(await real<object>()), inspectModel: vi.fn() }))
+vi.mock('@ui/scene-budget', async (real) => ({ ...(await real<object>()), sceneTextures: vi.fn() }))
 vi.mock('@ui/ai/request-format', () => ({ resolveEntityRef: (_: unknown, ref: string) => ref }))
 vi.mock('@ui/features/editor/scene-check-context', () => ({
   refreshSceneChecks: async () => [{ id: 'empty-prefab-ref', level: 'blocker', title: 'Nothing picked', detail: 'Pick a prefab', entityId: '512', fix: { label: 'x', action: 'y' } }]
@@ -110,6 +115,15 @@ describe('assistant scene requests', () => {
     expect(dog.slice(2).sort()).toEqual(['Basenji Dog Photo Print', 'METADOGE Dough Cut'])
     const stones = await found('stones')
     expect(stones.slice(0, 2).sort()).toEqual(['Rock01 Rework', 'Stone 03'])
+  })
+
+  it('refuses a model whose shared materials would take the scene past its texture limit, counting the ones it already has once', async () => {
+    const maps = ['stone-blocks', 'red-brick'].flatMap((name) => [`materials/${name}/color.jpg`, `materials/${name}/normal.jpg`])
+    vi.mocked(buildCodeModel).mockResolvedValueOnce({ bytes: new Uint8Array(8), clips: [], library: ['stone-blocks', 'red-brick'] })
+    vi.mocked(inspectModel).mockReturnValueOnce({ triangles: 100, materials: [{}, {}], textures: 4, largestImage: 512, sharedImages: maps, externalResources: maps } as unknown as ReturnType<typeof inspectModel>)
+    vi.mocked(sceneTextures).mockResolvedValueOnce({ used: 8, limit: 10, shared: new Set(['models/materials/stone-blocks/color.jpg']) })
+    await expect(browserSceneRequest({ type: 'buildModel', name: 'Tower', code: 'root', position: { x: 8, y: 0, z: 8 } }, new AbortController().signal))
+      .rejects.toThrow('The scene has 2 of its 10 textures left and this model would add 3')
   })
 
   it('builds into a stand-in without a name, the way the prompt shows it', async () => {

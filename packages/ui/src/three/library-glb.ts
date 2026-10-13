@@ -27,7 +27,7 @@ export function boxProjectUVs(geometry: THREE.BufferGeometry, world: THREE.Matri
 interface Gltf {
   materials?: {
     extras?: { library?: unknown }
-    pbrMetallicRoughness?: { baseColorTexture?: { index: number }; metallicRoughnessTexture?: { index: number } }
+    pbrMetallicRoughness?: { baseColorTexture?: { index: number } }
     normalTexture?: { index: number }
   }[]
   textures?: { source?: number }[]
@@ -52,8 +52,7 @@ export function externalizeLibraryImages(glb: ArrayBuffer): { glb: ArrayBuffer; 
     if (!isLibraryName(name)) continue
     const slots: [MaterialMap, number | undefined][] = [
       ['color', material.pbrMetallicRoughness?.baseColorTexture?.index],
-      ['normal', material.normalTexture?.index],
-      ['orm', material.pbrMetallicRoughness?.metallicRoughnessTexture?.index]
+      ['normal', material.normalTexture?.index]
     ]
     for (const [map, texture] of slots) {
       const source = texture === undefined ? undefined : json.textures?.[texture]?.source

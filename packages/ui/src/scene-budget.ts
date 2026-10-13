@@ -89,6 +89,21 @@ export async function sceneModels(): Promise<ModelRow[]> {
   return rows.sort((a, b) => b.triangles * b.entities.length - a.triangles * a.entities.length)
 }
 
+// What the scene's models already spend of its texture limit, and which shared files they point at:
+// a new model's shared file costs nothing when another model already uses it.
+export async function sceneTextures(): Promise<{ used: number; limit: number; shared: ReadonlySet<string> }> {
+  const files = new Map<string, Counts>()
+  for (const [, components] of authoredEntities()) {
+    const gltf = components.GltfContainer
+    if (!object(gltf) || typeof gltf.src !== 'string' || files.has(gltf.src)) continue
+    const counts = await countFile(gltf.src)
+    if (counts !== null) files.set(gltf.src, counts)
+  }
+  const shared = new Set([...files.values()].flatMap((f) => f.shared))
+  const used = [...files.values()].reduce((n, f) => n + f.textures, 0) + shared.size
+  return { used, limit: parcelLimits(Math.max(1, state.scene?.parcels.length ?? 1)).textures, shared }
+}
+
 export async function sceneBudget() {
   const parcels = Math.max(1, state.scene?.parcels.length ?? 1)
   const limits = parcelLimits(parcels)

@@ -1,5 +1,5 @@
-// Regenerates src/three/materials/ from ambientCG (CC0): each 1K set becomes 512 px color.jpg,
-// normal.jpg and orm.jpg (roughness in green, metalness in blue), plus CREDITS.md.
+// Regenerates src/three/materials/ from ambientCG (CC0): each 1K set becomes 512 px color.jpg and
+// normal.jpg, its roughness and metalness averaged into properties.json, plus CREDITS.md.
 // Run from the repo root: node packages/ui/scripts/pack-materials.mjs (needs unzip and Chromium).
 import fs from 'node:fs'
 import os from 'node:os'
@@ -20,6 +20,7 @@ const work = fs.mkdtempSync(path.join(os.tmpdir(), 'materials-'))
 
 const browser = await chromium.launch()
 const page = await browser.newPage()
+const properties = {}
 for (const [name, id] of Object.entries(SETS)) {
   const zip = path.join(work, `${id}.zip`)
   const response = await fetch(`https://ambientcg.com/get?file=${id}_1K-JPG.zip`)
@@ -58,22 +59,22 @@ for (const [name, id] of Object.entries(SETS)) {
       cg.putImageData(px, 0, 0)
     }
     const [normalCanvas] = await draw(normal)
-    const [ormCanvas, rg] = await draw(rough)
-    const r = rg.getImageData(0, 0, S, S)
-    const m = metal === null ? null : (await draw(metal))[1].getImageData(0, 0, S, S)
-    for (let i = 0; i < r.data.length; i += 4) {
-      const roughness = r.data[i]
-      r.data[i] = 255
-      r.data[i + 1] = roughness
-      r.data[i + 2] = m === null ? 0 : m.data[i]
+    const average = async (src) => {
+      if (src === null) return 0
+      const data = (await draw(src))[1].getImageData(0, 0, S, S).data
+      let total = 0
+      for (let i = 0; i < data.length; i += 4) total += data[i] / 255
+      return Math.round((total / (data.length / 4)) * 100) / 100
     }
-    rg.putImageData(r, 0, 0)
-    return { color: await jpg(colorCanvas), normal: await jpg(normalCanvas), orm: await jpg(ormCanvas) }
+    return { color: await jpg(colorCanvas), normal: await jpg(normalCanvas), roughness: await average(rough), metalness: await average(metal) }
   }, { color: map('Color'), normal: map('NormalGL'), rough: map('Roughness'), metal: map('Metalness') })
+  fs.rmSync(path.join(out, name), { recursive: true, force: true })
   fs.mkdirSync(path.join(out, name), { recursive: true })
-  for (const [file, data] of Object.entries(packed)) fs.writeFileSync(path.join(out, name, `${file}.jpg`), Buffer.from(data, 'base64'))
-  console.log(name, id)
+  for (const file of ['color', 'normal']) fs.writeFileSync(path.join(out, name, `${file}.jpg`), Buffer.from(packed[file], 'base64'))
+  properties[name] = { roughness: packed.roughness, metalness: packed.metalness }
+  console.log(name, id, properties[name])
 }
+fs.writeFileSync(path.join(out, 'properties.json'), `${JSON.stringify(properties, null, 2)}\n`)
 await browser.close()
 fs.rmSync(work, { recursive: true, force: true })
 
@@ -81,8 +82,9 @@ const rows = Object.entries(SETS).map(([name, id]) => `| \`${name}\` | [${id}](h
 fs.writeFileSync(path.join(out, 'CREDITS.md'), `# Material credits
 
 Every material here is a photo-scanned set from [ambientCG](https://ambientcg.com), released under
-[CC0 1.0](https://docs.ambientcg.com/license/). Scaled to 512 px; \`orm.jpg\` packs roughness (green)
-and metalness (blue) the way glTF reads them, and a dark scan's colour is lifted to a mid brightness.
+[CC0 1.0](https://docs.ambientcg.com/license/). Scaled to 512 px, a colour and a normal map each; the
+scan's roughness and metalness are averaged into \`properties.json\`, and a dark scan's colour is lifted
+to a mid brightness.
 Regenerate with \`node packages/ui/scripts/pack-materials.mjs\`.
 
 | Material | ambientCG set |

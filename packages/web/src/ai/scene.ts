@@ -13,7 +13,7 @@ import { announceBuiltModel } from '@ui/features/ai/built-models'
 import { buildCodeModel, overBudget, MODEL_BUDGET } from './code-model'
 import { MATERIAL_MAPS, materialFile } from '@ui/three/materials'
 import { materialBytes } from './material-files'
-import { sceneBudget } from '@ui/scene-budget'
+import { sceneBudget, sceneTextures } from '@ui/scene-budget'
 import { isFlatModel, searchModels } from './model-search'
 import { sendToScene } from '@ui/engine/bus'
 import { runRequestText } from '@ui/ai/requests'
@@ -186,24 +186,30 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     // counted from the exported file: the script ran in the worker, so nothing it reports is trusted
     const info = inspectModel(bytes)
     // the only files a built model may point at are the shared materials written beside it
-    const allowed = new Set(library.flatMap((name) => MATERIAL_MAPS.map((map) => materialFile(name, map))))
+    const allowed = new Map(library.flatMap((name) => MATERIAL_MAPS.map((map) => [materialFile(name, map), { name, map }] as const)))
     const outside = info.sharedImages.filter((uri) => !allowed.has(uri))
     if (info.externalResources.some((uri) => !info.sharedImages.includes(uri)) || outside.length > 0) throw new Error('The model refers to files outside the shared materials.')
     const stats = { triangles: info.triangles, materials: info.materials.length, textures: info.textures - info.sharedImages.length, largestTexture: info.largestImage }
     const over = overBudget(stats)
     if (over.length > 0) throw new Error(`The model is over budget (${over.join(', ')}); simplify it and build again.`)
+    // shared materials cost the scene's texture limit, once each however many models use them
+    const textures = await sceneTextures()
+    const adds = stats.textures + info.sharedImages.filter((uri) => !textures.shared.has(`models/${uri}`)).length
+    if (textures.used + adds > textures.limit) {
+      throw new Error(`The scene has ${Math.max(0, textures.limit - textures.used)} of its ${textures.limit} textures left and this model would add ${adds}. ` +
+        'Reuse materials the scene already has, give parts seen from afar relief:false, use fewer materials, or grow the parcels.')
+    }
     const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
     // a rebuild gets a new path, so the engine loads it instead of a cached copy
     const rel = `models/${slug}-${[...digest.slice(0, 4)].map((b) => b.toString(16).padStart(2, '0')).join('')}.glb`
     await ignoreModelScripts()
     await dataLayerSaveFileBytes(`models/src/${slug}.js`, new TextEncoder().encode(request.code))
     // the shared material files first, so the model never loads without them
-    for (const name of library) {
-      for (const map of MATERIAL_MAPS) {
-        const file = `models/${materialFile(name, map)}`
-        if (!(await dataLayerReadFileBytes(file).then(() => true, () => false))) await dataLayerSaveFileBytes(file, await materialBytes(name, map))
-        await ensureContentMapped(file)
-      }
+    for (const uri of info.sharedImages) {
+      const { name, map } = allowed.get(uri)!
+      const file = `models/${uri}`
+      if (!(await dataLayerReadFileBytes(file).then(() => true, () => false))) await dataLayerSaveFileBytes(file, await materialBytes(name, map))
+      await ensureContentMapped(file)
     }
     await dataLayerSaveFileBytes(rel, bytes)
     await ensureContentMapped(rel)

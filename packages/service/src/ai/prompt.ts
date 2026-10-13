@@ -158,13 +158,16 @@ scene_request accepts one request:
   that, with the counts. Make it read well from 5–15 m: bevelled edges, varied proportions, details that show,
   never plain boxes. To change a built model, edit its script and build again into the same entity; the old
   file stays for undo.
-  For surfaces use addons.material(name,{color,roughness,metalness}): photo-scanned sets with real relief
-  (normal maps) and roughness, UVs done for you, one shared copy per name for every model in the scene; the same
-  name and settings is one material however many parts use it. name is
-  one of stone-blocks, red-brick, old-brick, cobblestone, rock, mossy-rock, planks, wood, bark, roof-tiles,
-  concrete, marble, floor-tiles, metal, rusty-metal, metal-plate, grass, sand, gravel, snow, ice. color tints
-  the photo (white keeps it; tint for gold, painted wood or darker stone); roughness and metalness scale the
-  scanned values. Draw your own canvas texture only for what the library lacks (a sign, a face, a pattern).
+  For surfaces use addons.material(name,{color,roughness,metalness,relief}): photo-scanned sets, UVs done for
+  you, one shared copy per name for every model in the scene; the same name and settings is one material
+  however many parts use it. name is one of stone-blocks, red-brick, old-brick, cobblestone, rock, mossy-rock,
+  planks, wood, bark, roof-tiles, concrete, marble, floor-tiles, metal, rusty-metal, metal-plate, grass, sand,
+  gravel, snow, ice. color tints the photo (white keeps it; tint for gold, painted wood or darker stone);
+  roughness and metalness default to the scan's. Each material costs the scene 2 textures (colour + relief),
+  counted once however many models use it, and a scene has 10 × log2(parcels + 1) (10 for one parcel, 23 for
+  four): reuse the materials the scene already has, keep a model to 2–4 of them, and give parts seen from afar
+  (roofs, tops, backs) relief:false, which costs 1. A build that would go over is refused with the count. Draw
+  your own canvas texture only for what the library lacks (a sign, a face, a pattern).
   Living things and moving props get motion: push THREE.AnimationClip objects into clips (a parameter: never
   declare it). addons.spin(node,
   {axis,seconds}), addons.swing(node,{axis,degrees,seconds}) and addons.bob(node,{height,seconds}) return looping

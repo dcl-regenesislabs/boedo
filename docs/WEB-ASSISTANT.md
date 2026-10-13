@@ -145,8 +145,9 @@ components; see the [service README](../packages/service/README.md).
   names) and counts the model from the GLB against a per-model budget (8,000 triangles,
   6 materials, 4 textures up to 512 px). It writes `models/<name>-<hash>.glb`, the script
   to `models/src/` (kept out of the published scene) and the shared materials it
-  uses to `models/materials/<name>/` (color, normal and roughness/metalness JPGs bundled
-  with the editor; the worker never sees them). A rebuild keeps the previous file so undo still works.
+  uses to `models/materials/<name>/` (a colour and a relief JPG bundled with the editor; the
+  worker never sees them). Each costs the scene's texture limit once, and a build that would
+  push the scene over it is refused. A rebuild keeps the previous file so undo still works.
   `check` also returns the scene's budget against the parcel limits and its deploy size.
 - `build`: compile the current browser project, run the bundle once and return compiler
   diagnostics plus scene/client/server errors. This does not simulate a full playthrough.

@@ -1,8 +1,9 @@
 # Material credits
 
 Every material here is a photo-scanned set from [ambientCG](https://ambientcg.com), released under
-[CC0 1.0](https://docs.ambientcg.com/license/). Scaled to 512 px; `orm.jpg` packs roughness (green)
-and metalness (blue) the way glTF reads them, and a dark scan's colour is lifted to a mid brightness.
+[CC0 1.0](https://docs.ambientcg.com/license/). Scaled to 512 px, a colour and a normal map each; the
+scan's roughness and metalness are averaged into `properties.json`, and a dark scan's colour is lifted
+to a mid brightness.
 Regenerate with `node packages/ui/scripts/pack-materials.mjs`.
 
 | Material | ambientCG set |

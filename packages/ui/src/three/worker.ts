@@ -7,7 +7,7 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
 import { Brush, Evaluator, ADDITION, SUBTRACTION, INTERSECTION } from 'three-bvh-csg'
 import type { ThreeReply, ThreeRequest } from './protocol'
 import { lockDown, refusedSyntax } from './sandbox'
-import { isLibraryName, LIBRARY, metresPerTile, type LibraryName, type MaterialMap } from './materials'
+import { isLibraryName, LIBRARY, metresPerTile, surface, type LibraryName, type MaterialMap } from './materials'
 import { boxProjectUVs, externalizeLibraryImages } from './library-glb'
 
 type Axis = 'x' | 'y' | 'z'
@@ -53,16 +53,18 @@ function standIn(name: LibraryName, map: MaterialMap): THREE.CanvasTexture {
 
 // one material per name and settings, so a material used on many parts counts once against the budget
 const libraryMaterials = new Map<string, THREE.MeshStandardMaterial>()
-function libraryMaterial(name: unknown, o: { color?: THREE.ColorRepresentation; roughness?: number; metalness?: number } = {}): THREE.MeshStandardMaterial {
+function libraryMaterial(name: unknown, o: { color?: THREE.ColorRepresentation; roughness?: number; metalness?: number; relief?: boolean } = {}): THREE.MeshStandardMaterial {
   if (!isLibraryName(name)) throw new Error(`addons.material takes one of ${LIBRARY.join(', ')}`)
-  const key = `${name}|${new THREE.Color(o.color ?? 0xffffff).getHexString()}|${o.roughness ?? 1}|${o.metalness ?? 1}`
+  const roughness = o.roughness ?? surface(name).roughness
+  const metalness = o.metalness ?? surface(name).metalness
+  const relief = o.relief !== false
+  const key = `${name}|${new THREE.Color(o.color ?? 0xffffff).getHexString()}|${roughness}|${metalness}|${relief}`
   const known = libraryMaterials.get(key)
   if (known !== undefined) return known
-  const orm = standIn(name, 'orm')
-  // the factors scale the scanned maps, so 1 keeps them as photographed
+  // relief is the normal map: a second texture, worth it on what players see up close
   const material = new THREE.MeshStandardMaterial({
-    map: standIn(name, 'color'), normalMap: standIn(name, 'normal'), roughnessMap: orm, metalnessMap: orm,
-    color: o.color ?? 0xffffff, roughness: o.roughness ?? 1, metalness: o.metalness ?? 1
+    map: standIn(name, 'color'), ...(relief ? { normalMap: standIn(name, 'normal') } : {}),
+    color: o.color ?? 0xffffff, roughness, metalness
   })
   material.userData.library = name
   material.name = name
