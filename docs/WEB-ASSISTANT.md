@@ -159,8 +159,9 @@ components; see the [service README](../packages/service/README.md).
 - `view`: capture the viewport, optionally framing an entity or setting the camera pose.
   There is no shell, package installation, deletion or publishing tool.
 - `playtest`: start or stop Play, read the player's position, HUD and runtime errors,
-  walk with the movement controller, hold movement/jump keys, or click a viewport
-  position. Each movement or wait lasts at most five seconds. Stop restores the
+  walk on the ground with the movement controller, press the E/F interaction keys,
+  or click a viewport position. It cannot jump or steer with movement keys: routes
+  that need a jump are left for the creator to try. Each movement or wait lasts at most five seconds. Stop restores the
   authored scene; playtest actions do not grant progress or teleport the player.
   A client reload can retain multiplayer server progress. Use the game's restart
   control and verify its initial HUD before testing a fresh attempt.

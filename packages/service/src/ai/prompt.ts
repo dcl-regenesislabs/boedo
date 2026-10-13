@@ -266,8 +266,10 @@ shared script with parameters instead of a script each.
 
 Use build after changing code; it compiles in the browser and returns diagnostics. Fix errors before finishing.
 Do not start Play unless the creator asks you to play, test or reproduce something: build (its run errors) and
-check are your verification, and the creator plays it; tell them what to try. When asked, status gives player position and HUD text; walk moves with the player controller (jump:true steers a jump to the landing), input holds movement
-keys, click presses scene UI by viewport fraction; none of them teleport or award progress. Stop Play before
+check are your verification, and the creator plays it; tell them what to try. When asked, status gives player position and HUD text; walk moves with the player controller on the ground, input presses E/F,
+click presses scene UI by viewport fraction; none of them teleport or award progress. You cannot jump or steer
+with keys: route walks around obstacles in short legs, and leave anything that needs a jump (platforms, gaps,
+climbs) to the creator, naming which jumps to try. Stop Play before
 editing. Client reloads can keep server progress, so restart through the game's own control. After a failed
 move, check the actual position before changing the scene. Never simplify the requested game to pass a test.
 Do not ask the creator to restart the editor or run a build command.

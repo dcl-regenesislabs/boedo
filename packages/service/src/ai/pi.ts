@@ -95,10 +95,9 @@ export async function createPiFactory(authPath: string, preferredModel?: string,
         build: Type.Object({ label }),
         playtest: Type.Object({
           action: Type.Union(['start', 'stop', 'status', 'input', 'wait', 'walk', 'click'].map((value) => Type.Literal(value))),
-          keys: Type.Optional(Type.Array(Type.String(), { maxItems: 4 })),
+          keys: Type.Optional(Type.Array(Type.String(), { maxItems: 2 })),
           durationMs: Type.Optional(Type.Number({ minimum: 0, maximum: 5000 })),
           to: Type.Optional(Type.Object({ x: Type.Number(), y: Type.Number(), z: Type.Number() })),
-          jump: Type.Optional(Type.Boolean()),
           x: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
           y: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })), label
         }),
@@ -116,7 +115,7 @@ export async function createPiFactory(authPath: string, preferredModel?: string,
         write_file: 'Create or replace source code, only if its revision still matches.',
         scene_request: 'Inspect or change the live scene using the editor actions documented in the system prompt.',
         build: 'Compile and run the browser project once. Return compiler diagnostics and runtime errors; does not publish it.',
-        playtest: 'Check the running game with the real player controller and UI: a quick run after a build, or reproducing what the creator reports. start reloads the client scene at spawn and plays; stop restores edit mode and discards client runtime changes. The multiplayer server can retain progress across reloads: click the game restart button and verify its initial HUD before a fresh attempt. status reports player world position, HUD text and runtime errors. input holds keys W/A/S/D/Space/E/F/Shift for durationMs (0–5000); wait advances time; walk uses the controller towards to in world metres, optionally pressing Space with jump:true. click presses the scene UI at x/y fractions of the viewport. Does not grant progress. Use view during play to see the HUD and route.',
+        playtest: 'Check the running game with the real player controller and UI: a quick run after a build, or reproducing what the creator reports. start reloads the client scene at spawn and plays; stop restores edit mode and discards client runtime changes. The multiplayer server can retain progress across reloads: click the game restart button and verify its initial HUD before a fresh attempt. status reports player world position, HUD text and runtime errors. input holds the interaction keys E/F for durationMs (0–5000); wait advances time; walk uses the controller towards to in world metres, on the ground only. click presses the scene UI at x/y fractions of the viewport. Does not grant progress. Use view during play to see the HUD and route.',
         view: 'A picture of the scene. As is; or framed on entity (an id or unique name); or from a world position `from` looking at `lookAt`, in metres (16 per parcel), for a plan view from above, a facade or a close-up. Use it to check what you placed, moved or built.'
       }
       const tools: ToolDefinition[] = (Object.keys(schema) as BrowserToolName[]).map((name) => ({

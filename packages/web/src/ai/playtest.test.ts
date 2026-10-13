@@ -28,14 +28,14 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 describe('assistant playtesting', () => {
-  it('releases held movement keys when a turn is cancelled', async () => {
+  it('releases held interaction keys when a turn is cancelled', async () => {
     const controller = new AbortController()
     const released: string[] = []
     const canvas = document.querySelector('canvas')!
     canvas.addEventListener('keydown', () => controller.abort())
     canvas.addEventListener('keyup', (event) => released.push(event.code))
-    await expect(playtest({ action: 'input', keys: ['W', 'Space'], durationMs: 5000 }, controller.signal)).rejects.toThrow()
-    expect(released).toEqual(['KeyW', 'Space'])
+    await expect(playtest({ action: 'input', keys: ['E', 'F'], durationMs: 5000 }, controller.signal)).rejects.toThrow()
+    expect(released).toEqual(['KeyE', 'KeyF'])
     expect(mock.command).not.toHaveBeenCalled()
   })
 
@@ -43,7 +43,7 @@ describe('assistant playtesting', () => {
     mock.state.frozen = true
     mock.state.saveStatus = 'Missing checkpoint'
     await expect(playtest({ action: 'start' }, new AbortController().signal)).rejects.toThrow('Missing checkpoint')
-    await expect(playtest({ action: 'input', keys: ['W'] }, new AbortController().signal)).rejects.toThrow('Start playtesting')
+    await expect(playtest({ action: 'input', keys: ['E'] }, new AbortController().signal)).rejects.toThrow('Start playtesting')
     expect(mock.command).not.toHaveBeenCalled()
   })
 
@@ -81,27 +81,10 @@ describe('assistant playtesting', () => {
 
   it('bounds durations and rejects arbitrary keys and nonfinite targets', async () => {
     for (const request of [
-      { action: 'input', keys: ['Meta'] }, { action: 'input', keys: ['W'], durationMs: Infinity },
+      { action: 'input', keys: ['Meta'] }, { action: 'input', keys: ['W'] }, { action: 'input', keys: ['E'], durationMs: Infinity },
       { action: 'wait', durationMs: 5001 }, { action: 'walk', to: { x: NaN, y: 0, z: 0 } },
       { action: 'click', x: -1, y: 0.5 }
     ]) await expect(playtest(request, new AbortController().signal)).rejects.toThrow()
     expect(mock.command).not.toHaveBeenCalled()
   })
-
-  it('steers a jump with camera-relative keys and releases them on cancellation', async () => {
-    const controller = new AbortController()
-    const pressed: string[] = []
-    const released: string[] = []
-    const canvas = document.querySelector('canvas')!
-    canvas.addEventListener('keydown', (event) => {
-      pressed.push(event.code)
-      if (event.code === 'Space') controller.abort()
-    })
-    canvas.addEventListener('keyup', (event) => released.push(event.code))
-    await expect(playtest({ action: 'walk', to: { x: 5, y: 2, z: 3 }, jump: true }, controller.signal)).rejects.toThrow()
-    expect(pressed).toEqual(['KeyD', 'Space'])
-    expect(released).toEqual(['KeyD', 'Space'])
-    expect(mock.command.mock.calls.every((call) => call[0] === 'player_position')).toBe(true)
-  })
-
 })

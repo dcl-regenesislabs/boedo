@@ -222,9 +222,9 @@ don't install a coding tool on your computer: it reads and edits the project ope
 in your browser, including imported projects, and builds there. Sign in to
 Decentraland and use the assistant when the hosting service has enabled it.
 For a new game it proposes a short plan and asks what to change before building, then builds in
-stages you can react to. After a build it starts Play once to check the game runs and its HUD shows;
-playing it through is yours, and it can reproduce a problem you report with real movement, jumps and
-HUD clicks. Parcel changes load the new preview during the same turn, so it can keep building.
+stages you can react to. It checks its work with builds and scene checks; playing it through is
+yours. When you ask, it plays to reproduce a problem, walking on the ground and clicking the HUD;
+jumps are left for you to try. Parcel changes load the new preview during the same turn, so it can keep building.
 If another edit changes a file while it is working, it must read the new version
 before saving. Service setup: [Web assistant](./docs/WEB-ASSISTANT.md).
 Completed turns resume after reloads and service restarts using encrypted memory
