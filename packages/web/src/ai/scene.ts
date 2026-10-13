@@ -11,7 +11,9 @@ import { dataLayerListFiles, dataLayerReadFile, dataLayerReadFileBytes, dataLaye
 import { inspectModel } from '@ui/model-info'
 import { announceBuiltModel } from '@ui/features/ai/built-models'
 import { buildCodeModel, overBudget, MODEL_BUDGET } from './code-model'
-import { sceneBudget } from '@ui/scene-budget'
+import { MATERIAL_MAPS, materialFile } from '@ui/three/materials'
+import { materialBytes } from './material-files'
+import { modelImagePath, sceneBudget, sceneTextures } from '@ui/scene-budget'
 import { isFlatModel, searchModels } from './model-search'
 import { sendToScene } from '@ui/engine/bus'
 import { runRequestText } from '@ui/ai/requests'
@@ -170,8 +172,10 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     await loadModelCatalog()
     const asset = modelById(request.id)
     if (asset === undefined) throw new Error('No catalog model has that id. Use findModels.')
-    const placed = await placeGltf(request, await importCatalogFile(asset), asset.name, signal, settings)
-    return { ...placed, size: sizeOf(asset) }
+    const rel = await importCatalogFile(asset)
+    const cost = await catalogTextureCost(rel)
+    const placed = await placeGltf(request, rel, asset.name, signal, settings)
+    return { ...placed, size: sizeOf(asset), ...cost }
   }
   if (request.type === 'buildModel') {
     // building into a stand-in may leave out the name: the stand-in's own name is the model's
@@ -180,24 +184,33 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
     if (slug === '' || slug.length > 60) throw new Error('buildModel needs name (or into): 1–60 letters or digits.')
     if (typeof request.code !== 'string' || request.code.length > 60_000) throw new Error('buildModel needs code: the model script, under 60,000 characters.')
-    const { bytes, clips, library } = await buildCodeModel(request.code, signal)
+    const { bytes, clips, library, warnings } = await buildCodeModel(request.code, name, signal)
     // counted from the exported file: the script ran in the worker, so nothing it reports is trusted
     const info = inspectModel(bytes)
     // the only files a built model may point at are the shared materials written beside it
-    const outside = info.sharedImages.filter((uri) => !library.some((l) => uri === `materials/${l.name}.png`))
+    const allowed = new Map(library.flatMap((name) => MATERIAL_MAPS.map((map) => [materialFile(name, map), { name, map }] as const)))
+    const outside = info.sharedImages.filter((uri) => !allowed.has(uri))
     if (info.externalResources.some((uri) => !info.sharedImages.includes(uri)) || outside.length > 0) throw new Error('The model refers to files outside the shared materials.')
     const stats = { triangles: info.triangles, materials: info.materials.length, textures: info.textures - info.sharedImages.length, largestTexture: info.largestImage }
-    const over = overBudget(stats)
+    const over = overBudget(stats, info.textureProblems)
     if (over.length > 0) throw new Error(`The model is over budget (${over.join(', ')}); simplify it and build again.`)
+    // shared materials cost the scene's texture limit, once each however many models use them
+    const textures = await sceneTextures()
+    const adds = stats.textures + info.sharedImages.filter((uri) => !textures.shared.has(`models/${uri}`)).length
+    if (textures.used + adds > textures.limit) {
+      throw new Error(`The scene has ${Math.max(0, textures.limit - textures.used)} of its ${textures.limit} textures left and this model would add ${adds}. ` +
+        'Reuse materials the scene already has, give parts seen from afar relief:false, use fewer materials, or grow the parcels.')
+    }
     const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
     // a rebuild gets a new path, so the engine loads it instead of a cached copy
     const rel = `models/${slug}-${[...digest.slice(0, 4)].map((b) => b.toString(16).padStart(2, '0')).join('')}.glb`
     await ignoreModelScripts()
     await dataLayerSaveFileBytes(`models/src/${slug}.js`, new TextEncoder().encode(request.code))
     // the shared material files first, so the model never loads without them
-    for (const { name, png } of library) {
-      const file = `models/materials/${name}.png`
-      if (!(await dataLayerReadFileBytes(file).then(() => true, () => false))) await dataLayerSaveFileBytes(file, png)
+    for (const uri of info.sharedImages) {
+      const { name, map } = allowed.get(uri)!
+      const file = `models/${uri}`
+      if (!(await dataLayerReadFileBytes(file).then(() => true, () => false))) await dataLayerSaveFileBytes(file, await materialBytes(name, map))
       await ensureContentMapped(file)
     }
     await dataLayerSaveFileBytes(rel, bytes)
@@ -205,7 +218,7 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     // the old build stays: undo can still point the entity back at it, and Assets can delete it
     const placed = await placeGltf({ ...request, name: request.into === undefined ? name : undefined }, rel, name, signal, settings)
     announceBuiltModel({ name, path: rel, triangles: stats.triangles })
-    return { ...placed, script: `models/src/${slug}.js`, stats, clips, materials: library.map((l) => l.name), budget: MODEL_BUDGET, kb: Math.round(bytes.length / 1024), scene: await sceneBudget() }
+    return { ...placed, script: `models/src/${slug}.js`, stats, clips, materials: library, ...(warnings.length > 0 ? { warnings } : {}), budget: MODEL_BUDGET, kb: Math.round(bytes.length / 1024), scene: await sceneBudget() }
   }
   if (request.type === 'createEntity') {
     if (typeof request.name !== 'string' || !request.name.trim() || request.name.length > 100) throw new Error('Choose an entity name of 1–100 characters.')
@@ -257,6 +270,24 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
   if (!['attachScript', 'setParams', 'placePrefab'].includes(String(request.type))) throw new Error('Unsupported scene request.')
   if (request.type !== 'placePrefab') entity(request.to)
   return runRequestText(JSON.stringify({ version: 1, requests: [request] }), state.activeEntity)
+}
+
+// A catalog model is placed whatever its textures cost: the answer says what it spends of the scene's limit.
+async function catalogTextureCost(rel: string): Promise<Record<string, unknown>> {
+  let info: ReturnType<typeof inspectModel>
+  try {
+    info = inspectModel(await dataLayerReadFileBytes(rel))
+  } catch {
+    return { warning: 'Its textures could not be counted; run check to see the scene budget.' }
+  }
+  const scene = await sceneTextures()
+  const placedAlready = Object.values(state.snapshot).some((c) => object(c.GltfContainer) && c.GltfContainer.src === rel)
+  const adds = placedAlready ? 0 : info.textures - info.sharedImages.length + info.sharedImages.filter((uri) => !scene.shared.has(modelImagePath(rel, uri))).length
+  const left = scene.limit - scene.used - adds
+  return {
+    textures: info.textures, materials: info.materials.length, sceneTexturesLeft: left,
+    ...(left < 0 ? { warning: `The scene now uses ${scene.used + adds} of its ${scene.limit} textures; explorers warn above that. Swap it for a model with fewer textures, or grow the parcels.` } : {})
+  }
 }
 
 // Puts a model file on a new entity, or turns the `into` stand-in into it in place.

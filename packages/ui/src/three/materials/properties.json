@@ -1,0 +1,86 @@
+{
+  "stone-blocks": {
+    "roughness": 0.62,
+    "metalness": 0
+  },
+  "red-brick": {
+    "roughness": 0.58,
+    "metalness": 0
+  },
+  "old-brick": {
+    "roughness": 0.6,
+    "metalness": 0
+  },
+  "cobblestone": {
+    "roughness": 0.62,
+    "metalness": 0
+  },
+  "rock": {
+    "roughness": 0.65,
+    "metalness": 0
+  },
+  "mossy-rock": {
+    "roughness": 0.55,
+    "metalness": 0
+  },
+  "planks": {
+    "roughness": 0.45,
+    "metalness": 0
+  },
+  "wood": {
+    "roughness": 0.48,
+    "metalness": 0
+  },
+  "bark": {
+    "roughness": 0.62,
+    "metalness": 0
+  },
+  "roof-tiles": {
+    "roughness": 0.68,
+    "metalness": 0
+  },
+  "concrete": {
+    "roughness": 0.52,
+    "metalness": 0
+  },
+  "marble": {
+    "roughness": 0.07,
+    "metalness": 0
+  },
+  "floor-tiles": {
+    "roughness": 0.51,
+    "metalness": 0
+  },
+  "metal": {
+    "roughness": 0.41,
+    "metalness": 1
+  },
+  "rusty-metal": {
+    "roughness": 0.5,
+    "metalness": 0.75
+  },
+  "metal-plate": {
+    "roughness": 0.56,
+    "metalness": 0.03
+  },
+  "grass": {
+    "roughness": 0.54,
+    "metalness": 0
+  },
+  "sand": {
+    "roughness": 0.67,
+    "metalness": 0
+  },
+  "gravel": {
+    "roughness": 0.58,
+    "metalness": 0
+  },
+  "snow": {
+    "roughness": 0.5,
+    "metalness": 0
+  },
+  "ice": {
+    "roughness": 0.21,
+    "metalness": 0
+  }
+}

@@ -9,6 +9,8 @@ import { PublishError } from './errors'
 
 // sdk-commands' limit on one file of a deployment
 const MAX_FILE_BYTES = 50_000_000
+// worlds-content-server's MAX_FILE_COUNT default, over the entity's content entries
+const MAX_FILES = 10_000
 const PARCEL = /^-?\d+,-?\d+$/
 
 export interface DeploymentEntity {
@@ -117,6 +119,9 @@ export async function buildDeployment(input: {
     const id = await contentCid(bytes)
     list.push({ file: path, hash: id })
     files.set(id, bytes)
+  }
+  if (list.length > MAX_FILES) {
+    throw invalid(`This scene has ${list.length.toLocaleString('en')} files and a World takes at most ${MAX_FILES.toLocaleString('en')}. Delete files it does not use in Assets.`)
   }
   let bytes = 0
   for (const file of files.values()) bytes += file.length

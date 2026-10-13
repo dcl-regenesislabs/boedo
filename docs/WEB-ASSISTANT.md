@@ -144,8 +144,15 @@ components; see the [service README](../packages/service/README.md).
   policy that allows no network; the page checks the reply (size caps, known material
   names) and counts the model from the GLB against a per-model budget (8,000 triangles,
   6 materials, 4 textures up to 512 px). It writes `models/<name>-<hash>.glb`, the script
-  to `models/src/` (kept out of the published scene) and shared materials to
-  `models/materials/`. A rebuild keeps the previous file so undo still works.
+  to `models/src/` (kept out of the published scene) and the shared materials it
+  uses to `models/materials/T_<Name>_D.jpg` (colour, 1024 px) and `T_<Name>_N.jpg` (relief,
+  512 px), Decentraland's naming, bundled with the editor; the worker never sees them. Each
+  costs the scene's texture limit once, and a build that would push the scene over it is
+  refused, as is any texture that is not a power of two. The build follows Decentraland's
+  rules: double-sided parts become two front faces, vertex colours are removed, unnamed parts
+  are named `<Model>_PartNN` and static parts sharing a material are merged. A rebuild keeps
+  the previous file so undo still works; deleting a model also deletes material images
+  nothing else uses, and Assets lists unused ones.
   `check` also returns the scene's budget against the parcel limits and its deploy size.
 - `build`: compile the current browser project, run the bundle once and return compiler
   diagnostics plus scene/client/server errors. This does not simulate a full playthrough.

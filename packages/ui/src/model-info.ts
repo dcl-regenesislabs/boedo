@@ -44,20 +44,23 @@ function binChunk(bytes: Uint8Array): Uint8Array {
   return bytes.subarray(at + 8, Math.min(bytes.length, at + 8 + view.getUint32(at, true)))
 }
 
-// The longest side among the images embedded in the file; 0 when none can be read.
-function largestImage(gltf: Record<string, unknown>, bin: Uint8Array): number {
+// The sizes of the images embedded in the file that can be read.
+function embeddedImageSizes(gltf: Record<string, unknown>, bin: Uint8Array): { width: number; height: number }[] {
   const views = rows(gltf.bufferViews)
-  let largest = 0
+  const sizes: { width: number; height: number }[] = []
   for (const image of rows(gltf.images)) {
     if (typeof image.bufferView !== 'number') continue
     const view = views[image.bufferView]
     if (view === undefined || typeof view.byteLength !== 'number') continue
     const start = typeof view.byteOffset === 'number' ? view.byteOffset : 0
     const size = imageSize(bin.subarray(start, start + view.byteLength))
-    if (size !== null) largest = Math.max(largest, size.width, size.height)
+    if (size !== null) sizes.push(size)
   }
-  return largest
+  return sizes
 }
+
+const MAX_TEXTURE_SIDE = 1024
+const powerOfTwo = (n: number): boolean => n > 0 && (n & (n - 1)) === 0
 
 // Width and height from a PNG or JPEG header, without decoding it.
 export function imageSize(image: Uint8Array): { width: number; height: number } | null {
@@ -85,19 +88,18 @@ export function inspectModel(bytes: Uint8Array) {
   let complete = true, primitives = 0, triangles = 0
   const visited = new Set<number>()
   // each mesh read once: a file where many nodes share a mesh of many primitives must not cost their product
-  const summaries = new Map<unknown, { primitives: number; triangles: number; box: { lo: number[]; hi: number[] } | null }>()
+  const summaries = new Map<unknown, { primitives: number; triangles: number; box: { lo: number[]; hi: number[] } | null; unbounded: boolean }>()
   const meshSummary = (index: unknown) => {
     const cached = summaries.get(index)
     if (cached !== undefined) return cached
-    let count = 0, tris = 0
+    let count = 0, tris = 0, unbounded = false
     let lo: number[] | null = null, hi: number[] | null = null
     for (const primitive of rows(at(meshes, index).primitives)) {
       count++
       if (Array.isArray(primitive.targets) && primitive.targets.length > 0) warnings.add('Morph target bounds are not included.')
       const position = object(primitive.attributes) ? at(accessors, primitive.attributes.POSITION) : null
       if (position === null || position.min === undefined || position.max === undefined) {
-        complete = false
-        warnings.add('Some primitives have no declared position bounds.')
+        unbounded = true
         continue
       }
       const pLo = numbers(position.min, 3), pHi = numbers(position.max, 3)
@@ -110,7 +112,7 @@ export function inspectModel(bytes: Uint8Array) {
         else if (primitive.mode === 5 || primitive.mode === 6) tris += Math.max(0, n - 2)
       }
     }
-    const summary = { primitives: count, triangles: tris, box: lo === null || hi === null ? null : { lo, hi } }
+    const summary = { primitives: count, triangles: tris, box: lo === null || hi === null ? null : { lo, hi }, unbounded }
     summaries.set(index, summary)
     return summary
   }
@@ -133,11 +135,16 @@ export function inspectModel(bytes: Uint8Array) {
       complete = false
       warnings.add('Instanced node bounds are unavailable; check the rendered model.')
     }
-    if (node.mesh !== undefined && !collider) {
+    if (node.mesh !== undefined) {
+      // a collider costs the scene's triangles and bodies too, but draws nothing
       const summary = meshSummary(node.mesh)
       primitives += summary.primitives
       triangles += summary.triangles
-      if (summary.box !== null) {
+      if (summary.unbounded && !collider) {
+        complete = false
+        warnings.add('Some primitives have no declared position bounds.')
+      }
+      if (summary.box !== null && !collider) {
         const { lo, hi } = summary.box
         for (let corner = 0; corner < 8; corner++) {
           const p = Vector3.transformCoordinates({ x: (corner & 1 ? hi : lo)[0], y: (corner & 2 ? hi : lo)[1], z: (corner & 4 ? hi : lo)[2] }, world)
@@ -164,12 +171,19 @@ export function inspectModel(bytes: Uint8Array) {
     .flatMap((item) => typeof item.uri === 'string' && !item.uri.startsWith('data:') ? [item.uri] : [])
   const animations = rows(gltf.animations).map((a, i) => typeof a.name === 'string' ? a.name : `animation ${i}`)
   // a caveat about the bounds, not a problem with the model: it must not reach the creator as a warning
+  const images = embeddedImageSizes(gltf, binChunk(bytes))
+  // DCL's converter wants power-of-two sides and scales anything past 1024 down
+  const textureProblems = images.flatMap(({ width, height }) =>
+    !powerOfTwo(width) || !powerOfTwo(height) ? [`${width}x${height} is not a power of two`]
+      : Math.max(width, height) > MAX_TEXTURE_SIDE ? [`${width}x${height} is over ${MAX_TEXTURE_SIDE}`] : [])
+  for (const problem of textureProblems) warnings.add(`Texture ${problem}.`)
   const coordinates = `SDK local metres, before entity Transform; conservative static visual bounds${animations.length > 0 ? ' that leave out movement during animation' : ''}`
   return {
     bytes: bytes.byteLength, bounds, coordinates,
     triangles, primitives, materials: rows(gltf.materials).map((m, i) => typeof m.name === 'string' ? m.name : `material ${i}`),
     textures: rows(gltf.images).length,
-    largestImage: largestImage(gltf, binChunk(bytes)),
+    largestImage: images.reduce((largest, size) => Math.max(largest, size.width, size.height), 0),
+    textureProblems,
     sharedImages: rows(gltf.images).flatMap((image) => typeof image.uri === 'string' && !image.uri.startsWith('data:') ? [image.uri] : []),
     animations, colliderNodes, externalResources: resources, warnings: [...warnings]
   }

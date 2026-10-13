@@ -48,6 +48,15 @@ integrity['three/worker.js'] = sri(fs.readFileSync(path.join(dist, 'three/worker
 const catalog = writePrefabCatalog(path.join(repo, 'packages/desktop/prefabs'), dist)
 integrity[catalog.file] = catalog.integrity
 
+// the shared materials buildModel writes into a project, fetched only when a model uses one
+const materials = path.join(repo, 'packages/ui/src/three/materials')
+fs.mkdirSync(path.join(dist, 'materials'), { recursive: true })
+for (const file of fs.readdirSync(materials).filter((f) => f.endsWith('.jpg'))) {
+  const rel = `materials/${file}`
+  fs.copyFileSync(path.join(materials, file), path.join(dist, rel))
+  integrity[rel] = sri(fs.readFileSync(path.join(dist, rel)))
+}
+
 const pinFetchedFiles = {
   name: 'pin-fetched-files',
   enforce: 'post',

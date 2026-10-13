@@ -125,12 +125,12 @@ const material: ViewConfig = {
   },
   sliders: { ...materialSliders(''), 'material.pbr.emissiveIntensity': { min: 0, max: 5, step: 0.1 } },
   files: {
-    'material.pbr.texture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg', 'ktx2'] },
-    'material.pbr.emissiveTexture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg', 'ktx2'] },
-    'material.pbr.bumpTexture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg', 'ktx2'] },
-    'material.pbr.alphaTexture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg', 'ktx2'] },
-    'material.unlit.texture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg', 'ktx2'] },
-    'material.unlit.alphaTexture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg', 'ktx2'] },
+    'material.pbr.texture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg'] },
+    'material.pbr.emissiveTexture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg'] },
+    'material.pbr.bumpTexture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg'] },
+    'material.pbr.alphaTexture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg'] },
+    'material.unlit.texture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg'] },
+    'material.unlit.alphaTexture.tex.texture.src': { ext: ['png', 'jpg', 'jpeg'] },
     'gltf.gltfSrc': { ext: ['glb', 'gltf'] }
   },
   docs: {

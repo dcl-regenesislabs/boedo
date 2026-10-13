@@ -11,14 +11,18 @@ function contentKey(bytes: Uint8Array): Promise<string> {
   return key
 }
 
-// The bytes a publish would upload: what .dclignore keeps, identical files stored once as publishing does by content id.
-export async function publishedBytes(files: Map<string, Uint8Array>): Promise<number> {
+// What a publish would upload: the bytes once per content, as publishing stores identical files once, and every
+// path as a file, as the deployment's content list and its file limit count them.
+export async function publishedSize(files: Map<string, Uint8Array>): Promise<{ bytes: number; files: number }> {
   const dclignore = files.get('.dclignore')
   const kept = publishableFiles(files.keys(), dclignore === undefined ? undefined : new TextDecoder().decode(dclignore)).filter((path) => path !== LOCK_FILE)
   const unique = new Map<string, number>()
+  let paths = 0
   for (const path of kept) {
     const bytes = files.get(path)
-    if (bytes !== undefined) unique.set(await contentKey(bytes), bytes.byteLength)
+    if (bytes === undefined) continue
+    unique.set(await contentKey(bytes), bytes.byteLength)
+    paths++
   }
-  return [...unique.values()].reduce((total, size) => total + size, 0)
+  return { bytes: [...unique.values()].reduce((total, size) => total + size, 0), files: paths }
 }

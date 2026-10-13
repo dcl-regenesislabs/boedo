@@ -11,12 +11,13 @@ vi.mock('./engine/datalayer', () => ({
   dataLayerPathTick: () => tick.n
 }))
 import { state } from '@scene/state'
-import { sceneBudget, sceneModels } from './scene-budget'
+import { sceneBudget, sceneModels, sceneTextures, setPublishedSize } from './scene-budget'
 
-const model = (count: number): Uint8Array => new TextEncoder().encode(JSON.stringify({
+const model = (count: number, extra: Record<string, unknown> = {}): Uint8Array => new TextEncoder().encode(JSON.stringify({
   asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0 }],
-  meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }], accessors: [{ min: [0, 0, 0], max: [1, 1, 1], count }]
+  meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }], accessors: [{ min: [0, 0, 0], max: [1, 1, 1], count }], ...extra
 }))
+const texture = (src: string) => ({ tex: { texture: { src } } })
 
 describe('scene budget over the project files', () => {
   beforeEach(() => {
@@ -42,5 +43,23 @@ describe('scene budget over the project files', () => {
     files.set('models/tree.glb', model(300))
     tick.n++
     expect((await sceneBudget()).used.triangles).toBe(101)
+  })
+
+  it('counts a Material\'s image files with the models\' shared ones, each file once, and no video texture', async () => {
+    files.set('models/tree.glb', model(3, { images: [{ uri: 'materials/T_Bark_D.jpg' }] }))
+    state.snapshot = {
+      '512': { GltfContainer: { src: 'models/tree.glb' } },
+      '513': { Material: { material: { pbr: { texture: texture('models/materials/T_Bark_D.jpg'), bumpTexture: texture('assets/images/bump.png') } } } },
+      '514': { Material: { material: { unlit: { texture: texture('assets/images/bump.png'), alphaTexture: { tex: { videoTexture: { videoPlayerEntity: 512 } } } } } } }
+    }
+    expect((await sceneBudget()).used.textures).toBe(2)
+    expect((await sceneTextures()).used).toBe(2)
+  })
+
+  it('holds the files the host counts for a deployment to 200 a parcel', async () => {
+    setPublishedSize(async () => ({ bytes: 0, files: 201 }))
+    const budget = await sceneBudget()
+    setPublishedSize(null)
+    expect([budget.used.files, budget.limits.files, budget.over]).toEqual([201, 200, ['files']])
   })
 })

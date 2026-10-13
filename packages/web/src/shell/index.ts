@@ -36,6 +36,7 @@ import { browserSceneRequest } from '../ai/scene'
 import { sameBytes } from '../ai/tools'
 import { captureView } from '../ai/view'
 import { createAssetRequests } from '../ai/assets'
+import { setMaterialBase } from '../ai/material-files'
 import { runFreshBuild } from '@ui/actions/verify-build'
 import { flushPendingSave } from '@ui/core/autosave'
 import { updateSpawnPoints } from '@ui/spawn-points'
@@ -59,7 +60,7 @@ import { createUserPrefabs } from './user-prefabs'
 import { fileIntegrity, threeWorkerSource } from '../workers'
 import { setThreeWorker } from '@ui/three/client'
 import { setPublishedSize } from '@ui/scene-budget'
-import { publishedBytes } from './deploy-size'
+import { publishedSize } from './deploy-size'
 import {
   COMPOSITE_CANDIDATES,
   IMG_MIME,
@@ -552,7 +553,8 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
       ? null
       : createUserPrefabs(createPrefabsApi(services.services.projects, (url, init) => services.signedFetch(url, init)), contentCid)
   setThreeWorker(threeWorkerSource(host.editorBase))
-  setPublishedSize(async () => publishedBytes(await projects.files(project().id)))
+  setMaterialBase(host.editorBase)
+  setPublishedSize(async () => publishedSize(await projects.files(project().id)))
   const prefabs = createPrefabLibrary({
     builtin: createBuiltinPrefabs(host.editorBase, fileIntegrity('prefabs/catalog.json'), fetchVerified),
     user: () => (userPrefabs !== null && wallet() !== null ? userPrefabs.tree : null)

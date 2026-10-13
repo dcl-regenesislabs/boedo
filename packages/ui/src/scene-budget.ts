@@ -1,4 +1,4 @@
-// The scene against the per-parcel limits; each placed copy of a model counts again.
+// The scene against the per-parcel limits: triangles and bodies count every placed copy, textures and materials once per file.
 import { object } from '@dcl-editor/contract'
 import { state, isRuntimeEntity, isUiEntity, provenanceBaseline } from '@scene/state'
 import { entityName } from '@scene/custom-components'
@@ -9,23 +9,35 @@ const MB = 1024 * 1024
 // a primitive's triangles as the engine meshes it
 const PRIMITIVE_TRIANGLES: Record<string, number> = { box: 12, plane: 2, cylinder: 128, sphere: 960 }
 
-// Soft caps the explorers warn about. Size has none here: what a deployment accepts depends on where it goes.
+// Soft caps the explorers warn about, and the file count Genesis City refuses a deployment above. Size has
+// none here: what a deployment accepts depends on where it goes.
 export function parcelLimits(parcels: number) {
   const log = Math.log2(parcels + 1)
-  return { triangles: parcels * 10_000, entities: parcels * 200, bodies: parcels * 300, textures: Math.floor(log * 10) }
+  return { triangles: parcels * 10_000, entities: parcels * 200, bodies: parcels * 300, materials: Math.floor(log * 20), textures: Math.floor(log * 10), files: parcels * 200 }
 }
 
 type Counts = { triangles: number; primitives: number; materials: number; textures: number; bytes: number; shared: string[]; clips: string[]; warnings: string[] }
-// The bytes a deployment would carry, from the host that knows the publish rules; without one only
-// the placed model files are counted.
-let publishedBytes: (() => Promise<number>) | null = null
-export function setPublishedSize(measure: (() => Promise<number>) | null): void {
-  publishedBytes = measure
+// The bytes and distinct files a deployment would carry, from the host that knows the publish rules;
+// without one only the placed model files are counted.
+type PublishedSize = { bytes: number; files: number }
+let publishedSize: (() => Promise<PublishedSize>) | null = null
+export function setPublishedSize(measure: (() => Promise<PublishedSize>) | null): void {
+  publishedSize = measure
 }
 
 const counted = new Map<string, { tick: number; counts: Promise<Counts | null> }>()
 // another project's files share no paths with this one's
 let countedIn: string | null = null
+
+// A file a model points at, as its project path.
+export function modelImagePath(model: string, uri: string): string {
+  const path = new URL(uri, `file:///${model.slice(0, model.lastIndexOf('/') + 1)}`).pathname.slice(1)
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
+}
 
 function countFile(src: string): Promise<Counts | null> {
   const realm = dataLayerRealm() ?? ''
@@ -40,8 +52,7 @@ function countFile(src: string): Promise<Counts | null> {
   const pending: Promise<Counts | null> = dataLayerReadFileBytes(src).then((bytes) => {
     const info = inspectModel(bytes)
     // a texture file beside the model, resolved to its project path so models sharing it count it once
-    const dir = src.slice(0, src.lastIndexOf('/') + 1)
-    const shared = info.sharedImages.map((uri) => new URL(uri, `file:///${dir}`).pathname.slice(1))
+    const shared = info.sharedImages.map((uri) => modelImagePath(src, uri))
     return { triangles: info.triangles, primitives: info.primitives, materials: info.materials.length, textures: info.textures - shared.length, bytes: bytes.byteLength, shared, clips: info.animations, warnings: info.warnings }
   }).catch(() => {
     // unreadable or not a model: reported as missing, and read again next time
@@ -50,6 +61,23 @@ function countFile(src: string): Promise<Counts | null> {
   })
   counted.set(src, { tick, counts: pending })
   return pending
+}
+
+const MATERIAL_TEXTURES = ['texture', 'bumpTexture', 'emissiveTexture', 'alphaTexture'] as const
+
+// The image files a Material component draws with; avatar and video textures are no file.
+export function materialTextureFiles(material: unknown): string[] {
+  if (!object(material) || !object(material.material)) return []
+  return Object.values(material.material).flatMap((variant) => !object(variant) ? [] : MATERIAL_TEXTURES.flatMap((key) => {
+    const slot = variant[key]
+    const file = object(slot) && object(slot.tex) && object(slot.tex.texture) ? slot.tex.texture.src : undefined
+    return typeof file === 'string' && file !== '' ? [file] : []
+  }))
+}
+
+// The image files beside a model it points at, as project paths; null when it cannot be read.
+export async function modelImageFiles(src: string): Promise<string[] | null> {
+  return (await countFile(src))?.shared ?? null
 }
 
 function authoredEntities(): [string, Record<string, unknown>][] {
@@ -89,6 +117,23 @@ export async function sceneModels(): Promise<ModelRow[]> {
   return rows.sort((a, b) => b.triangles * b.entities.length - a.triangles * a.entities.length)
 }
 
+// What the scene's models and Materials already spend of its texture limit, and which image files they
+// point at: a new model's shared file costs nothing when the scene already uses it.
+export async function sceneTextures(): Promise<{ used: number; limit: number; shared: ReadonlySet<string> }> {
+  const files = new Map<string, Counts>()
+  const images: string[] = []
+  for (const [, components] of authoredEntities()) {
+    images.push(...materialTextureFiles(components.Material))
+    const gltf = components.GltfContainer
+    if (!object(gltf) || typeof gltf.src !== 'string' || files.has(gltf.src)) continue
+    const counts = await countFile(gltf.src)
+    if (counts !== null) files.set(gltf.src, counts)
+  }
+  const shared = new Set([...files.values()].flatMap((f) => f.shared).concat(images))
+  const used = [...files.values()].reduce((n, f) => n + f.textures, 0) + shared.size
+  return { used, limit: parcelLimits(Math.max(1, state.scene?.parcels.length ?? 1)).textures, shared }
+}
+
 export async function sceneBudget() {
   const parcels = Math.max(1, state.scene?.parcels.length ?? 1)
   const limits = parcelLimits(parcels)
@@ -97,6 +142,7 @@ export async function sceneBudget() {
   let bodies = 0
   const files = new Map<string, Counts>()
   const materials = new Set<string>()
+  const images = new Set<string>()
   for (const [, components] of authored) {
     const gltf = components.GltfContainer
     if (object(gltf) && typeof gltf.src === 'string') {
@@ -109,20 +155,24 @@ export async function sceneBudget() {
       bodies++
     }
     if (components.Material !== undefined) materials.add(JSON.stringify(components.Material))
+    for (const file of materialTextureFiles(components.Material)) images.add(file)
   }
-  const modelBytes = [...files.values()].reduce((n, f) => n + f.bytes, 0)
+  for (const f of files.values()) for (const file of f.shared) images.add(file)
+  const placedOnly = { bytes: [...files.values()].reduce((n, f) => n + f.bytes, 0), files: files.size }
+  const published = publishedSize !== null ? await publishedSize().catch(() => placedOnly) : placedOnly
   const used = {
     triangles,
     entities: authored.length,
     bodies,
     materials: materials.size + [...files.values()].reduce((n, f) => n + f.materials, 0),
-    textures: [...files.values()].reduce((n, f) => n + f.textures, 0) + new Set([...files.values()].flatMap((f) => f.shared)).size,
-    megabytes: Math.round((publishedBytes !== null ? await publishedBytes().catch(() => modelBytes) : modelBytes) / MB * 10) / 10
+    textures: [...files.values()].reduce((n, f) => n + f.textures, 0) + images.size,
+    files: published.files,
+    megabytes: Math.round(published.bytes / MB * 10) / 10
   }
   const over = (Object.keys(limits) as (keyof typeof limits)[]).filter((key) => used[key] > limits[key])
   return {
     parcels, used, limits, over,
-    megabytesOf: publishedBytes !== null ? 'every file a deployment carries, before the scene build adds its code' : 'placed model files only',
-    note: 'soft limits: explorers warn above them. megabytes is the deploy size, uncapped here (see megabytesOf); materials are uncapped.'
+    megabytesOf: publishedSize !== null ? 'every file a deployment carries, before the scene build adds its code' : 'placed model files only',
+    note: 'soft limits: explorers warn above them, except files, which Genesis City refuses a deployment above (a World takes up to 10,000). files and megabytes count what megabytesOf says; megabytes is uncapped here.'
   }
 }
