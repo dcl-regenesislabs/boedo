@@ -2,18 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import { state } from '@scene/state'
 import { useStore } from '../core/store'
 import { uiCheckModelRefs, uiFetchCatalog, uiImportAsset, uiLoadLocalModels, uiPlaceLocalModel, uiImportFiles } from '../actions/assets'
-import { opendclUrl } from '../assets'
+import { loadLocalSounds, opendclUrl, SOUND_EXT } from '../assets'
 import { Button, ContextMenu, IconButton, LinkButton, MenuItem, Modal, SearchField, Select, Shelf } from '../ds'
 import { deleteProjectFile, fileUsers, filesDeletedWith, olderBuilds, unusedModelFiles, unusedModelsKey } from '../project-file-use'
 import { assetsReview, takeSweepRequest } from './assets-review'
-import { onDataLayerWrite } from '../engine/datalayer'
+import { dataLayerReadFileBytes, onDataLayerWrite } from '../engine/datalayer'
 import { canAskAssistant, prefillAssistant } from './ai-store'
 import { threeAvailable } from '../three/client'
 import { LeftTabs, type LeftView } from './left-view'
 import { ensurePrefabsLoaded } from './prefab-store'
 import { SearchEmpty } from './SearchEmpty'
 import { catalogMatches, countPrefabMatches, matchHint } from './search-hints'
-import { IconRefresh } from '../icons'
+import { IconPlay, IconRefresh, IconSound, IconStop } from '../icons'
 
 const PAGE_SIZE = 60
 
@@ -110,6 +110,35 @@ function LocalGrid(props: { list: string[]; older: string[]; unused: string[]; o
   }
   const fileRef = useRef<HTMLInputElement>(null)
   const carryRef = useRef<File[]>([])
+  const [playing, setPlaying] = useState<string | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const stopPreview = (): void => {
+    const audio = audioRef.current
+    audioRef.current = null
+    setPlaying(null)
+    if (audio === null) return
+    audio.pause()
+    URL.revokeObjectURL(audio.src)
+  }
+  useEffect(() => stopPreview, [])
+  const togglePreview = async (path: string): Promise<void> => {
+    const was = playing
+    stopPreview()
+    if (was === path) return
+    try {
+      const type = path.toLowerCase().endsWith('.mp3') ? 'audio/mpeg' : path.toLowerCase().endsWith('.wav') ? 'audio/wav' : 'audio/ogg'
+      const audio = new Audio(URL.createObjectURL(new Blob([new Uint8Array(await dataLayerReadFileBytes(path))], { type })))
+      audio.onended = () => {
+        if (audioRef.current === audio) stopPreview()
+      }
+      audioRef.current = audio
+      setPlaying(path)
+      await audio.play()
+    } catch (e) {
+      stopPreview()
+      state.saveStatus = `preview failed: ${String(e)}`
+    }
+  }
 
   useEffect(() => {
     const el = fileRef.current
@@ -174,21 +203,35 @@ function LocalGrid(props: { list: string[]; older: string[]; unused: string[]; o
           const folder = p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : ''
           const older = props.older.includes(p)
           const unused = props.unused.includes(p)
+          const sound = SOUND_EXT.test(p)
           return (
             <div
               key={p}
               className="eui-asset"
-              data-tip={older ? `An earlier build of a model in the scene, kept for undo · right-click to delete` : unused ? `Not placed in the scene or named by a script · right-click to delete` : `Place ${p} · right-click for more`}
-              onClick={() => void uiPlaceLocalModel(p)}
+              data-tip={older ? `An earlier build of a model in the scene, kept for undo · right-click to delete` : unused ? `Not placed in the scene or named by a script · right-click to delete` : sound ? `${p} · right-click for more` : `Place ${p} · right-click for more`}
+              onClick={() => void (sound ? togglePreview(p) : uiPlaceLocalModel(p))}
               onContextMenu={(e) => {
                 e.preventDefault()
                 setMenu({ x: e.clientX, y: e.clientY, path: p })
               }}
             >
               <div className="glyph">
-                <ModelGlyph />
+                {sound ? <IconSound /> : <ModelGlyph />}
+                {sound && (
+                  <IconButton
+                    className="eui-asset-preview"
+                    tip={playing === p ? 'Stop' : 'Preview'}
+                    active={playing === p}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void togglePreview(p)
+                    }}
+                  >
+                    {playing === p ? <IconStop /> : <IconPlay />}
+                  </IconButton>
+                )}
               </div>
-              <span className="name">{name.replace(/\.(glb|gltf)$/i, '')}</span>
+              <span className="name">{name.replace(/\.(glb|gltf|mp3|ogg|wav)$/i, '')}</span>
               <span className="pack">{older ? 'older build' : unused ? 'unused' : folder.replace(/^assets\//, '') || 'model'}</span>
             </div>
           )
@@ -319,7 +362,8 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
 
   const refresh = (): void => {
     setModels(null)
-    void uiLoadLocalModels().then(setModels)
+    // models first: the capped preview of My files should still show them
+    void Promise.all([uiLoadLocalModels(), loadLocalSounds()]).then(([m, sounds]) => setModels([...m, ...sounds]))
     void olderBuilds().then(setOlder, () => setOlder([]))
     void unusedModelFiles().then(setUnused, () => setUnused([]))
   }
@@ -334,7 +378,7 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
     const off = onDataLayerWrite((paths) => {
-      if (!paths.some((p) => /\.(glb|gltf)$/i.test(p))) return
+      if (!paths.some((p) => /\.(glb|gltf)$/i.test(p) || SOUND_EXT.test(p))) return
       clearTimeout(timer)
       timer = setTimeout(refresh, 300)
     })

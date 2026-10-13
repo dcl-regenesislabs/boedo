@@ -57,7 +57,8 @@ For the same reason (unsigned builds), SmartScreen may warn on first run. Click
    gizmos, tweak them in the inspector. The **Assets** panel has a catalog of
    ready-made models, plus a tile to add your own `.glb` / `.gltf` files from
    your computer — if a model keeps its textures in separate files, select
-   them together with it and the editor brings them all in. Right-click one of
+   them together with it and the editor brings them all in. Your sounds show there
+   too, with a ▶ button to preview them. Right-click one of
    your files there to delete it; the dialog says what still uses it. The **Prefabs**
    tab next to it holds the prefabs you've saved for reuse — in this scene, in
    your own cross-scene library, or shipped with the editor.

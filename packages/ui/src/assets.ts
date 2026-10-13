@@ -243,6 +243,16 @@ export async function loadLocalModels(): Promise<string[]> {
   }
 }
 
+export const SOUND_EXT = /\.(mp3|ogg|wav)$/i
+
+export async function loadLocalSounds(): Promise<string[]> {
+  try {
+    return (await projectFiles()).filter((p) => SOUND_EXT.test(p)).sort()
+  } catch {
+    return []
+  }
+}
+
 // Place a model that's already in the project content at `position`.
 export async function placeLocalModel(
   rel: string,

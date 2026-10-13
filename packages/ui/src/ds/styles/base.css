@@ -665,6 +665,10 @@
    (sizing comes from the shared ".eui-asset img, .eui-asset .glyph" rule) */
 .eui-asset .glyph { display: flex; align-items: center; justify-content: center; color: var(--text-3); background: var(--paper-hi); }
 .eui-asset .glyph svg { width: 44%; height: 44%; }
+/* a sound's preview button sits in its glyph's corner */
+.eui-asset .glyph { position: relative; }
+.eui-asset .glyph .eui-asset-preview { position: absolute; right: 4px; bottom: 4px; background: var(--input); }
+.eui-asset .glyph .eui-asset-preview svg { width: 15px; height: 15px; }
 .eui-asset-upload { border-style: dashed; cursor: pointer; }
 .eui-asset-upload .glyph { background: transparent; color: var(--primary); font-size: 32px; font-weight: 300; line-height: 1; }
 .eui-asset-upload:hover { border-color: var(--primary-border); }
