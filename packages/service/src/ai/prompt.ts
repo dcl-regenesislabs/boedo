@@ -154,14 +154,17 @@ scene_request accepts one request:
   (three-bvh-csg; give brushes a MeshStandardMaterial) and canvas(w,h), an OffscreenCanvas for textures drawn in
   code (CanvasTexture, colorSpace SRGBColorSpace for colour maps). No imports, lights, cameras or async. Metres,
   Y up, base at y=0 centred on x/z. MeshStandardMaterial only; emissiveIntensity at most 1. Budget per model:
-  8,000 triangles, 6 materials, 4 textures of at most 512 px; it is refused over that, with the counts. Make it
-  read well from 5–15 m: bevelled edges, varied proportions, details that show, textures drawn in code (stone
-  courses, planks, grain, shingles) with UVs scaled to about one tile per metre, never plain boxes. To change a
-  built model, edit its script and build again into the same entity; the old file stays for undo.
-  For surfaces use addons.material(name,{color,roughness,metalness}) with name one of stone, brick, planks,
-  wood, roof, metal, grass, sand: one shared file per name for every model in the scene, laid one tile per
-  metre with UVs done for you, and color tints it. Draw your own canvas texture only for what the library lacks
-  (a sign, a face, a pattern).
+  8,000 triangles, 6 materials, 4 textures of at most 512 px (shared materials do not count); it is refused over
+  that, with the counts. Make it read well from 5–15 m: bevelled edges, varied proportions, details that show,
+  never plain boxes. To change a built model, edit its script and build again into the same entity; the old
+  file stays for undo.
+  For surfaces use addons.material(name,{color,roughness,metalness}): photo-scanned sets with real relief
+  (normal maps) and roughness, UVs done for you, one shared copy per name for every model in the scene; the same
+  name and settings is one material however many parts use it. name is
+  one of stone-blocks, red-brick, old-brick, cobblestone, rock, mossy-rock, planks, wood, bark, roof-tiles,
+  concrete, marble, floor-tiles, metal, rusty-metal, metal-plate, grass, sand, gravel, snow, ice. color tints
+  the photo (white keeps it; tint for gold, painted wood or darker stone); roughness and metalness scale the
+  scanned values. Draw your own canvas texture only for what the library lacks (a sign, a face, a pattern).
   Living things and moving props get motion: push THREE.AnimationClip objects into clips (a parameter: never
   declare it). addons.spin(node,
   {axis,seconds}), addons.swing(node,{axis,degrees,seconds}) and addons.bob(node,{height,seconds}) return looping

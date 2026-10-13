@@ -11,6 +11,8 @@ import { dataLayerListFiles, dataLayerReadFile, dataLayerReadFileBytes, dataLaye
 import { inspectModel } from '@ui/model-info'
 import { announceBuiltModel } from '@ui/features/ai/built-models'
 import { buildCodeModel, overBudget, MODEL_BUDGET } from './code-model'
+import { MATERIAL_MAPS, materialFile } from '@ui/three/materials'
+import { materialBytes } from './material-files'
 import { sceneBudget } from '@ui/scene-budget'
 import { isFlatModel, searchModels } from './model-search'
 import { sendToScene } from '@ui/engine/bus'
@@ -184,7 +186,8 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     // counted from the exported file: the script ran in the worker, so nothing it reports is trusted
     const info = inspectModel(bytes)
     // the only files a built model may point at are the shared materials written beside it
-    const outside = info.sharedImages.filter((uri) => !library.some((l) => uri === `materials/${l.name}.png`))
+    const allowed = new Set(library.flatMap((name) => MATERIAL_MAPS.map((map) => materialFile(name, map))))
+    const outside = info.sharedImages.filter((uri) => !allowed.has(uri))
     if (info.externalResources.some((uri) => !info.sharedImages.includes(uri)) || outside.length > 0) throw new Error('The model refers to files outside the shared materials.')
     const stats = { triangles: info.triangles, materials: info.materials.length, textures: info.textures - info.sharedImages.length, largestTexture: info.largestImage }
     const over = overBudget(stats)
@@ -195,17 +198,19 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     await ignoreModelScripts()
     await dataLayerSaveFileBytes(`models/src/${slug}.js`, new TextEncoder().encode(request.code))
     // the shared material files first, so the model never loads without them
-    for (const { name, png } of library) {
-      const file = `models/materials/${name}.png`
-      if (!(await dataLayerReadFileBytes(file).then(() => true, () => false))) await dataLayerSaveFileBytes(file, png)
-      await ensureContentMapped(file)
+    for (const name of library) {
+      for (const map of MATERIAL_MAPS) {
+        const file = `models/${materialFile(name, map)}`
+        if (!(await dataLayerReadFileBytes(file).then(() => true, () => false))) await dataLayerSaveFileBytes(file, await materialBytes(name, map))
+        await ensureContentMapped(file)
+      }
     }
     await dataLayerSaveFileBytes(rel, bytes)
     await ensureContentMapped(rel)
     // the old build stays: undo can still point the entity back at it, and Assets can delete it
     const placed = await placeGltf({ ...request, name: request.into === undefined ? name : undefined }, rel, name, signal, settings)
     announceBuiltModel({ name, path: rel, triangles: stats.triangles })
-    return { ...placed, script: `models/src/${slug}.js`, stats, clips, materials: library.map((l) => l.name), budget: MODEL_BUDGET, kb: Math.round(bytes.length / 1024), scene: await sceneBudget() }
+    return { ...placed, script: `models/src/${slug}.js`, stats, clips, materials: library, budget: MODEL_BUDGET, kb: Math.round(bytes.length / 1024), scene: await sceneBudget() }
   }
   if (request.type === 'createEntity') {
     if (typeof request.name !== 'string' || !request.name.trim() || request.name.length > 100) throw new Error('Choose an entity name of 1–100 characters.')

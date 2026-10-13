@@ -18,7 +18,7 @@ export type ThreeRequest =
 export type ThreeReply =
   // the worker holds the port: transfers sent before this can be lost on the way
   | { kind: 'ready' }
-  // library: the shared material files this model points at, to write beside it when missing
-  | { kind: 'built'; glb: ArrayBuffer; clips: string[]; library: { name: string; png: ArrayBuffer }[] }
+  // library: the shared materials this model points at, whose files the page writes beside it
+  | { kind: 'built'; glb: ArrayBuffer; clips: string[]; library: string[] }
   | { kind: 'shown' }
   | { kind: 'failed'; error: string }

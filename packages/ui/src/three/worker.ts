@@ -7,7 +7,7 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
 import { Brush, Evaluator, ADDITION, SUBTRACTION, INTERSECTION } from 'three-bvh-csg'
 import type { ThreeReply, ThreeRequest } from './protocol'
 import { lockDown, refusedSyntax } from './sandbox'
-import { drawLibrary, isLibraryName, LIBRARY, type LibraryName } from './materials'
+import { isLibraryName, LIBRARY, metresPerTile, type LibraryName, type MaterialMap } from './materials'
 import { boxProjectUVs, externalizeLibraryImages } from './library-glb'
 
 type Axis = 'x' | 'y' | 'z'
@@ -37,24 +37,41 @@ function turned(node: THREE.Object3D, axis: Axis, angle: (phase: number) => numb
   return new THREE.QuaternionKeyframeTrack(`${named(node)}.quaternion`, times, values)
 }
 
-const libraryTextures = new Map<LibraryName, THREE.CanvasTexture>()
+// The real images never enter the worker: each map is a one-pixel stand-in that leaves the GLB as
+// a pointer to the shared file (externalizeLibraryImages).
+const standIns = new Map<string, THREE.CanvasTexture>()
+function standIn(name: LibraryName, map: MaterialMap): THREE.CanvasTexture {
+  let texture = standIns.get(`${name}/${map}`)
+  if (texture === undefined) {
+    texture = new THREE.CanvasTexture(new OffscreenCanvas(1, 1))
+    if (map === 'color') texture.colorSpace = THREE.SRGBColorSpace
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping
+    standIns.set(`${name}/${map}`, texture)
+  }
+  return texture
+}
 
+// one material per name and settings, so a material used on many parts counts once against the budget
+const libraryMaterials = new Map<string, THREE.MeshStandardMaterial>()
 function libraryMaterial(name: unknown, o: { color?: THREE.ColorRepresentation; roughness?: number; metalness?: number } = {}): THREE.MeshStandardMaterial {
   if (!isLibraryName(name)) throw new Error(`addons.material takes one of ${LIBRARY.join(', ')}`)
-  let map = libraryTextures.get(name)
-  if (map === undefined) {
-    map = new THREE.CanvasTexture(drawLibrary(name))
-    map.colorSpace = THREE.SRGBColorSpace
-    map.wrapS = map.wrapT = THREE.RepeatWrapping
-    libraryTextures.set(name, map)
-  }
-  const material = new THREE.MeshStandardMaterial({ map, color: o.color ?? 0xffffff, roughness: o.roughness ?? (name === 'metal' ? 0.45 : 0.9), metalness: o.metalness ?? (name === 'metal' ? 0.8 : 0) })
+  const key = `${name}|${new THREE.Color(o.color ?? 0xffffff).getHexString()}|${o.roughness ?? 1}|${o.metalness ?? 1}`
+  const known = libraryMaterials.get(key)
+  if (known !== undefined) return known
+  const orm = standIn(name, 'orm')
+  // the factors scale the scanned maps, so 1 keeps them as photographed
+  const material = new THREE.MeshStandardMaterial({
+    map: standIn(name, 'color'), normalMap: standIn(name, 'normal'), roughnessMap: orm, metalnessMap: orm,
+    color: o.color ?? 0xffffff, roughness: o.roughness ?? 1, metalness: o.metalness ?? 1
+  })
   material.userData.library = name
   material.name = name
+  libraryMaterials.set(key, material)
   return material
 }
 
-const isLibrary = (material: THREE.Material): boolean => isLibraryName(material.userData.library)
+const libraryOf = (node: THREE.Mesh): LibraryName | undefined =>
+  [node.material].flat().map((material) => material.userData.library).find(isLibraryName)
 
 const addons = {
   // a shared tiling material: its texture is one file for every model, laid at one tile per metre
@@ -106,12 +123,16 @@ async function build(code: string): Promise<void> {
   // projected without translation, so copies of one geometry that only move still share one buffer
   const projected = new Map<string, THREE.BufferGeometry>()
   root.traverse((node) => {
-    if (!(node instanceof THREE.Mesh) || ![node.material].flat().some(isLibrary)) return
+    if (!(node instanceof THREE.Mesh)) return
+    const name = libraryOf(node)
+    if (name === undefined) return
     const turn = node.matrixWorld.clone().setPosition(0, 0, 0)
-    const key = `${node.geometry.uuid}|${turn.elements.map((n) => n.toFixed(4)).join(',')}`
+    const key = `${node.geometry.uuid}|${metresPerTile(name)}|${turn.elements.map((n) => n.toFixed(4)).join(',')}`
     let geometry = projected.get(key)
     if (geometry === undefined) {
-      geometry = mergeVertices(boxProjectUVs(node.geometry, turn))
+      geometry = mergeVertices(boxProjectUVs(node.geometry, turn, metresPerTile(name)))
+      // normal maps need tangents, and the exporter writes only the ones the geometry has
+      if (geometry.getAttribute('normal') !== undefined) geometry.computeTangents()
       projected.set(key, geometry)
     }
     node.geometry = geometry
@@ -120,8 +141,7 @@ async function build(code: string): Promise<void> {
   const exported = await new GLTFExporter().parseAsync(root, { binary: true, animations })
   if (!(exported instanceof ArrayBuffer)) throw new Error('the exporter returned no binary')
   const { glb, used } = externalizeLibraryImages(exported)
-  const library = await Promise.all(used.map(async (name) => ({ name, png: await (await drawLibrary(name).convertToBlob({ type: 'image/png' })).arrayBuffer() })))
-  reply({ kind: 'built', glb, clips: animations.map((clip) => clip.name), library }, [glb, ...library.map((l) => l.png)])
+  reply({ kind: 'built', glb, clips: animations.map((clip) => clip.name), library: used }, [glb])
 }
 
 function externalUris(glb: ArrayBuffer, given: Record<string, ArrayBuffer>): boolean {
