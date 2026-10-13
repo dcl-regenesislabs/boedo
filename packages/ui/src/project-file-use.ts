@@ -10,9 +10,14 @@ const SCRIPT = /^src\/.*\.(ts|tsx|js)$/
 // a model the assistant built in code: models/<name>-<hash>.glb, its script models/src/<name>.js
 const BUILT = /^models\/([a-z0-9-]+)-[0-9a-f]{8}\.glb$/
 
+const fileFields: [component: string, field: string][] = [['GltfContainer', 'src'], ['AudioSource', 'audioClipUrl'], ['AudioStream', 'url']]
+
 export async function fileUsers(path: string): Promise<{ entities: string[]; scripts: string[] }> {
   const entities = Object.entries(state.snapshot)
-    .filter(([id, c]) => !isReservedEntity(id) && object(c.GltfContainer) && c.GltfContainer.src === path)
+    .filter(([id, c]) => !isReservedEntity(id) && fileFields.some(([component, field]) => {
+      const value = c[component]
+      return object(value) && value[field] === path
+    }))
     .map(([id]) => entityName(state.snapshot, id) ?? `#${id}`)
   const files = await dataLayerListFiles(IGNORED_DIRS)
   const scripts: string[] = []

@@ -271,7 +271,7 @@ function LocalGrid(props: { list: string[]; older: string[]; unused: string[]; o
                   <li key={u}>{u}</li>
                 ))}
               </ul>
-              <p>Those will show nothing where the model was.</p>
+              <p>{SOUND_EXT.test(doomed.path) ? 'Those will go silent.' : /\.(glb|gltf)$/i.test(doomed.path) ? 'Those will show nothing where the model was.' : 'Those will no longer find it.'}</p>
             </>
           )}
           {doomed.error !== undefined && <p role="alert">{doomed.error}</p>}
