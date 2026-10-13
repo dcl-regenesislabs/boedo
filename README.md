@@ -239,7 +239,7 @@ When nothing in the catalog fits, or you ask for something specific, it builds t
 run in a sandbox with no network) and saves the script next to it in `models/src/`, so "make the roof taller"
 edits and rebuilds it. Built models can move (a looping clip plays on its own) and share a library of 21
 photo-scanned materials (stone, brick, wood, metal, grass, snow and more, with relief; CC0 from ambientCG)
-stored once in `models/materials/`; each costs the scene two textures, so a build that would go over the
+stored once in `models/materials/` as `T_<Name>_D.jpg` / `T_<Name>_N.jpg`; each costs the scene two textures, so a build that would go over the
 parcels' texture limit is refused. When the choice is yours, the chat shows catalog cards you can
 turn around in 3D, beside a "Build it in code" card; a model it built shows in its reply with a 3D view and
 **Make changes**, and Assets has a **Create with AI** tile to start one. The toolbar's gauge button opens **Scene insights**: the

@@ -145,7 +145,9 @@ scene_request accepts one request:
   downloads that model into models/ and creates the entity with it (its own meshes collide); with into:"Platform 1"
   instead of name and position it turns that stand-in into the model in place: MeshRenderer, Material and
   MeshCollider go, scale resets to 1 unless given. A model's size is its own: pick one near the size you need, or
-  give scale = wanted ÷ size; the model's feet are usually at the entity's origin.
+  give scale = wanted ÷ size; the model's feet are usually at the entity's origin. The result gives the model's
+  textures and materials and the scene's textures left, with a warning when it takes the scene over: prefer a
+  lighter model then.
 - {type:"buildModel",name:"Stone Tower",code:"<script>",position:{x:8,y:0,z:8}} builds a model from a three.js
   script you write, saves it to models/ (the script to models/src/<name>.js, never published) and creates the entity; into:"Tower"
   instead of name and position turns that stand-in into it, or replaces an earlier build. code is a function body
@@ -156,9 +158,10 @@ scene_request accepts one request:
   (64, 128, 256, 512; any other size is refused). No imports, lights, cameras or async. Metres, Y up, base at
   y=0 centred on x/z. MeshStandardMaterial only; emissiveIntensity at most 1. Decentraland draws only front
   faces: a thin part seen from both sides (a leaf card, a flag, a sign) gets side:THREE.DoubleSide, which the
-  build turns into two faces. Cut-outs (leaves, fences, grates, decals) use alphaTest:0.5 with transparent left
+  build turns into two faces (twice its triangles). Cut-outs (leaves, fences, grates, decals) use alphaTest:0.5 with transparent left
   off; transparent:true only for glass or water, on its own mesh. Vertex colours are not supported and are
-  removed. Budget per model:
+  removed. Name only the parts you animate or refer to: unnamed parts are named <Model>_Part01… and static
+  parts sharing a material are merged into one mesh. A texture whose sides are not powers of two is refused. Budget per model:
   8,000 triangles, 6 materials, 4 textures of at most 512 px (shared materials do not count); it is refused over
   that, with the counts. Make it read well from 5–15 m: bevelled edges, varied proportions, details that show,
   never plain boxes. To change a built model, edit its script and build again into the same entity; the old
@@ -198,7 +201,8 @@ scene_request accepts one request:
   scene relaunches with the new parcels when your turn ends. It cannot change the title.
 - {type:"check"} runs the editor's scene checks (wrong prefab wiring, unanswered game events, things outside the
   parcels, …) and returns its findings; a blocker is something the creator would be shown as broken.
-  It also returns budget: the scene's triangles, entities, bodies, materials and textures against the parcel limits,
+  It also returns budget: the scene's triangles, entities, bodies, materials, textures and files (publishable files;
+  Genesis City allows 200 per parcel) against the parcel limits,
   which are soft (explorers warn, slower devices struggle): keep every value under, and simplify or grow the
   parcels first. megabytes is the deploy size; keep it small, as big scenes load slowly.
 - {type:"batch",requests:[...]} runs up to 200 of the requests above in order, reads and writes together, and

@@ -184,7 +184,7 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
     if (slug === '' || slug.length > 60) throw new Error('buildModel needs name (or into): 1–60 letters or digits.')
     if (typeof request.code !== 'string' || request.code.length > 60_000) throw new Error('buildModel needs code: the model script, under 60,000 characters.')
-    const { bytes, clips, library } = await buildCodeModel(request.code, name, signal)
+    const { bytes, clips, library, warnings } = await buildCodeModel(request.code, name, signal)
     // counted from the exported file: the script ran in the worker, so nothing it reports is trusted
     const info = inspectModel(bytes)
     // the only files a built model may point at are the shared materials written beside it
@@ -218,7 +218,7 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     // the old build stays: undo can still point the entity back at it, and Assets can delete it
     const placed = await placeGltf({ ...request, name: request.into === undefined ? name : undefined }, rel, name, signal, settings)
     announceBuiltModel({ name, path: rel, triangles: stats.triangles })
-    return { ...placed, script: `models/src/${slug}.js`, stats, clips, materials: library, budget: MODEL_BUDGET, kb: Math.round(bytes.length / 1024), scene: await sceneBudget() }
+    return { ...placed, script: `models/src/${slug}.js`, stats, clips, materials: library, ...(warnings.length > 0 ? { warnings } : {}), budget: MODEL_BUDGET, kb: Math.round(bytes.length / 1024), scene: await sceneBudget() }
   }
   if (request.type === 'createEntity') {
     if (typeof request.name !== 'string' || !request.name.trim() || request.name.length > 100) throw new Error('Choose an entity name of 1–100 characters.')

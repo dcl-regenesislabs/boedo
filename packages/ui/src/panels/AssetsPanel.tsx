@@ -149,7 +149,7 @@ function LocalGrid(props: { list: string[]; older: string[]; onUploaded: () => v
             ref={fileRef}
             type="file"
             multiple
-            accept=".glb,.gltf,.bin,.png,.jpg,.jpeg,.webp,.ktx2,.mp3,.ogg,.wav,.mp4,.json,.txt,.md,model/gltf-binary"
+            accept=".glb,.gltf,.bin,.png,.jpg,.jpeg,.mp3,.ogg,.wav,.mp4,.json,.txt,.md,model/gltf-binary"
             style={{ display: 'none' }}
             onChange={(e) => void onFile(e)}
           />
