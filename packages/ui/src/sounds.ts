@@ -13,8 +13,8 @@ export type SoundName = (typeof SOUNDS)[number]
 
 /** Where a sound is served beside editor.js. */
 export const soundFile = (name: SoundName): string => `sounds/${name}.mp3`
-/** Where a sound sits in the project, beside the creator's imported ones. */
-export const soundProjectPath = (name: SoundName): string => `assets/audio/${name}.mp3`
+/** Where a sound sits in the project: its own folder, so a creator's assets/audio/<name>.mp3 is never mistaken for it. */
+export const soundProjectPath = (name: SoundName): string => `assets/audio/library/${name}.mp3`
 
 export const soundInfo = (name: SoundName): { description: string; durationSeconds: number; loop: boolean } => properties[name]
 

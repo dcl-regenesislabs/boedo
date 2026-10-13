@@ -154,7 +154,7 @@ components; see the [service README](../packages/service/README.md).
   the previous file so undo still works; deleting a model also deletes material images
   nothing else uses, and Assets lists unused ones.
   `addSound` copies one of 25 CC0 sounds from Kenney's packs (mono mp3s, bundled with the editor
-  beside the materials, fetched against their hashes) into `assets/audio/<name>.mp3` if it is not
+  beside the materials, fetched against their hashes) into `assets/audio/library/<name>.mp3` if it is not
   there yet, and answers its path, length and whether it loops. The prompt lists the names and has
   the assistant play them with an AudioSource: created once, retriggered with `AudioSource.playSound`.
   `packages/ui/scripts/pack-sounds.mjs` regenerates them; the packs have no wind, crowd, water or

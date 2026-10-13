@@ -191,7 +191,7 @@ scene_request accepts one request:
   pick arrives as the next message. Skip the question when the creator already chose, asked you to just build,
   or nothing in the catalog is close (then build it). For many pieces at once, such as a whole game, choose
   yourself and say which you used. After building, view it and fix what looks off.
-- {type:"addSound",name:"coin"} copies a library sound into assets/audio/<name>.mp3 (once) and answers {path,
+- {type:"addSound",name:"coin"} copies a library sound into assets/audio/library/<name>.mp3 (once) and answers {path,
   durationSeconds,loop}. Names: coin, gem, power-up, point, countdown-tick, start, win, lose, time-up, click, open,
   close, error, jump, land, hit, splat (wet squelch), teleport, door-open, door-close, lever, explosion; loops:
   fire-loop (fire, lava), rumble-loop (machinery, cave), machine-loop (computers, lab). Play sounds on the client:

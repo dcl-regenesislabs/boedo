@@ -171,7 +171,7 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
   if (request.type === 'addSound') {
     if (!isSoundName(request.name)) throw new Error(`addSound needs name, one of: ${SOUNDS.join(', ')}.`)
     const path = soundProjectPath(request.name)
-    if (!(await dataLayerReadFileBytes(path).then(() => true, () => false))) await dataLayerSaveFileBytes(path, await soundBytes(request.name))
+    if (!(await dataLayerListFiles()).includes(path)) await dataLayerSaveFileBytes(path, await soundBytes(request.name))
     await ensureContentMapped(path)
     const { durationSeconds, loop } = soundInfo(request.name)
     return { path, durationSeconds, loop }
