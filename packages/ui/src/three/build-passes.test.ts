@@ -3,12 +3,22 @@ import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { checkCanvasSize, mergeStatic, partNamer, singleSided, stripVertexColors, toSceneAxes } from './build-passes'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { checkCanvasSize, mergeParts, mergeStatic, partNamer, singleSided, stripVertexColors, toSceneAxes } from './build-passes'
 
 describe('a model build', () => {
   it('takes only power-of-two canvas sides up to 512', () => {
     expect(() => checkCanvasSize(512, 64)).not.toThrow()
     for (const [w, h] of [[300, 128], [1024, 512], [256, 0], [128.5, 128]]) expect(() => checkCanvasSize(w, h)).toThrow(/power of two up to 512/)
+  })
+
+  it('merges indexed and non-indexed parts, and names the attributes when parts cannot merge', () => {
+    const rounded = new RoundedBoxGeometry()
+    const box = new THREE.BoxGeometry()
+    const merged = mergeParts([rounded, box])
+    expect(merged.getAttribute('position').count).toBe(rounded.getAttribute('position').count + box.getIndex()!.count)
+    const bare = new THREE.BoxGeometry().deleteAttribute('uv')
+    expect(() => mergeParts([box, bare])).toThrow(/mergeGeometries: parts have different attributes \(part 0: normal, position, uv; part 1: normal, position\)/)
   })
 
   it('drops vertex and instance colours and says so', () => {

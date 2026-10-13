@@ -13,6 +13,34 @@ export function checkCanvasSize(width: number, height: number): void {
     '(1, 2, 4, 8, 16, 32, 64, 128, 256 or 512); pick those sizes and draw to fit them.')
 }
 
+const attributeList = (geometry: THREE.BufferGeometry): string => Object.keys(geometry.attributes).sort().join(', ')
+const layout = (a: THREE.BufferAttribute | THREE.InterleavedBufferAttribute): string =>
+  `${a.itemSize}:${String(a.normalized)}:${a.array.constructor.name}`
+
+function mergeFailure(parts: THREE.BufferGeometry[]): string {
+  const first = parts[0]
+  for (let i = 1; i < parts.length; i++) {
+    if (attributeList(parts[i]) !== attributeList(first)) {
+      return `parts have different attributes (part 0: ${attributeList(first)}; part ${i}: ${attributeList(parts[i])}); ` +
+        'give every part the same attributes, or add the odd ones as separate meshes.'
+    }
+    const odd = Object.keys(first.attributes).find((name) => layout(parts[i].getAttribute(name)) !== layout(first.getAttribute(name)))
+    if (odd !== undefined) return `attribute "${odd}" has a different layout in part ${i}; add that part as a separate mesh.`
+  }
+  return 'parts have different morph targets; add them as separate meshes.'
+}
+
+// three's merge returns null when only some parts are indexed (RoundedBoxGeometry never is),
+// and a null geometry fails later with an error that names nothing the script wrote
+export function mergeParts(geometries: THREE.BufferGeometry[], useGroups = false): THREE.BufferGeometry {
+  if (!Array.isArray(geometries) || geometries.length === 0) throw new Error('addons.mergeGeometries: pass an array of at least one geometry.')
+  const mixed = geometries.some((g) => g.index !== null) && geometries.some((g) => g.index === null)
+  const parts = mixed ? geometries.map((g) => (g.index === null ? g : g.toNonIndexed())) : geometries
+  const merged = mergeGeometries(parts, useGroups)
+  if (merged === null) throw new Error(`addons.mergeGeometries: ${mergeFailure(parts)}`)
+  return merged
+}
+
 // Decentraland's client ignores vertex colours, so a model coloured that way would look different there
 export function stripVertexColors(root: THREE.Object3D): string[] {
   let parts = 0

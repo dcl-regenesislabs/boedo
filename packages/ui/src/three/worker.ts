@@ -3,13 +3,13 @@ import * as THREE from 'three'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
-import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { Brush, Evaluator, ADDITION, SUBTRACTION, INTERSECTION } from 'three-bvh-csg'
 import type { ThreeReply, ThreeRequest } from './protocol'
 import { lockDown, refusedSyntax } from './sandbox'
 import { isLibraryName, LIBRARY, libraryMaterialName, metresPerTile, surface, type LibraryName, type MaterialMap } from './materials'
 import { boxProjectUVs, externalizeLibraryImages } from './library-glb'
-import { checkCanvasSize, mergeStatic, partNamer, singleSided, stripVertexColors, toSceneAxes } from './build-passes'
+import { checkCanvasSize, mergeParts, mergeStatic, partNamer, singleSided, stripVertexColors, toSceneAxes } from './build-passes'
 
 type Axis = 'x' | 'y' | 'z'
 const STEPS = 24
@@ -79,7 +79,7 @@ const libraryOf = (node: THREE.Mesh): LibraryName | undefined =>
 const addons = {
   // a shared tiling material: its texture is one file for every model, laid at one tile per metre
   material: libraryMaterial,
-  RoundedBoxGeometry, mergeGeometries, mergeVertices,
+  RoundedBoxGeometry, mergeGeometries: mergeParts, mergeVertices,
   Brush, Evaluator, ADDITION, SUBTRACTION, INTERSECTION,
   canvas: (width: number, height: number) => {
     checkCanvasSize(width, height)
