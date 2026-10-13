@@ -38,7 +38,7 @@ interface Gltf {
 
 const pad = (n: number): number => (n + 3) & ~3
 
-// Library images leave the GLB: each map points at materials/<name>/<map>.jpg beside it, and the bytes go.
+// Library images leave the GLB: each map points at its shared file beside it (materialFile), and the bytes go.
 export function externalizeLibraryImages(glb: ArrayBuffer): { glb: ArrayBuffer; used: LibraryName[] } {
   const bytes = new Uint8Array(glb)
   const view = new DataView(glb)
@@ -64,7 +64,8 @@ export function externalizeLibraryImages(glb: ArrayBuffer): { glb: ArrayBuffer; 
   for (const [index, { name, map }] of library) {
     const image = json.images?.[index]
     if (typeof image?.bufferView === 'number') dropped.add(image.bufferView)
-    if (json.images !== undefined) json.images[index] = { uri: materialFile(name, map), name: `${name}-${map}` }
+    const uri = materialFile(name, map)
+    if (json.images !== undefined) json.images[index] = { uri, name: uri.replace(/^.*\/|\.jpg$/g, '') }
   }
   // the dropped views stay as tiny unused entries so no other index moves
   const kept: Uint8Array[] = []

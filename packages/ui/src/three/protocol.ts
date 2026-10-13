@@ -6,7 +6,8 @@ export interface ModelStats {
 }
 
 export type ThreeRequest =
-  | { kind: 'build'; code: string }
+  // name: the model's, which its unnamed parts are named after
+  | { kind: 'build'; code: string; name: string }
   // the preview: a canvas the worker draws on, and the model's bytes
   // files: what the model points at, by the uri it uses (a built model's shared materials)
   | { kind: 'view'; canvas: OffscreenCanvas; bytes: ArrayBuffer; files?: Record<string, ArrayBuffer>; width: number; height: number; dpr: number }
@@ -19,6 +20,7 @@ export type ThreeReply =
   // the worker holds the port: transfers sent before this can be lost on the way
   | { kind: 'ready' }
   // library: the shared materials this model points at, whose files the page writes beside it
-  | { kind: 'built'; glb: ArrayBuffer; clips: string[]; library: string[] }
+  // warnings: what the worker changed so the model meets Decentraland's rules
+  | { kind: 'built'; glb: ArrayBuffer; clips: string[]; library: string[]; warnings: string[] }
   | { kind: 'shown' }
   | { kind: 'failed'; error: string }

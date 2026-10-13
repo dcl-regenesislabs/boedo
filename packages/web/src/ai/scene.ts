@@ -182,7 +182,7 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
     if (slug === '' || slug.length > 60) throw new Error('buildModel needs name (or into): 1–60 letters or digits.')
     if (typeof request.code !== 'string' || request.code.length > 60_000) throw new Error('buildModel needs code: the model script, under 60,000 characters.')
-    const { bytes, clips, library } = await buildCodeModel(request.code, signal)
+    const { bytes, clips, library } = await buildCodeModel(request.code, name, signal)
     // counted from the exported file: the script ran in the worker, so nothing it reports is trusted
     const info = inspectModel(bytes)
     // the only files a built model may point at are the shared materials written beside it

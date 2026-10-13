@@ -7,17 +7,16 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
 import { Brush, Evaluator, ADDITION, SUBTRACTION, INTERSECTION } from 'three-bvh-csg'
 import type { ThreeReply, ThreeRequest } from './protocol'
 import { lockDown, refusedSyntax } from './sandbox'
-import { isLibraryName, LIBRARY, metresPerTile, surface, type LibraryName, type MaterialMap } from './materials'
+import { isLibraryName, LIBRARY, libraryMaterialName, metresPerTile, surface, type LibraryName, type MaterialMap } from './materials'
 import { boxProjectUVs, externalizeLibraryImages } from './library-glb'
+import { checkCanvasSize, mergeStatic, partNamer, singleSided, stripVertexColors } from './build-passes'
 
 type Axis = 'x' | 'y' | 'z'
 const STEPS = 24
 
 // a node's tracks address it by name, so every animated node gets one
-function named(node: THREE.Object3D): string {
-  if (node.name === '') node.name = `part_${node.id}`
-  return node.name
-}
+let namer = partNamer('Model')
+const named = (node: THREE.Object3D): string => namer.name(node)
 
 // one turn of a periodic motion, sampled so it loops without a seam
 function sampled(seconds: number, at: (phase: number) => number[]): { times: number[]; values: number[] } {
@@ -55,10 +54,12 @@ function standIn(name: LibraryName, map: MaterialMap): THREE.CanvasTexture {
 const libraryMaterials = new Map<string, THREE.MeshStandardMaterial>()
 function libraryMaterial(name: unknown, o: { color?: THREE.ColorRepresentation; roughness?: number; metalness?: number; relief?: boolean } = {}): THREE.MeshStandardMaterial {
   if (!isLibraryName(name)) throw new Error(`addons.material takes one of ${LIBRARY.join(', ')}`)
-  const roughness = o.roughness ?? surface(name).roughness
-  const metalness = o.metalness ?? surface(name).metalness
+  // to the hundredth, so the name built from the settings tells every material apart
+  const roughness = Math.round((o.roughness ?? surface(name).roughness) * 100) / 100
+  const metalness = Math.round((o.metalness ?? surface(name).metalness) * 100) / 100
   const relief = o.relief !== false
-  const key = `${name}|${new THREE.Color(o.color ?? 0xffffff).getHexString()}|${roughness}|${metalness}|${relief}`
+  const settings = { color: new THREE.Color(o.color ?? 0xffffff).getHexString(), roughness, metalness, relief }
+  const key = libraryMaterialName(name, settings)
   const known = libraryMaterials.get(key)
   if (known !== undefined) return known
   // relief is the normal map: a second texture, worth it on what players see up close
@@ -67,7 +68,7 @@ function libraryMaterial(name: unknown, o: { color?: THREE.ColorRepresentation; 
     color: o.color ?? 0xffffff, roughness, metalness
   })
   material.userData.library = name
-  material.name = name
+  material.name = key
   libraryMaterials.set(key, material)
   return material
 }
@@ -80,7 +81,10 @@ const addons = {
   material: libraryMaterial,
   RoundedBoxGeometry, mergeGeometries, mergeVertices,
   Brush, Evaluator, ADDITION, SUBTRACTION, INTERSECTION,
-  canvas: (width: number, height: number) => new OffscreenCanvas(width, height),
+  canvas: (width: number, height: number) => {
+    checkCanvasSize(width, height)
+    return new OffscreenCanvas(width, height)
+  },
   // tracks for an AnimationClip; a part moves around its own origin, so put it in a group at the pivot
   spin: (node: THREE.Object3D, o: { axis?: Axis; seconds?: number } = {}) => turned(node, o.axis ?? 'y', (p) => p, o.seconds ?? 4),
   swing: (node: THREE.Object3D, o: { axis?: Axis; degrees?: number; seconds?: number } = {}) =>
@@ -112,16 +116,19 @@ function capGeometry(): void {
   }
 }
 
-async function build(code: string): Promise<void> {
+async function build(code: string, model: string): Promise<void> {
   // a build worker runs one script and is thrown away, so it is locked for good
   lockDown(self)
   const refused = refusedSyntax(code)
   if (refused !== null) throw new Error(refused)
   capGeometry()
+  namer = partNamer(model)
   const root = new THREE.Group()
   const clips: unknown[] = []
   new Function('THREE', 'addons', 'root', 'clips', code)(THREE, addons, root, clips)
   root.updateMatrixWorld(true)
+  const warnings = stripVertexColors(root)
+  singleSided(root)
   // projected without translation, so copies of one geometry that only move still share one buffer
   const projected = new Map<string, THREE.BufferGeometry>()
   root.traverse((node) => {
@@ -140,10 +147,12 @@ async function build(code: string): Promise<void> {
     node.geometry = geometry
   })
   const animations = clips.filter((clip): clip is THREE.AnimationClip => clip instanceof THREE.AnimationClip)
+  mergeStatic(root, animations)
+  namer.nameAll(root)
   const exported = await new GLTFExporter().parseAsync(root, { binary: true, animations })
   if (!(exported instanceof ArrayBuffer)) throw new Error('the exporter returned no binary')
   const { glb, used } = externalizeLibraryImages(exported)
-  reply({ kind: 'built', glb, clips: animations.map((clip) => clip.name), library: used }, [glb])
+  reply({ kind: 'built', glb, clips: animations.map((clip) => clip.name), library: used, warnings }, [glb])
 }
 
 function externalUris(glb: ArrayBuffer, given: Record<string, ArrayBuffer>): boolean {
@@ -235,7 +244,7 @@ function handle(event: MessageEvent<ThreeRequest>): void {
     if (request.kind !== 'build' && request.kind !== 'view' && request.kind !== 'clip' && view === null) return
     if ((request.kind === 'build' && mode !== 'build') || (request.kind === 'view' && mode !== 'view')) throw new Error(`a ${String(mode)} worker does not ${request.kind}`)
     if (request.kind === 'build') {
-      build(request.code).catch((error: unknown) => reply({ kind: 'failed', error: error instanceof Error ? error.message : String(error) }))
+      build(request.code, request.name).catch((error: unknown) => reply({ kind: 'failed', error: error instanceof Error ? error.message : String(error) }))
     } else if (request.kind === 'view') {
       show(request)
     } else if (request.kind === 'clip') {
