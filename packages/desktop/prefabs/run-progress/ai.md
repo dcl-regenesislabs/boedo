@@ -17,18 +17,26 @@ The project copy is normally custom/run_progress/; inspect the actual folder.
 
 Configure the placed script, with one distinct courseId per course:
 
-- `courseId`: state namespace, default "course". Never reuse it for another manager.
+- `courseId`: state namespace, default "course". One course has ONE owner: this
+  placed Run Progress. Never place a second one or call `createRun` with the same
+  id ("needs a unique courseId"); custom scripts read `runOf`/`restartRun` only.
 - `title`: completion screen title.
 - `objective`: short instruction below the status row.
 - `startArea`, `finishArea`: names of existing Trigger Areas.
 - `startMarker`: named entity at a safe feet position before the start area.
+  A missing marker falls back to its area's floor (logged), and with no area
+  either to Health & Respawn's respawnAt.
 - `checkpointAreas`: ordered Trigger Area picker; stored as comma-separated names, or pass an array through setScriptParams.
-- `checkpointMarkers`: comma-separated spawn-marker names in matching order.
+- `checkpointMarkers`: one spawn marker per checkpoint, same order; a count mismatch is a problem card.
 - `collectibleAreas`: comma-separated Trigger Area names, each counts once per player.
 - `accentColor`: fallback six-digit hex color. Place UI Theme to style the entire scene together.
 - `collectibleVisuals`: comma-separated names of plain visual entities, matching collectibleAreas in order.
+- `hud`: "Full" (run panel, corner clock, controls), "Big timer" (one large
+  centred clock plus Restart and the results screen) or "Hidden" (draws nothing).
+  The creator's HUD request is THIS setting: "one big timer" = "Big timer". For a
+  custom HUD set "Hidden" and read `runOf()`; never draw a second clock beside it.
 
-An empty checkpointAreas/checkpointMarkers or collectibleAreas disables that goal.
+An empty checkpointAreas or collectibleAreas disables that goal.
 All area names must be distinct. Place every area with fireWhen "every time" so
 it can trigger on later attempts. Each spawn marker must be above solid ground,
 clear of hazards, and outside its own checkpoint trigger. Names must be unique.
@@ -71,7 +79,8 @@ test riding and jumping from it in the engine before treating it as reachable.
 - DO size trigger areas generously enough for the moving avatar.
 - DO walk toward a safe takeoff edge before longer jumps; target landing centres.
 - DO keep jumps within the existing controller's reach and test the actual route.
-- DON'T add a second timer, checkpoint map, collectible counter or restart handler.
+- DON'T add a second timer, checkpoint map, collectible counter or restart handler,
+  and never rewrite the run in your own script to change its look: set `hud`.
 - DON'T use Game Flow merely for individual restarts; reserve it for shared rounds.
 - DON'T claim completion from a build alone. Test falling, an incomplete finish,
   all pickups/checkpoints, the finish screen and Run again.
@@ -85,9 +94,8 @@ The HUD and full run loop then work without another scene script.
 
 ## Creator workflow
 
-Add Trigger Areas and name them, then place Run Progress from the library. In its inspector choose Start Area,
-Finish Area and Start Marker. Use **+ Add** in the checkpoint, spawn-marker and collectible lists; their row
-numbers define the matching order. Move a row up or remove it with the row buttons. These are real scene
-entity pickers: no hand-written CSV or generated script is needed. Use unique names without commas.
+Add and name Trigger Areas, then place Run Progress. In its inspector choose Start Area, Finish Area and
+Start Marker, and use **+ Add** in the checkpoint, spawn-marker and collectible lists; row order is the
+matching order. These are scene entity pickers, so no CSV or generated script is needed; names have no commas.
 Place **UI Theme**, choose one accent color and Dark or Light, and Play. The HUD, result dialog, progress,
 buttons and Announcer use that theme. Keep one UI Theme per scene; its settings override the fallback accent.

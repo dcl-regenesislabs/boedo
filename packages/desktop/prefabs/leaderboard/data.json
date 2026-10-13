@@ -13,8 +13,16 @@
     "board"
   ],
   "requiresSdk": "auth-server",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "changelog": [
+    {
+      "version": "1.4.0",
+      "notes": "The 3D panel's text is readable from its front, and players can no longer walk through the board. A board placed before this keeps its old text position and no collider: delete it and place it again."
+    },
+    {
+      "version": "1.3.0",
+      "notes": "Rows show the display name of players in the scene, or a name the row carries; others show a short address."
+    },
     {
       "version": "1.0.0",
       "notes": "Initial release: a panel that reads the game.state key you name in boardKey and paints its top rows, so the board a Script keeps is the board every player sees and a late joiner gets it from the snapshot."

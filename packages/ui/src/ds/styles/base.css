@@ -526,13 +526,9 @@
   animation: eui-play-pulse 2.4s ease-in-out infinite;
 }
 @keyframes eui-play-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
-.eui-play-badge {
-  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-  padding: 4px 12px; border-radius: 999px; white-space: nowrap;
-  background: hsl(38, 95%, 55%); color: #1a1400;
-  font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em;
-  box-shadow: var(--shadow-float);
-}
+/* chrome a playing scene hides but keeps mounted (Editor.tsx, App.tsx) */
+.eui-play-hide { display: contents; }
+.eui-play-hide[hidden] { display: none; }
 
 .eui-check {
   display: flex; align-items: center; gap: 8px;

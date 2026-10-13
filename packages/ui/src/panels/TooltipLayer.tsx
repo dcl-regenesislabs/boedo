@@ -22,6 +22,11 @@ type Tip = { text: string; left: number; anchorTop: number; anchorBottom: number
 const TIP_WIDTH = 220 // .eui-tip max-width; the clamp assumes the widest case
 const EDGE = 8 // minimum gap to the viewport edge
 const GAP = 6 // gap between the control and the tip
+const WATCH_MS = 200
+
+function rendered(el: Element): boolean {
+  return el.isConnected && el.closest('[hidden]') === null && (typeof el.checkVisibility !== 'function' || el.checkVisibility())
+}
 
 export function TooltipLayer(): JSX.Element {
   const anchor = useRef<HTMLSpanElement>(null)
@@ -34,9 +39,13 @@ export function TooltipLayer(): JSX.Element {
     if (root === undefined) return
     let timer: ReturnType<typeof setTimeout> | undefined
     let current: Element | null = null
+    // A control hidden under the pointer (Play hides the whole editor) sends no
+    // pointer event, so a shown tip checks that its control is still there.
+    let watch: ReturnType<typeof setInterval> | undefined
 
     const hide = (): void => {
       clearTimeout(timer)
+      clearInterval(watch)
       current = null
       setTip(null)
     }
@@ -48,6 +57,7 @@ export function TooltipLayer(): JSX.Element {
       if (el === current) return
       current = el
       clearTimeout(timer)
+      clearInterval(watch)
       if (el === null) {
         setTip(null)
         return
@@ -64,6 +74,10 @@ export function TooltipLayer(): JSX.Element {
         const half = TIP_WIDTH / 2 + EDGE
         const cx = Math.max(half, Math.min(window.innerWidth - half, r.left + r.width / 2))
         setTip({ text, left: cx, anchorTop: r.top, anchorBottom: r.bottom })
+        clearInterval(watch)
+        watch = setInterval(() => {
+          if (!rendered(el)) hide()
+        }, WATCH_MS)
       }, DELAY_MS)
     }
 
@@ -84,6 +98,7 @@ export function TooltipLayer(): JSX.Element {
       root.removeEventListener('pointerdown', hide, true)
       window.removeEventListener('blur', hide)
       clearTimeout(timer)
+      clearInterval(watch)
     }
   }, [])
 

@@ -6,6 +6,7 @@
 // Pure: log text in, rows out.
 import { isGameLifeLine } from '../play/game-life'
 import { stripAnsi } from './scene-health'
+import type { ServerLogLine } from '../../engine/hosted'
 
 export type LogRole = 'server' | 'you'
 
@@ -90,6 +91,13 @@ export function errorLines(logs: string): string[] {
     .filter((line) => line.error || ENGINE_ERROR.test(line.text))
     .map((line) => line.text.replace(STAMP, '').trim().replace(/^(?:Scene|System)Error:\s*/, ''))
     .filter((text) => text !== '')
+}
+
+// The SDK's Storage logs a 404 before reading it as a key that was never stored.
+const MISSING_STORAGE_KEY = /Error in \S+\/values\/[^\s/?]+ endpoint\b.*\\?"status\\?":\s*404\b/
+
+export function isServerError(line: ServerLogLine): boolean {
+  return line.level === 'error' && !MISSING_STORAGE_KEY.test(line.msg)
 }
 
 /** The Game tab's rows: every console line, minus the editor's own machinery. */

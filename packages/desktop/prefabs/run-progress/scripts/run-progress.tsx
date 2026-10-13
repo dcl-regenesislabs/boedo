@@ -1,17 +1,36 @@
 import ReactEcs, { ReactEcsRenderer } from '@dcl/sdk/react-ecs'
 import { engine, PlayerIdentityData, VisibilityComponent, type Entity } from '@dcl/sdk/ecs'
 import { isServer } from '@dcl/sdk/network'
-import { game } from '~runtime/game'
+import { game, reportProblem } from '~runtime/game'
 import { RunHud } from '~runtime/gameHud'
 import { UI_CANVAS } from '~runtime/uiTheme'
 import type { ColorHex, EntityName, EntityNames, ZoneName, ZoneNames } from '~runtime/authoring'
 import { createRun, restartRun, runOf } from '~runtime/runs'
-import { namedEntity, namedPosition } from '~runtime/sceneNames'
+import { entityWorld, namedEntity } from '~runtime/sceneNames'
+import type { Vec3 } from '~runtime/pure/worldTransform'
 import { elapsedRun, freshRun, type RunAction, type RunState } from '~runtime/pure/runState'
 import { RunPrediction } from '~runtime/pure/runPrediction'
 
 function list(value: string): string[] {
   return value.split(',').map((name) => name.trim()).filter(Boolean)
+}
+
+function named(name: string | undefined) {
+  const entity = name?.trim() ? namedEntity(name) : null
+  return entity === null ? null : entityWorld(entity)
+}
+
+// A missing marker must not stop the course: respawn on the floor of its area, and
+// with no area either, let Health & Respawn's respawnAt decide.
+function spawnPosition(marker: string | undefined, area: string): Vec3 | undefined {
+  const exact = named(marker)
+  if (exact !== null) return exact.position
+  const zone = named(area)
+  console.log(zone === null
+    ? `[runProgress] no spawn marker "${marker ?? ''}" or area "${area}" — Health & Respawn's respawnAt is used`
+    : `[runProgress] no spawn marker "${marker ?? ''}" — respawning on area "${area}"`)
+  if (zone === null) return undefined
+  return { ...zone.position, y: zone.position.y - Math.abs(zone.scale.y) / 2 }
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -41,7 +60,9 @@ export class RunProgress {
     public checkpointMarkers: EntityNames = 'Spawn 1, Spawn 2, Spawn 3',
     public collectibleAreas: ZoneNames = 'Orb 1, Orb 2, Orb 3, Orb 4, Orb 5',
     public accentColor: ColorHex = '#FFC459',
-    public collectibleVisuals: EntityNames = ''
+    public collectibleVisuals: EntityNames = '',
+    /** "Big timer" shows one large clock at the top; "Hidden" draws nothing, for a custom HUD. */
+    public hud: 'Full' | 'Big timer' | 'Hidden' = 'Full'
   ) {}
 
   start(): void {
@@ -50,12 +71,14 @@ export class RunProgress {
     this.visuals = list(this.collectibleVisuals)
     if (this.visuals.length !== 0 && this.visuals.length !== this.items.length) throw new Error('Each collectible area needs a matching visual name.')
     const markers = list(this.checkpointMarkers)
-    if (this.points.length !== markers.length) throw new Error('Each checkpoint area needs a matching spawn marker.')
+    if (isServer() && markers.length !== this.points.length) {
+      reportProblem('Run Progress', `${this.points.length} checkpoint areas but ${markers.length} spawn markers — give each checkpoint one marker, in the same order.`)
+    }
     if (isServer()) {
       createRun({
         id: this.courseId, startArea: this.startArea, finishArea: this.finishArea,
-        startPosition: namedPosition(this.startMarker),
-        checkpoints: this.points.map((area, index) => ({ area, position: namedPosition(markers[index]) })),
+        startPosition: spawnPosition(this.startMarker, this.startArea),
+        checkpoints: this.points.map((area, index) => ({ area, position: spawnPosition(markers[index], area) })),
         collectibles: this.items
       })
       return
@@ -78,7 +101,7 @@ export class RunProgress {
     watch(this.finishArea, { type: 'finish' })
     this.points.forEach((area, index) => watch(area, { type: 'checkpoint', index }))
     this.items.forEach((id) => watch(id, { type: 'collect', id }))
-    ReactEcsRenderer.addUiRenderer(this.entity, () => this.render(), UI_CANVAS)
+    if (this.hud !== 'Hidden') ReactEcsRenderer.addUiRenderer(this.entity, () => this.render(), UI_CANVAS)
   }
 
   update(): void {
@@ -130,7 +153,7 @@ export class RunProgress {
   private render(): ReactEcs.JSX.Element {
     const player = this.player()
     const state = this.current() ?? freshRun()
-    const health = record(game.state.health)[player]
+    const health = game.state.healthBar === false ? null : record(game.state.health)[player]
     const life = record(record(game.state.healthLife)[player])
     return <RunHud
       title={this.title} objective={this.objective} phase={state.phase}
@@ -141,7 +164,7 @@ export class RunProgress {
       maxHealth={typeof game.state.healthMax === 'number' ? game.state.healthMax : 100}
       respawnSeconds={life.dead === true && typeof life.respawnAt === 'number' ? Math.max(0, life.respawnAt - game.now()) / 1000 : 0}
       notice={game.now() < this.noticeUntil ? this.notice : ''}
-      accentColor={this.accentColor} restart={() => this.restart()}
+      accentColor={this.accentColor} restart={() => this.restart()} hud={this.hud === 'Big timer' ? 'Big timer' : 'Full'}
     />
   }
 }

@@ -54,7 +54,7 @@ Rules for modules in this folder:
 | `rng` | seeded draws, and the draw-order invariant that makes them agree across clients |
 | `rpc` | request/response over the message bus; `createRpc` at module scope only |
 | `playerStore` | per-wallet `Storage.player` rows, schema-versioned, debounced flush |
-| `playerPositions` | the client-side roster |
+| `playerPositions` | the client-side roster and display names |
 | `serverLife` | the heartbeat and the `waking / running / degraded / asleep / unreachable` ladder |
 | `serverState` | server-private state with opt-in `Storage` persistence; throws on a client |
 | `protectedSync` | `create + syncEntity + validateBeforeChange` in one call, plus the observed-authority ledger |

@@ -13,7 +13,8 @@ import { readServerPresence } from './server-presence'
 
 const TICK_MS = 1000
 
-export function PlayGame(props: { onLogs: () => void }): JSX.Element | null {
+// `logsLink: false` where the surrounding bar already offers the logs
+export function PlayGame(props: { onLogs: () => void; logsLink?: boolean }): JSX.Element | null {
   const scripts = useStore(() => consumerStore.scripts)
   const snapshot = useStore(() => state.snapshot)
   const [reported, setReported] = useState<{ life: GameLife; at: number } | null>(null)
@@ -63,13 +64,15 @@ export function PlayGame(props: { onLogs: () => void }): JSX.Element | null {
   }, [game])
   if (!game) return null
   const life = gameLife(reported?.life ?? null, now - startedAt.current, server)
+  // a healthy running game is the normal case; the bar speaks only when something is off
+  if (life === 'running' && problems === 0) return null
   const since = reported?.at ?? startedAt.current
   const strip = withProblems(gameStrip(life, (now - since) / 1000), problems)
   return (
     <div className="eui-play-game">
-      <Chip tone={strip.tone}>
+      <Chip tone={strip.tone} tip={strip.text}>
         {strip.text}
-        {strip.logs && (
+        {strip.logs && props.logsLink !== false && (
           <button className="eui-play-game-logs" onClick={props.onLogs}>
             Logs
           </button>

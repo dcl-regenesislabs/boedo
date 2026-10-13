@@ -28,7 +28,7 @@
         },
         "513": {
           "json": {
-            "position": { "x": 0, "y": 0.45, "z": 0.02 },
+            "position": { "x": 0, "y": 0.45, "z": -0.02 },
             "rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
             "scale": { "x": 1, "y": 1, "z": 1 },
             "parent": 512
@@ -42,7 +42,7 @@
         "512": {
           "json": {
             "src": "{assetPath}/board-panel.glb",
-            "visibleMeshesCollisionMask": 0,
+            "visibleMeshesCollisionMask": 2,
             "invisibleMeshesCollisionMask": 0
           }
         }

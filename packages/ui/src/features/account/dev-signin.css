@@ -12,7 +12,7 @@
 .eui-logs-toggle:hover { color: var(--text); background: var(--paper-hi); }
 .eui-logs-drawer {
   pointer-events: auto;
-  position: fixed; left: 0; right: 0; bottom: 0; height: 240px;
+  position: fixed; left: 0; right: 0; bottom: 0; height: var(--logs-h);
   display: flex; flex-direction: column; z-index: 79;
   background: var(--panel); border-top: 1px solid var(--divider);
 }

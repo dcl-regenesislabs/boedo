@@ -154,6 +154,7 @@ async function handle(msg: PageToSceneMessage): Promise<void> {
       if (msg.showLinks !== undefined) state.showLinks = msg.showLinks
       if (msg.snap !== undefined) state.snap = msg.snap
       if (msg.showSpawnAreas !== undefined) state.showSpawnAreas = msg.showSpawnAreas
+      if (msg.playInspect !== undefined) state.playInspect = msg.playInspect
       if (msg.baseCorner !== undefined) adoptBaseCorner(msg.baseCorner)
       break
     case 'spawn-points':
@@ -173,7 +174,10 @@ async function handle(msg: PageToSceneMessage): Promise<void> {
     case 'set-frozen':
       state.frozen = msg.frozen
       // back to edit mode: a camera-look toggle from play must not survive
-      if (msg.frozen) forceCursorUnlock()
+      if (msg.frozen) {
+        forceCursorUnlock()
+        state.playInspect = false
+      }
       break
     case 'focus':
       setSelectionAndActive([msg.entity], msg.entity)

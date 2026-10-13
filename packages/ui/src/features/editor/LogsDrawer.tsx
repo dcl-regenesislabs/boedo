@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { cmd } from '../../engine/cmd'
 import { useStore } from '../../core/store'
 import { chrome } from '../../core/chrome'
-import { BUILD_TAB_EMPTY, GAME_TAB_EMPTY, GAME_TAB_TIP, PROBLEM_MARKER, gameTabLines, lastSeconds, type RelayedLine } from './log-roles'
+import { BUILD_TAB_EMPTY, GAME_TAB_EMPTY, GAME_TAB_TIP, PROBLEM_MARKER, gameTabLines, isServerError, lastSeconds, type RelayedLine } from './log-roles'
 import { stripAnsi } from './scene-health'
 import { SearchField, Segmented, labelTip } from '../../ds'
 import { launchParam } from '../../boot/launch-params'
@@ -69,7 +69,7 @@ export function LogsDrawer(props: {
       after = lines[lines.length - 1].seq
       const now = Date.now()
       const rows = lines.map((line) => ({
-        text: `[server] ${line.level === 'log' ? '' : `${PROBLEM_MARKER} `}${line.msg}`,
+        text: `[server] ${line.level === 'system' || isServerError(line) ? `${PROBLEM_MARKER} ` : ''}${line.msg}`,
         ms: now
       }))
       setHostServerLogs((prev) => [...prev, ...rows].slice(-MAX_SHELL_LINES))

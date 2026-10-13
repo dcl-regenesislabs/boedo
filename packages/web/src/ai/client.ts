@@ -102,7 +102,8 @@ export function createBrowserAssistant(options: {
       ok = true
       reportTool(turn.id, call, text, shown)
     } catch (error) {
-      text = error instanceof Error ? error.message : 'The browser tool failed.'
+      // the engine console rejects with its own reply as a plain string
+      text = error instanceof Error ? error.message : typeof error === 'string' && error !== '' ? error : 'The browser tool failed.'
     }
     if (active === turn && !turn.controller.signal.aborted) send({ kind: 'result', turnId: turn.id, callId: call.callId, ok, text })
   }

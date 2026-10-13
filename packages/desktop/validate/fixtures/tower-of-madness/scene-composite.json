@@ -278,7 +278,7 @@
             "position": {
               "x": 0,
               "y": 0.45,
-              "z": 0.02
+              "z": -0.02
             },
             "rotation": {
               "x": 0,
@@ -320,7 +320,7 @@
             "position": {
               "x": 0,
               "y": 0.45,
-              "z": 0.02
+              "z": -0.02
             },
             "rotation": {
               "x": 0,
@@ -538,14 +538,14 @@
         "520": {
           "json": {
             "src": "custom/leaderboard/board-panel.glb",
-            "visibleMeshesCollisionMask": 0,
+            "visibleMeshesCollisionMask": 2,
             "invisibleMeshesCollisionMask": 0
           }
         },
         "522": {
           "json": {
             "src": "custom/leaderboard/board-panel.glb",
-            "visibleMeshesCollisionMask": 0,
+            "visibleMeshesCollisionMask": 2,
             "invisibleMeshesCollisionMask": 0
           }
         }

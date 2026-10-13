@@ -12,7 +12,8 @@
 // `node packages/service/scripts/assistant-login.ts --provider claude --auth .data/assistant/.auth.json`,
 // then add `--ai-auth .data/assistant/.auth.json`.
 //
-// Rebuild after editing the editor: `npm run build -w @dcl-editor/web`, then reload the page.
+// Rebuild after editing the editor: `npm run build -w @dcl-editor/web`, then reload the page;
+// after editing packages/scene, `npm run export-static -w @dcl-editor/scene` first.
 import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'

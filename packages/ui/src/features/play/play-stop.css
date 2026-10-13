@@ -1,0 +1,43 @@
+/* Play-mode bar (PlayStop.tsx): the zone and game read-outs, Logs and Stop, the
+   only editor chrome over a playing scene. The buttons stay faded until hovered
+   so a scene's own HUD reads as it does for a player; the read-outs do not,
+   since a problem count has to be seen. */
+.eui-play-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: var(--z-hud);
+  max-width: calc(100vw - 32px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.eui-play-bar.over-logs { bottom: calc(var(--logs-h) + 14px); }
+.eui-play-btn {
+  pointer-events: auto;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--divider);
+  border-radius: var(--r-pill);
+  background: var(--paper);
+  color: var(--text-2);
+  font: 600 var(--fs-xs) / 1 var(--font-family);
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.eui-play-btn:hover,
+.eui-play-btn:focus-visible,
+.eui-play-btn[aria-pressed='true'] { opacity: 1; color: var(--text); }
+.eui-play-btn svg { width: 12px; height: 12px; color: var(--warning); }
+.eui-play-note {
+  flex: none;
+  color: var(--warning);
+  font: 600 var(--fs-xs) / 1 var(--font-family);
+  filter: drop-shadow(0 1px 3px var(--scrim));
+}

@@ -7,12 +7,17 @@
 // The panel is ordinary scene content: swap board-panel.glb for your own model
 // and keep (or restyle) the text child — the script writes only its `text`, so
 // font, size and colour stay exactly as authored.
+// The text sits on the panel's -z face, where players read it (a TextShape reads
+// from -z); a replacement model must face the same way.
 import { TextShape, Transform, VisibilityComponent, engine, type Entity } from '@dcl/sdk/ecs'
 import { isServer } from '@dcl/sdk/network'
 import { game } from '~runtime/game'
 import { boardRows, clampRows, renderPanel } from './pure/board'
 import { runBoardKey } from '~runtime/pure/runBoard'
+import { playerName } from '~runtime/playerPositions'
 import { mountLeaderboardHud } from './leaderboard-hud'
+
+const NAME_REFRESH_S = 1
 
 const EMPTY = 'Nothing to show yet — set the board key the server writes to.'
 
@@ -48,6 +53,14 @@ export class Leaderboard {
     }
     this.panel = this.findPanel()
     game.onStateChange(() => this.repaint())
+    // Avatar names arrive after the rows do, and with no state change to repaint on.
+    let wait = 0
+    engine.addSystem((dt) => {
+      wait += dt
+      if (wait < NAME_REFRESH_S) return
+      wait = 0
+      this.repaint()
+    })
     this.repaint()
   }
 
@@ -61,7 +74,9 @@ export class Leaderboard {
   private content() {
     const runs = this.source === 'Run best times'
     const sort: 'asc' | 'desc' = runs ? 'asc' : this.sort
-    return { title: this.title, sort, rows: boardRows(game.state[runs ? runBoardKey(this.courseId) : this.boardKey], sort, clampRows(this.rows)),
+    const rows = boardRows(game.state[runs ? runBoardKey(this.courseId) : this.boardKey], sort, clampRows(this.rows))
+      .map((row) => ({ ...row, name: playerName(row.player) ?? row.name }))
+    return { title: this.title, sort, rows,
       empty: runs ? 'Complete a run to set the first time.' : EMPTY }
   }
 

@@ -8,8 +8,8 @@
 // rotation come from the entity's OWN Transform, so a unit box/sphere carrying
 // the entity's world transform IS the trigger volume — no guessing.
 //
-// The draw is gated on `ready` only, NOT on `frozen`: a zone you can't see while
-// the scene plays is a zone you can't debug walking into.
+// Hidden while the scene plays: Play shows the scene as a player sees it, and the
+// play bar's "You're inside" chip is how a zone is checked by walking into it.
 //
 // Drawn in the MAIN scene like the seat markers, NOT on RELATION_LAYER — that
 // layer only reaches the view through the relations TextureCamera overlay, so
@@ -109,7 +109,7 @@ function shownTriggers(): string[] {
 
 function updateTriggerVolumes(): void {
   if (root === null) return
-  const ids = state.status === 'ready' ? shownTriggers() : []
+  const ids = state.status === 'ready' && state.frozen ? shownTriggers() : []
   for (let i = 0; i < slots.length; i++) {
     const id = ids[i]
     if (id === undefined) {

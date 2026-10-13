@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { runBoard } from '../../runtime-modules/pure/runBoard'
+import { boardRows, renderPanel } from '../../prefabs/leaderboard/scripts/pure/board'
 
 describe('course best-time leaderboard', () => {
   it('keeps one fastest time per player across repeated finishes', () => {
@@ -16,5 +17,13 @@ describe('course best-time leaderboard', () => {
     expect(rows).toHaveLength(25)
     expect(rows[0]).toEqual({ player: 'player29', score: 1 })
     expect(rows.at(-1)?.score).toBe(25)
+  })
+
+  it('paints the finisher\'s display name and a short wallet for a row without one', () => {
+    const named = runBoard([], { player: '0x4b65000000000000000000000000000000006caa', bestMs: 59200, name: 'Ada' })
+    const board = runBoard(named, { player: '0x1111000000000000000000000000000000002222', bestMs: 61000 })
+    expect(renderPanel('Fastest Climbs', boardRows(board, 'asc', 8), 'asc', '')).toBe(
+      'FASTEST CLIMBS\n\n1. Ada   0:59\n2. 0x1111…2222   1:01'
+    )
   })
 })

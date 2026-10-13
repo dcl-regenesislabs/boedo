@@ -105,7 +105,9 @@ You need Node 24, git, and both repos side by side:
    npm run dev:web -- --bevy ../bevy-explorer --ai-auth .data/assistant/.auth.json
    ```
 
-4. **After editing the editor:** `npm run build -w @dcl-editor/web`, then reload the page.
+4. **After editing the editor:** `npm run build -w @dcl-editor/web`, then reload the page. A change
+   under `packages/scene` (the in-engine editor scene) also needs
+   `npm run export-static -w @dcl-editor/scene`; the web build leaves `dist/scene` alone.
 
 So one local page runs your editor, your explorer and your engine together: change any of the
 three, rebuild that one (editor: `npm run build -w @dcl-editor/web`; engine: step 1b; explorer:
@@ -188,5 +190,4 @@ behind Cloudflare. It stores projects and runs the assistant on the team's Claud
 
 - A second engine (the scene server frame) sometimes stalls at 95% in `navigator.gpu.requestAdapter()`.
 - Strangers can appear at parcel 0,0 in a local preview: it still opens a global comms session.
-- In Play, the scene's own UI sits under the editor's panels (⌘U hides the editor).
 - The service records nothing per assistant turn yet: no duration, tokens or failure data.

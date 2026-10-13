@@ -34,6 +34,7 @@ export function notifyDevSceneReady(): boolean {
     showLinks: state.showLinks,
     snap: state.snap,
     showSpawnAreas: state.showSpawnAreas,
+    playInspect: state.playInspect,
     baseCorner: baseParcelCorner()
   })
   // the fresh instance defaults to frozen:false and an empty spawn list — the

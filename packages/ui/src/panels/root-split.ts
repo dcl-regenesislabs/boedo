@@ -36,6 +36,11 @@ export function splitRoots(snapshot: Snapshot, roots: string[]): RootSplit {
   return { placed, spawned }
 }
 
+// Every entity in a folder, nested ones too, so the two folders add up to the shelf's count.
+export function entityCount(roots: string[], children: Map<string, string[]>): number {
+  return roots.reduce((n, id) => n + 1 + entityCount(children.get(id) ?? [], children), 0)
+}
+
 export const PLACED_TIP = 'In the scene the moment the game starts, exactly as you placed them.'
 
 export const SPAWNED_TIP =

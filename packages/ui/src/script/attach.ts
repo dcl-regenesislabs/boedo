@@ -25,7 +25,15 @@ export function hasScript(entityId: string, path: string): boolean {
 // Append `path` to the entity's script list. No-op when it's already there.
 // Returns whether an attachment happened.
 export async function attachScript(entityId: string, path: string, content?: string): Promise<boolean> {
-  if (state.snapshot[entityId] === undefined || hasScript(entityId, path)) return false
+  if (state.snapshot[entityId] === undefined) return false
+  if (hasScript(entityId, path)) {
+    try {
+      await refreshScriptLayout(entityId, path, content ?? (await dataLayerReadFile(path)))
+    } catch {
+      // unreadable source: the stored params stay as they were
+    }
+    return false
+  }
 
   let layout: string | undefined
   try {
@@ -50,11 +58,21 @@ export async function attachScript(entityId: string, path: string, content?: str
   return true
 }
 
+export function entitiesWithScript(path: string): string[] {
+  return Object.keys(state.snapshot).filter((id) => hasScript(id, path))
+}
+
+export async function refreshScriptEverywhere(path: string, content: string): Promise<void> {
+  for (const id of entitiesWithScript(path)) await refreshScriptLayout(id, path, content)
+}
+
 // Re-read an attached script's params from its new source, keeping the values already set.
 export async function refreshScriptLayout(entityId: string, path: string, content: string): Promise<void> {
   const items = scriptItems(entityId)
   if (!items.some((it) => it.path === path)) return
   const fresh = JSON.parse(freshLayout(content)) as ScriptLayout
+  // a source that does not parse reads as no params, which would wipe every configured value
+  if (fresh.error !== undefined) return
   const next = items.map((it) =>
     it.path === path ? { ...it, layout: JSON.stringify(mergeLayout(fresh, parseLayout(it.layout) ?? { params: {} })) } : it
   )

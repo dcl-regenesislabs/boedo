@@ -86,6 +86,7 @@ export function forwardEngineKeys(engineWindow: Window): void {
           ctrlKey: e.ctrlKey,
           metaKey: e.metaKey,
           altKey: e.altKey,
+          repeat: e.repeat,
           bubbles: false,
           cancelable: true,
         }),

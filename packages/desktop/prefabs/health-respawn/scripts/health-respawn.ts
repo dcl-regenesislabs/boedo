@@ -38,7 +38,9 @@ export class HealthRespawn {
     /** Seconds to remain dead before returning to the latest checkpoint. */
     public respawnDelay: number = 0,
     /** Seconds of protection after a respawn. */
-    public protectionSeconds: number = 1
+    public protectionSeconds: number = 1,
+    /** Show hit points on Run Progress's HUD. Turn off when nothing in the game deals damage. */
+    public healthBar: boolean = true
   ) {}
 
   start(): void {
@@ -53,7 +55,7 @@ export class HealthRespawn {
     if (this.respawnAt === (0 as Entity)) console.log(`[healthRespawn] ${NO_POINT}`)
     if (isServer()) {
       onPlayerRespawn((player) => this.restore(player))
-      game.onReady(() => game.setState({ [HEALTH_KEY]: {}, [LIFE_KEY]: {}, healthMax: clampMax(this.maxHealth) }))
+      game.onReady(() => game.setState({ [HEALTH_KEY]: {}, [LIFE_KEY]: {}, healthMax: clampMax(this.maxHealth), healthBar: this.healthBar !== false }))
       game.onPlayerJoin((player) => this.revive(player))
       game.onPlayerLeave((player) => {
         const map = { ...asHealthMap(game.state[HEALTH_KEY]) }

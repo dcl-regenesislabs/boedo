@@ -52,28 +52,47 @@ export interface RunHudProps {
   notice: string
   accentColor: string
   restart(): void
+  /** "Big timer" replaces the run panel and corner clock with one large centred clock. */
+  hud?: 'Full' | 'Big timer'
+}
+
+function runGoals(props: RunHudProps): string {
+  const goals: string[] = []
+  if (props.checkpoints > 0) goals.push(`Checkpoint ${props.checkpoint} / ${props.checkpoints}`)
+  if (props.collectibles > 0) goals.push(`${props.collected} / ${props.collectibles} collected`)
+  return goals.join('  ·  ')
 }
 
 export function RunHud(props: RunHudProps) {
   const theme = sceneUiTheme(props.accentColor)
   const complete = props.phase === 'finished'
+  const full = props.hud !== 'Big timer'
+  const goals = runGoals(props)
+  const lifeLine = props.health !== null || props.respawnSeconds > 0
+  const stats = (props.collectibles > 0 ? 1 : 0) + (props.checkpoints > 0 ? 1 : 0)
   return <UiEntity uiTransform={{ width: '100%', height: '100%', positionType: 'absolute', pointerFilter: 'none' }}>
-    {!complete && <UiPanel theme={theme} uiTransform={{ positionType: 'absolute', position: { top: 28, left: 28 }, width: 420, maxWidth: '60%', height: 274 }}>
+    {!complete && !full && <UiEntity uiTransform={{ positionType: 'absolute', position: { top: 28 }, width: '100%', justifyContent: 'center', pointerFilter: 'none' }}>
+      <UiPanel theme={theme} uiTransform={{ width: 400, maxWidth: '80%', height: goals === '' ? 128 : 160, padding: 16 }}>
+        <UiText value={formatRunTime(props.elapsedMs)} color={theme.text} size={72} height={96} align="middle-center" mono />
+        {goals !== '' && <UiText value={goals} color={theme.muted} size={16} height={28} align="middle-center" />}
+      </UiPanel>
+    </UiEntity>}
+    {!complete && full && <UiPanel theme={theme} uiTransform={{ positionType: 'absolute', position: { top: 28, left: 28 }, width: 420, maxWidth: '60%', height: 274 }}>
       <UiText value={props.phase === 'ready' ? 'READY TO RUN' : 'RUN IN PROGRESS'} color={theme.accentText} size={15} height={24} />
       <UiText value={props.title} color={theme.text} size={26} height={40} />
       <UiText value={props.phase === 'ready' ? 'Cross the start to begin' : props.objective} color={theme.muted} size={18} height={58} />
       <Progress label="Collected" value={props.collected} maximum={props.collectibles} theme={theme} />
       <Progress label="Checkpoint" value={props.checkpoint} maximum={props.checkpoints} theme={theme} />
     </UiPanel>}
-    {!complete && <UiPanel theme={theme} uiTransform={{ positionType: 'absolute', position: { top: 28, right: 28 }, width: 208, height: 120 }}>
+    {!complete && full && <UiPanel theme={theme} uiTransform={{ positionType: 'absolute', position: { top: 28, right: 28 }, width: 208, height: 120 }}>
       <Metric label="TIME" value={formatRunTime(props.elapsedMs)} accent={theme.text} />
     </UiPanel>}
-    {!complete && <UiPanel theme={theme} uiTransform={{ positionType: 'absolute', position: { bottom: 28, left: 28 }, width: 300, height: props.health === null ? 64 : 108, padding: 16 }}>
-      {props.health !== null && <UiEntity uiTransform={{ width: '100%', height: 44, flexDirection: 'column', pointerFilter: 'none' }}>
+    {!complete && (full || lifeLine) && <UiPanel theme={theme} uiTransform={{ positionType: 'absolute', position: { bottom: 28, left: 28 }, width: 300, height: (lifeLine ? 44 : 0) + (full ? 32 : 0) + 32, padding: 16 }}>
+      {lifeLine && <UiEntity uiTransform={{ width: '100%', height: 44, flexDirection: 'column', pointerFilter: 'none' }}>
         <UiText value={props.respawnSeconds > 0 ? `Respawning in ${Math.ceil(props.respawnSeconds)}…` : `Health ${props.health} / ${props.maxHealth}`} color={props.respawnSeconds > 0 ? theme.danger : theme.text} size={16} height={30} />
-        <ProgressBar value={props.health} maximum={props.maxHealth} accent={props.health <= props.maxHealth * 0.25 ? theme.danger : theme.accent} />
+        {props.health !== null && <ProgressBar value={props.health} maximum={props.maxHealth} accent={props.health <= props.maxHealth * 0.25 ? theme.danger : theme.accent} />}
       </UiEntity>}
-      <UiText value="WASD move · Space jump" color={theme.muted} size={17} height={32} />
+      {full && <UiText value="WASD move · Space jump" color={theme.muted} size={17} height={32} />}
     </UiPanel>}
     {!complete && <UiButton theme={theme} label="Restart run" secondary onClick={props.restart}
       uiTransform={{ positionType: 'absolute', position: { bottom: 28, right: 28 }, width: 172 }} />}
@@ -82,21 +101,21 @@ export function RunHud(props: RunHudProps) {
     </UiEntity>}
     {complete && <UiEntity uiTransform={{ positionType: 'absolute', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', pointerFilter: 'none' }}
       uiBackground={{ color: { r: 0, g: 0, b: 0, a: 0.28 } }}>
-      <UiPanel theme={theme} uiTransform={{ width: 560, maxWidth: '90%', height: 456, padding: 32 }}>
+      <UiPanel theme={theme} uiTransform={{ width: 560, maxWidth: '90%', height: stats === 0 ? 332 : 456, padding: 32 }}>
         <UiText value="RUN COMPLETE" color={theme.accentText} size={16} height={28} align="middle-center" />
         <UiText value={props.title} color={theme.text} size={30} height={52} align="middle-center" />
         <UiText value={formatRunTime(props.elapsedMs)} color={theme.text} size={76} height={100} align="middle-center" mono />
         <UiText value={props.bestMs === null ? 'Confirming your result…' : `Personal best  ${formatRunTime(props.bestMs)}`} color={theme.muted} size={18} height={36} align="middle-center" />
-        <UiEntity uiTransform={{ width: '100%', height: 96, margin: { top: 12, bottom: 16 }, padding: 16, borderRadius: 8, pointerFilter: 'none' }} uiBackground={{ color: theme.surface }}>
-          <UiEntity uiTransform={{ width: '50%', height: 60, flexDirection: 'column', pointerFilter: 'none' }}>
+        {stats > 0 && <UiEntity uiTransform={{ width: '100%', height: 96, margin: { top: 12, bottom: 16 }, padding: 16, borderRadius: 8, pointerFilter: 'none' }} uiBackground={{ color: theme.surface }}>
+          {props.collectibles > 0 && <UiEntity uiTransform={{ width: `${100 / stats}%`, height: 60, flexDirection: 'column', pointerFilter: 'none' }}>
             <UiText value="COLLECTED" color={theme.muted} size={14} height={24} align="middle-center" />
             <UiText value={`${props.collected} / ${props.collectibles}`} color={theme.accentText} size={26} height={36} align="middle-center" mono />
-          </UiEntity>
-          <UiEntity uiTransform={{ width: '50%', height: 60, flexDirection: 'column', pointerFilter: 'none' }}>
+          </UiEntity>}
+          {props.checkpoints > 0 && <UiEntity uiTransform={{ width: `${100 / stats}%`, height: 60, flexDirection: 'column', pointerFilter: 'none' }}>
             <UiText value="CHECKPOINT" color={theme.muted} size={14} height={24} align="middle-center" />
             <UiText value={`${props.checkpoint} / ${props.checkpoints}`} color={theme.accentText} size={26} height={36} align="middle-center" mono />
-          </UiEntity>
-        </UiEntity>
+          </UiEntity>}
+        </UiEntity>}
         <UiButton theme={theme} label="Run again" onClick={props.restart} />
       </UiPanel>
     </UiEntity>}

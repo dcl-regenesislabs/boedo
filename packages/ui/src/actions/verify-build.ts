@@ -4,7 +4,7 @@ import { state } from '@scene/state'
 import { cmd } from '../engine/cmd'
 import { hostV1 } from '../engine/hosted'
 import { pauseScene, reloadSnapshot, syncFrozenState } from '@scene/inspector'
-import { errorLines } from '../features/editor/log-roles'
+import { errorLines, isServerError } from '../features/editor/log-roles'
 import { noteSceneUpToDate, sceneNeedsReload } from '../features/editor/scene-health'
 import { log } from '../log'
 
@@ -46,6 +46,6 @@ export async function runFreshBuild(): Promise<BuildRun> {
   }
   if (serverLogs !== undefined) await sleep(SERVER_SETTLE_MS)
   const errors = errorLines(await cmd.sceneLogs(300).catch(() => ''))
-  const serverErrors = serverLogs === undefined ? [] : serverLogs(serverSince).filter((line) => line.level === 'error').map((line) => line.msg)
+  const serverErrors = serverLogs === undefined ? [] : serverLogs(serverSince).filter(isServerError).map((line) => line.msg)
   return { reloaded, errors: errors.slice(0, 20), serverErrors: serverErrors.slice(0, 20) }
 }

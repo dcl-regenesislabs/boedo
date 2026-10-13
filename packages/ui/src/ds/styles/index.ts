@@ -18,6 +18,7 @@ import ai from '../../features/ai/ai.css?inline'
 import playPointer from '../../features/play/play-pointer.css?inline'
 import playZones from '../../features/play/play-zones.css?inline'
 import playGame from '../../features/play/play-game.css?inline'
+import playStop from '../../features/play/play-stop.css?inline'
 import update from '../../features/update/update.css?inline'
 
 registerCss('ds/tokens', 'tokens', tokens)
@@ -34,6 +35,7 @@ registerCss('feature/ai', 'features', ai)
 registerCss('feature/play-pointer', 'features', playPointer)
 registerCss('feature/play-zones', 'features', playZones)
 registerCss('feature/play-game', 'features', playGame)
+registerCss('feature/play-stop', 'features', playStop)
 registerCss('feature/update', 'features', update)
 
 export { collectCss, registerCss } from './registry'

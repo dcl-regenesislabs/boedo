@@ -64,6 +64,8 @@ export const state = reactive({
   jumpTarget: null as string | { x: number; y: number } | null,
   // whether the pinned scene is currently frozen (paused)
   frozen: false,
+  // the creator inspects a playing scene: its gizmo and selection show though it runs
+  playInspect: false,
   // play-mode HUD (page-side): interaction hints for the hovered entity and
   // whether the engine holds the mouse for camera-look (draw the crosshair)
   playHover: [] as HoverHint[],

@@ -36,8 +36,8 @@
     "digest": "b4f2af9d259366ea76eef5cb1ac146b05cd42c478e186970b404ef1ad06616c2"
   },
   "health-respawn": {
-    "version": "1.2.1",
-    "digest": "0ecc88c566b69e3e6143294a58bd5db9f35a5703920115b8540dea337ab10a1b"
+    "version": "1.3.1",
+    "digest": "57fb4f10f0ff600e49454b2f493bf6e6827585e0f0008d5902b0b608b9c3c16a"
   },
   "high-stool": {
     "version": "1.1.0",
@@ -48,8 +48,8 @@
     "digest": "0711512393d3f93d1b1a7d709493e770da633e06baf5ba7e87c399cdc0fb2551"
   },
   "leaderboard": {
-    "version": "1.2.0",
-    "digest": "6e3031461cd23e0f51e06a083ee91d0d6a0dd04694378c5c374820b91c678b87"
+    "version": "1.4.0",
+    "digest": "fc8cd11155feb7124ec6fbd7b14b4089e3dc053323d1b15ad9cfc6906c614d92"
   },
   "loveseat": {
     "version": "1.1.0",
@@ -64,8 +64,8 @@
     "digest": "90fc9953c2c3c085854c9ba2d547208155b3ecfd5c8fdde80558dd644511ffad"
   },
   "run-progress": {
-    "version": "1.0.0",
-    "digest": "9768af5f30cc64038981e5871cf70a5499b6404b2dc602a42642b636943a5199"
+    "version": "1.3.1",
+    "digest": "4bcc926f839a3c7bbc1f734d92edae294f402af21a789e3fd7667a71c1e395af"
   },
   "rustic-bench": {
     "version": "1.1.0",

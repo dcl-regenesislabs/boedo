@@ -17,6 +17,10 @@ Use the same Course Id (default "course"). Confirmed finishes automatically fill
 the board, fastest first, and survive player departures and server restarts. No
 custom score code is needed. One course has one top-25 board.
 
+The 3D panel is solid and reads from its -z side: at identity rotation players
+stand at -z looking toward +z. Turn the board by rotating its root; never move or
+flip the text child.
+
 For other scoring systems choose Source "State key" and provide server-owned rows
 as below. Place one panel per board; use 2D UI when the scores belong on screen.
 
@@ -71,8 +75,9 @@ Then place a second Leaderboard with `boardKey: 'bestTimes'`.
   number a client reports is a claim.
 - DON'T write more than the visible places into the key. Fold to the top ten in
   server code — every extra row rides the wire on every change.
-- DO expect wallet addresses. There is no name lookup for a player who is not
-  connected, so offline players show as a shortened address.
+- Rows show display names: a player in the scene is named live; Run best times
+  stores the finisher's name when the server can see it. Give your own rows a
+  `name` beside `player` to keep it for offline players; else a short wallet shows.
 
 ## Example
 

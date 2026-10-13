@@ -7,6 +7,7 @@ import {
   RotateCw,
   Scaling,
   Play,
+  CircleStop,
   Pause,
   StepForward,
   Square,
@@ -73,6 +74,7 @@ export const IconPlay = wrap(Play)
 export const IconPause = wrap(Pause)
 export const IconStep = wrap(StepForward)
 export const IconStop = wrap(Square)
+export const IconStopPlay = wrap(CircleStop)
 // VolumeOff is the speaker with the diagonal bar through it (VolumeX is the
 // speaker with a ✕, which reads as "no audio device" rather than "muted").
 export const IconSound = wrap(Volume2)

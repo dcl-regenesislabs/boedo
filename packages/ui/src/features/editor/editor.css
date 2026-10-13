@@ -4,7 +4,7 @@
    single source for every offset, --edge-pad zeroes the float inset the resize
    handles compute against. In the web editor the panels keep base.css's floating
    layout, over the world, below the topbar. */
-.eui-root { --topbar-h: 52px; }
+.eui-root { --topbar-h: 52px; --logs-h: 240px; }
 .eui-root:not(.eui-docked) .eui-left, .eui-root:not(.eui-docked) .eui-right-col,
 .eui-root:not(.eui-docked) .eui-left-resize, .eui-root:not(.eui-docked) .eui-right-resize {
   top: calc(var(--topbar-h) + 12px);

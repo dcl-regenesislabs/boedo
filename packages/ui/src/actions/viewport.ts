@@ -6,7 +6,9 @@ import { PICK_LAYER } from '@scene/viewport/pick-layer'
 import { sendToScene } from '../engine/bus'
 import { launchParam } from '../boot/launch-params'
 import { cmd } from '../engine/cmd'
+import { chrome, setRightOpen } from '../core/chrome'
 import { run } from './run'
+import { uiSetTool } from './selection'
 
 // every collision layer except the editor's own pick overlay
 const ALL_LAYERS_BUT_PICK = ~PICK_LAYER >>> 0
@@ -48,4 +50,15 @@ export const uiToggleColliders = async (): Promise<void> => {
   const on = !state.showColliders
   state.showColliders = on
   await run(cmd.debugColliders(on ? ALL_LAYERS_BUT_PICK : 0))
+}
+
+// Inspect a playing scene: the editor and the gizmo come back over the game so
+// values can be tuned live (they revert on Stop) and copied.
+export const uiSetPlayInspect = (on: boolean): void => {
+  if (state.playInspect === on) return
+  state.playInspect = on
+  void sendToScene({ type: 'set-flags', playInspect: on })
+  if (!on) return
+  if (!chrome.rightOpen) setRightOpen(true)
+  if (state.activeAction === 'select') uiSetTool(state.lastTool)
 }

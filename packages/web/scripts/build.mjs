@@ -94,3 +94,14 @@ for (const file of list(dist).sort()) {
 for (const [name, [raw, gzip]] of sizes) {
   console.log(`${name.padEnd(44)} ${String(raw).padStart(9)} bytes  ${String(gzip).padStart(8)} gzip`)
 }
+
+// dist/scene is only re-exported on request, so a hosted editor keeps running the
+// old editor scene (gizmo, selection, play behaviour) after a scene change
+function newest(dir) {
+  if (!fs.existsSync(dir)) return 0
+  return Math.max(0, ...list(dir).map((file) => fs.statSync(file).mtimeMs))
+}
+const sceneExport = path.join(dist, 'scene')
+if (fs.readdirSync(sceneExport).length > 0 && newest(path.join(repo, 'packages/scene/src')) > newest(sceneExport)) {
+  console.warn('⚠ dist/scene is older than packages/scene/src: run `npm run export-static -w @dcl-editor/scene`')
+}

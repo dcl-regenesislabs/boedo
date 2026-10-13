@@ -1,11 +1,13 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { state } from '@scene/state'
-import { uiPause } from './playback'
+import { flushPendingSave } from '../core/autosave'
+import { playBlockingFindings } from '../features/editor/scene-checks'
+import { uiPause, uiPlay } from './playback'
 
-const host = vi.hoisted(() => ({ reload: vi.fn(), hide: vi.fn() }))
+const host = vi.hoisted(() => ({ reload: vi.fn(), hide: vi.fn(), play: vi.fn() }))
 vi.mock('@scene/inspector', () => ({
   pauseScene: async () => { state.frozen = true; return true },
-  reloadSnapshot: () => host.reload(), playScene: vi.fn(), stepScene: vi.fn(), saveCompositeDirect: vi.fn()
+  reloadSnapshot: () => host.reload(), playScene: () => host.play(), stepScene: vi.fn(), saveCompositeDirect: vi.fn()
 }))
 vi.mock('../engine/scene-ui', () => ({ autoHideSceneUi: () => host.hide(), releaseAutoHiddenSceneUi: vi.fn() }))
 vi.mock('../engine/cmd', () => ({ cmd: {} }))
@@ -33,4 +35,17 @@ it('keeps optimistic edits when asked to pause an already frozen scene', async (
   state.frozen = true
   await uiPause()
   expect(host.reload).not.toHaveBeenCalled()
+})
+
+it('starts Play on a later press when an earlier start hung', async () => {
+  vi.useFakeTimers()
+  state.frozen = true
+  vi.mocked(playBlockingFindings).mockReturnValue([])
+  vi.mocked(flushPendingSave).mockReturnValueOnce(new Promise(() => {}))
+  void uiPlay()
+  await vi.advanceTimersByTimeAsync(60_000)
+  void uiPlay()
+  await vi.advanceTimersByTimeAsync(0)
+  expect(host.play).toHaveBeenCalledTimes(1)
+  vi.useRealTimers()
 })

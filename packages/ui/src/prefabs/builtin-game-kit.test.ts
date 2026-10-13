@@ -200,7 +200,7 @@ describe('the health & respawn', () => {
   it('takes its respawn point as an entity pick, not a typed id', () => {
     const { params, error } = getScriptParams(read(`${FOLDER}/scripts/health-respawn.ts`))
     expect(error).toBeUndefined()
-    expect(Object.keys(params)).toEqual(['respawnAt', 'maxHealth', 'dieBelowHeight', 'respawnDelay', 'protectionSeconds'])
+    expect(Object.keys(params)).toEqual(['respawnAt', 'maxHealth', 'dieBelowHeight', 'respawnDelay', 'protectionSeconds', 'healthBar'])
     expect(params.respawnAt.type).toBe('entity')
     expect(params.dieBelowHeight.value).toBe(0)
   })

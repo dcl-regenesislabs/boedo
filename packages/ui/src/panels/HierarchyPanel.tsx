@@ -41,6 +41,7 @@ import { PrefabMark, PrefabUpdateBadge } from './prefab-widgets'
 import { prefabAssetId } from '../prefabs/provenance'
 import { isMod } from '../lib/keys'
 import {
+  entityCount,
   FOLD_PLACED,
   FOLD_SPAWNED,
   PLACED_TIP,
@@ -309,7 +310,7 @@ export function HierarchyPanel(props: {
       <TreeFolder
         foldKey={FOLD_PLACED}
         label="From the start"
-        count={roots.placed.length}
+        count={entityCount(roots.placed, forest.children)}
         tip={PLACED_TIP}
         forceOpen={search.keptAny(roots.placed)}
       >
@@ -318,7 +319,7 @@ export function HierarchyPanel(props: {
       <TreeFolder
         foldKey={FOLD_SPAWNED}
         label="When spawned"
-        count={roots.spawned.length}
+        count={entityCount(roots.spawned, forest.children)}
         tip={SPAWNED_TIP}
         forceOpen={search.keptAny(roots.spawned)}
         hidden={spawnedHidden}

@@ -49,6 +49,9 @@ Params of the prefab's script — set them in the placePrefab request:
   a player is allowed to stand on.
 - `respawnDelay`: seconds to remain dead before returning (default 0).
 - `protectionSeconds`: damage/fall protection after returning (default 1).
+- `healthBar`: show hit points on Run Progress's HUD (default on). Set it to
+  false when nothing calls `damage()` (falling alone needs no bar) unless the
+  creator asks for one. Published as `game.state.healthBar`.
 
 Checkpoint destinations and an explicit restart move use the shared
 `src/scripts/runtime/respawn.ts` module; read its header. Health & Respawn must

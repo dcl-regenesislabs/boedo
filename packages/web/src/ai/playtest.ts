@@ -6,7 +6,7 @@ import { restartScene } from '@ui/boot/boot'
 import { consoleCommand, getEngineWindow } from '@ui/engine/console'
 import { cmd } from '@ui/engine/cmd'
 import { hostV1 } from '@ui/engine/hosted'
-import { errorLines } from '@ui/features/editor/log-roles'
+import { errorLines, isServerError } from '@ui/features/editor/log-roles'
 import { steerJump, playerPosition, type Point } from './movement-keys'
 
 const KEYS: Record<string, { key: string; code: string; keyCode: number }> = {
@@ -62,7 +62,7 @@ async function status(): Promise<unknown> {
     playing: !state.frozen,
     position: playerPosition(position),
     hud, errors: errorLines(logs).slice(-20),
-    serverErrors: hostV1()?.previewServerLogs?.(0).filter((line) => line.level === 'error').slice(-20).map((line) => line.msg) ?? []
+    serverErrors: hostV1()?.previewServerLogs?.(0).filter(isServerError).slice(-20).map((line) => line.msg) ?? []
   }
 }
 
@@ -120,7 +120,12 @@ export async function playtest(request: Record<string, unknown>, signal: AbortSi
       const to = request.to
       if (!object(to) || ![to.x, to.y, to.z].every((v) => typeof v === 'number' && Number.isFinite(v))) throw new Error('walk requires a finite to: {x, y, z} in world metres.')
       if (request.jump === true) await jumpTo({ x: Number(to.x), y: Number(to.y), z: Number(to.z) }, signal)
-      else await consoleCommand('walk_player_to', [String(to.x), String(to.y), String(to.z), '5'])
+      else {
+        await consoleCommand('walk_player_to', [String(to.x), String(to.y), String(to.z), '5']).catch(async () => {
+          const at = await consoleCommand('player_position').catch(() => 'unknown')
+          throw new Error(`The walk stopped before ${to.x} ${to.y} ${to.z}: something blocks the way or the target is higher than a step. The player is at ${at}. Walk around it, or use jump:true to reach a platform.`)
+        })
+      }
     } else if (action === 'click') {
       const { x, y } = request
       if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y) || x < 0 || x > 1 || y < 0 || y > 1) throw new Error('click x and y must be fractions of the viewport from 0 to 1.')

@@ -20,7 +20,30 @@ import { uiSetCamera } from './selection'
 // avatar input-locked) — nothing like the real preview.
 let prePlayCam: CameraMode | null = null
 
-export const uiPause = async (): Promise<void> => {
+// One transport change at a time: a second press while Play is still saving and
+// rebuilding reads the scene as stopped and would start it again. A start can
+// hang (a save, a reload, an engine command that never answers), so the lock
+// lapses after a rebuild's worst case and Stop always takes over.
+const TRANSITION_DEADLINE_MS = 45_000
+let transition: { done: Promise<void>; since: number } | null = null
+let generation = 0
+function exclusive(task: (gen: number) => Promise<void>): Promise<void> {
+  if (transition !== null && Date.now() - transition.since < TRANSITION_DEADLINE_MS) return transition.done
+  const gen = ++generation
+  const done: Promise<void> = task(gen).finally(() => {
+    if (transition?.done === done) transition = null
+  })
+  transition = { done, since: Date.now() }
+  return done
+}
+const superseded = (gen: number): boolean => gen !== generation
+
+export const uiPause = (): Promise<void> => {
+  transition = null
+  return exclusive(pause)
+}
+
+async function pause(): Promise<void> {
   const wasPlaying = !state.frozen
   await run(pauseScene(), false)
   if (wasPlaying && state.frozen) await reloadSnapshot()
@@ -38,6 +61,9 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+// held on screen until the rebuild ends: a press during it would otherwise look ignored
+export const REBUILDING_FOR_PLAY = 'rebuilding the scene before play…'
+
 // Play must never resume a scene instance older than the code it is about to run.
 // Unfreezing only continues the instance the engine already has, and a script
 // attached (or edited) since that instance loaded was never instantiated, so it
@@ -50,7 +76,7 @@ function sleep(ms: number): Promise<void> {
 async function waitForFreshBuild(): Promise<void> {
   wireSceneHealth()
   if (!sceneNeedsReload()) return
-  state.saveStatus = 'rebuilding the scene before play…'
+  state.saveStatus = REBUILDING_FOR_PLAY
   await awaitFreshBundle()
   // by id: a bare /reload respawns every scene, the editor's and a host page's included
   const hash = state.scene?.hash
@@ -60,10 +86,15 @@ async function waitForFreshBuild(): Promise<void> {
   state.saveStatus = ''
 }
 
-export const uiPlay = async (): Promise<void> => {
+export const uiPlay = (): Promise<void> => exclusive((gen) => play(gen))
+
+export const uiTogglePlay = (): Promise<void> => (state.frozen ? uiPlay() : uiPause())
+
+async function play(gen: number): Promise<void> {
   // persist edit-mode changes before the scene starts running — once playing,
   // edits become runtime-only (not saved), so this is the last authored save
   await flushPendingSave()
+  if (superseded(gen)) return
   // Authoring problems the scene cannot run through. The card's "Play anyway"
   // waves exactly one press past this, so a wrong rule never traps a creator.
   const blocking = playBlockingFindings()
@@ -73,6 +104,7 @@ export const uiPlay = async (): Promise<void> => {
     return
   }
   await waitForFreshBuild()
+  if (superseded(gen)) return
   if (state.camMode !== 'none') {
     prePlayCam = state.camMode === 'free' ? 'free' : 'target'
     uiSetCamera('off')

@@ -23,6 +23,7 @@ import { SyncConflictGate } from '../sync/SyncChip'
 import { PlayPointer } from '../play/PlayPointer'
 import { PlayZones } from '../play/PlayZones'
 import { PlayGame } from '../play/PlayGame'
+import { PlayStop } from '../play/PlayStop'
 import { LogsDrawer, type LogsTab } from './LogsDrawer'
 import { stripAnsi, useSceneHealth, errorLocation, type SceneHealth } from './scene-health'
 import { SceneChecksCard } from './SceneChecksCard'
@@ -30,6 +31,7 @@ import { SceneInsightsDock } from './SceneInsightsDock'
 import { openCodeAt } from '../../panels/ai-store'
 import { baseName } from '../../script/project-files'
 import { chrome, toggleUiHidden } from '../../core/chrome'
+import { uiSetPlayInspect } from '../../actions/viewport'
 import { MOD, isPrimaryMod, keyCombo } from '../../lib/keys'
 
 export function engineUrl(params: URLSearchParams): string {
@@ -161,8 +163,12 @@ export function Editor(props: { params: URLSearchParams; preview?: number }): JS
   // there is something worth looking at — never a half-rendered viewport.
   const ready = status === 'ready' && scene !== undefined
   const [logsOpen, setLogsOpen] = useState(false)
+  // logs opened during Play show over the game; a drawer left open from editing stays out of it
+  const [logsInPlay, setLogsInPlay] = useState(false)
+  const playingRef = useRef(false)
   const [logsAsk, setLogsAsk] = useState<{ tab?: LogsTab; n: number }>({ n: 0 })
   const openLogs = (tab?: LogsTab): void => {
+    setLogsInPlay(playingRef.current)
     setLogsAsk((ask) => ({ tab, n: ask.n + 1 }))
     setLogsOpen(true)
   }
@@ -242,9 +248,21 @@ export function Editor(props: { params: URLSearchParams; preview?: number }): JS
   // while the editor is pausing the scene itself the mode stays what it was: the
   // scene running for a moment on attach or Stop is not the creator playing
   const settling = useStore(isSettling)
+  const [playing, setPlaying] = useState(false)
   useEffect(() => {
-    if (!settling) host?.setMode(ready && !frozen ? 'play' : 'edit')
+    if (settling) return
+    setPlaying(ready && !frozen)
+    host?.setMode(ready && !frozen ? 'play' : 'edit')
   }, [host, ready, frozen, settling])
+  playingRef.current = playing
+  useEffect(() => {
+    if (playing) return
+    setLogsInPlay(false)
+    uiSetPlayInspect(false)
+  }, [playing])
+  // Inspect shows the whole editor over the running game
+  const inspecting = useStore(() => state.playInspect)
+  const fullScreen = playing && !inspecting
   const booting = !ready && !revealed
   return (
     <>
@@ -274,15 +292,21 @@ export function Editor(props: { params: URLSearchParams; preview?: number }): JS
       ))}
       {!ready && !everReady && stalled && <InspectorStallNotice onLogs={() => openLogs()} />}
       {revealed && health !== null && <SceneHealthBanner health={health} onLogs={() => openLogs()} />}
-      {revealed && !uiHidden && <SceneChecksCard />}
-      {revealed && !uiHidden && <SceneInsightsDock />}
+      {revealed && !uiHidden && !fullScreen && <SceneChecksCard />}
+      {revealed && !uiHidden && !fullScreen && <SceneInsightsDock />}
       {props.params.get('project') !== null && <SyncConflictGate project={props.params.get('project') as string} />}
+      {/* Play is the game as a player sees it: the chrome stays mounted (the
+          chat keeps its turn, the panels their scroll) but takes no room. */}
       {!uiHidden && (
         <>
-          <SceneTopbar logsOpen={logsOpen} onToggleLogs={toggleLogs} project={props.params.get('project')} />
+          <div className="eui-play-hide" hidden={fullScreen}>
+            <SceneTopbar logsOpen={logsOpen} onToggleLogs={toggleLogs} project={props.params.get('project')} />
+          </div>
           <PublishOutcomeToast />
-          <App />
-          <LogsDrawer open={logsOpen} initialTab={logsAsk.tab} openKey={logsAsk.n} onClose={closeLogs} />
+          <App playing={fullScreen} />
+          <div className="eui-play-hide" hidden={fullScreen && !logsInPlay}>
+            <LogsDrawer open={logsOpen} initialTab={logsAsk.tab} openKey={logsAsk.n} onClose={closeLogs} />
+          </div>
         </>
       )}
       {/* Player-facing, not editor chrome: the crosshair and "press E" prompts are
@@ -290,9 +314,13 @@ export function Editor(props: { params: URLSearchParams; preview?: number }): JS
           ⌘U must not take them away — that is exactly the view you hide it to get. */}
       {/* hosted: the host's own HUD draws the reticle and the prompts */}
       {!frozen && host === null && <PlayPointer />}
-      {!frozen && !uiHidden && <PlayZones />}
-      {!frozen && !uiHidden && <PlayGame onLogs={() => openLogs('scene')} />}
-      {uiHidden && (
+      {playing && (
+        <PlayStop onLogs={() => openLogs('scene')} overLogs={logsOpen && logsInPlay}>
+          <PlayZones />
+          <PlayGame onLogs={() => openLogs('scene')} logsLink={false} />
+        </PlayStop>
+      )}
+      {uiHidden && !playing && (
         <button className="eui-ui-restore" onClick={toggleUiHidden}>
           Press <kbd>{keyCombo(MOD, 'U')}</kbd> to show the editor
         </button>

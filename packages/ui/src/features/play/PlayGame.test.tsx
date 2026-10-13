@@ -109,12 +109,12 @@ afterEach(() => {
 })
 
 describe('the Game strip', () => {
-  it('says the game is running', async () => {
+  it('stays out of the bar while the game runs', async () => {
     scene({ 'src/race.ts': GAME_SCRIPT })
     sceneLogs.mockResolvedValue(`[1.0] Log: ${GAME_LIFE_MARKER} running`)
     const hud = mount(<PlayGame onLogs={() => {}} />)
     await hud.settle()
-    expect(hud.text()).toBe('● Game running')
+    expect(hud.text()).toBe('')
     hud.unmount()
   })
 
@@ -172,7 +172,7 @@ describe('the Game strip', () => {
     readServerPresence.mockResolvedValue('absent')
     const hud = mount(<PlayGame onLogs={() => {}} />)
     await hud.settle()
-    expect(hud.text()).toBe('● Game running')
+    expect(hud.text()).toBe('')
     hud.unmount()
   })
 
@@ -207,7 +207,7 @@ describe('the Game strip', () => {
     sceneLogs.mockResolvedValue(`[30.0] Log: ${GAME_LIFE_MARKER} running`)
     const first = mount(<PlayGame onLogs={() => {}} />)
     await nextPoll()
-    expect(first.text()).toBe('● Game running')
+    expect(first.text()).toBe('')
     first.unmount()
     // Play rebuilt and reloaded: a fresh instance, a fresh log, the clock back at
     // 0 — so start()'s card is already in the tail the run's first poll reads.
@@ -231,7 +231,7 @@ describe('the Game strip', () => {
     first.unmount() // Stop — the shell's backlog and the console tail both stay
     const second = mount(<PlayGame onLogs={() => {}} />)
     await nextPoll()
-    expect(second.text()).toBe('● Game running')
+    expect(second.text()).toBe('')
     sceneLogs.mockResolvedValue([RUNNING, CLIENT_CARD, '[5.0] Error: [you] state.score: dropped'].join('\n'))
     await nextPoll()
     expect(second.text()).toBe('● Game running · 1 problemLogs')
@@ -271,12 +271,12 @@ describe('the Game strip', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(GAME_POLL_MS)
     })
-    expect(hud.text()).toBe('● Game running')
+    expect(hud.text()).toBe('')
     sceneLogs.mockResolvedValue('[9.0] Log: chatter that pushed the line out')
     await act(async () => {
       await vi.advanceTimersByTimeAsync(GAME_SILENT_MS + GAME_POLL_MS)
     })
-    expect(hud.text()).toBe('● Game running')
+    expect(hud.text()).toBe('')
     hud.unmount()
   })
 

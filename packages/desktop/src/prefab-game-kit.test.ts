@@ -175,6 +175,7 @@ vi.mock('@dcl/sdk/react-ecs', () => ({
 vi.mock('@dcl/asset-packs', () => ({ getActionEvents: () => ({ emit: () => {} }) }))
 vi.mock('@dcl/sdk/ecs', () => ({
   engine: host.engine,
+  AvatarBase: { getOrNull: () => null },
   EntityState: { Removed: 2 },
   GltfContainer: { getMutableOrNull: () => null },
   PlayerIdentityData: {

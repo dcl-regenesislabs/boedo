@@ -38,6 +38,7 @@ import { captureView } from '../ai/view'
 import { createAssetRequests } from '../ai/assets'
 import { runFreshBuild } from '@ui/actions/verify-build'
 import { flushPendingSave } from '@ui/core/autosave'
+import { updateSpawnPoints } from '@ui/spawn-points'
 import { playtest } from '../ai/playtest'
 import { externalDependencies } from '../archive/dependencies'
 import { createPublisher } from '../publish/publish'
@@ -219,6 +220,12 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
                 await waitForPreviewLayout(parcels, () => {
                   for (const listener of readyListeners) listener(ready!)
                 }, signal)
+              } else if (ready !== null) {
+                const fresh = previewReady(raw ?? {}, ready.realm)
+                if (fresh.spawn !== ready.spawn || fresh.spawnPoints !== ready.spawnPoints) {
+                  ready = { ...ready, spawn: fresh.spawn, spawnPoints: fresh.spawnPoints }
+                  updateSpawnPoints(fresh.spawn, fresh.spawnPoints)
+                }
               }
               return {
                 requiredPermissions: raw?.requiredPermissions ?? [], spawnPoints: raw?.spawnPoints ?? [],

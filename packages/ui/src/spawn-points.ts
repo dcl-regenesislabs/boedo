@@ -9,7 +9,7 @@
 // instance starts with an empty spawn list, and a dev session that rebuilds the
 // editor scene on every source change would otherwise never show a spawn
 // marker again until a full restart.
-import { launchParam, baseParcelCorner } from './boot/launch-params'
+import { launchParam, baseParcelCorner, patchLaunchParams } from './boot/launch-params'
 import { sendToScene } from './engine/bus'
 
 // An axis is either a coordinate or a [min, max] range — both shift by the same
@@ -55,4 +55,10 @@ export function sendSpawnPoints(): void {
   } catch (e) {
     console.warn('[editor-ui] could not read spawnPoints from scene.json:', e)
   }
+}
+
+/** scene.json's spawn changed without a relaunch: Stop/Play and the marker use the new one. */
+export function updateSpawnPoints(spawn: string, spawnPoints: string): void {
+  patchLaunchParams({ spawn, spawnPoints })
+  sendSpawnPoints()
 }

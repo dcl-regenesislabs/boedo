@@ -84,6 +84,11 @@ function emitCard(card: ErrorCard): void {
   console.error(`${PROBLEM_LINE} [${card.side}] ${card.name}: ${card.message}`)
 }
 
+/** A setup problem a prefab found, shown in the editor's Game strip like the module's own cards. */
+export function reportProblem(name: string, message: string): void {
+  emitCard({ side: isServer() ? 'server' : 'you', name, message })
+}
+
 export type { Player }
 
 // Each top-level game.state key rides its own synced entity, so a single write

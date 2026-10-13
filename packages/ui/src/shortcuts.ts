@@ -19,7 +19,7 @@ import { state, topLevelSelected } from '@scene/state'
 import { uiSetTool, uiFrameSelectionOrScene, uiSetCamera, uiClearSelection } from './actions/selection'
 import { uiDeleteSelected } from './actions/entities'
 import { uiGroupIntoFolder, uiUngroupSelection } from './actions/folders'
-import { uiPlay, uiPause } from './actions/playback'
+import { uiTogglePlay } from './actions/playback'
 import { toggleSceneAudio } from './engine/audio'
 import { deleteConfirmSkipped } from './panels/delete-confirm'
 import { aiStore, runStudioChord } from './panels/ai-store'
@@ -164,7 +164,13 @@ const buildGroups = (): ShortcutGroup[] => [
   {
     title: 'Playback',
     items: [
-      { combo: 'F5', label: 'Play / preview', match: (e) => e.key === 'F5', run: () => void uiPlay() },
+      {
+        combo: 'F5',
+        label: 'Play / stop',
+        // a held key repeats, and each repeat would flip the scene again
+        match: (e) => e.key === 'F5' && !e.shiftKey && !isMod(e) && !e.altKey && !e.repeat,
+        run: () => void uiTogglePlay()
+      },
       // In the desktop app both are claimed in the MAIN process (chords.ts),
       // which preventDefaults before any frame sees the key — these matchers are
       // the web bundle's fallback, so the cheatsheet rows aren't a lie there.
@@ -173,10 +179,7 @@ const buildGroups = (): ShortcutGroup[] => [
         combo: keyCombo(MOD, 'P'),
         label: 'Play / pause',
         match: (e) => isMod(e) && !e.shiftKey && !e.altKey && e.code === 'KeyP' && aiStore.mode !== 'studio',
-        run: () => {
-          if (state.frozen) void uiPlay()
-          else void uiPause()
-        }
+        run: () => void uiTogglePlay()
       },
       // hosted: the engine's volume is the host page's own setting, there is no mute
       ...(isHosted()

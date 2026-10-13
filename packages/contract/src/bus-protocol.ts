@@ -64,6 +64,8 @@ export type PageToSceneMessage =
       showLinks?: boolean
       snap?: boolean
       showSpawnAreas?: boolean
+      // Play with the inspector open: the gizmo and selection show over the running scene
+      playInspect?: boolean
       // init's baseCorner again: a scene instance started after boot never got init
       baseCorner?: { x: number; z: number }
     }

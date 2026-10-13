@@ -12,6 +12,12 @@ export function setLaunchParams(params: URLSearchParams): void {
   launchParams = params
 }
 
+// in place: the Editor's own params object is the one boot reads again on Stop
+export function patchLaunchParams(patch: Record<string, string>): void {
+  launchParams ??= new URLSearchParams(window.location.search)
+  for (const [name, value] of Object.entries(patch)) launchParams.set(name, value)
+}
+
 export function clearLaunchParams(): void {
   launchParams = null
 }

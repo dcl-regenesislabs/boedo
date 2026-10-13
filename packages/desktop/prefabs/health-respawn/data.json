@@ -21,8 +21,10 @@
     "code": "game.onEnterArea('Spikes', (player) => damage(player, 25))",
     "next": "Press New script below, write that inside the isServer() block it comes with, and import damage from the health.ts beside this item's own script."
   },
-  "version": "1.2.1",
+  "version": "1.3.1",
   "changelog": [
+    { "version": "1.3.1", "notes": "The health bar is on by default again; turn Health Bar off for a game that never deals damage." },
+    { "version": "1.3.0", "notes": "Health bar setting, off by default: a course that never deals damage shows no hit points." },
     { "version": "1.2.1", "notes": "Guide covers in-bounds respawn destinations, permissions and course playtesting." },
     {
       "version": "1.2.0",

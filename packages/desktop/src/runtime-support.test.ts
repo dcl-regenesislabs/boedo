@@ -24,12 +24,12 @@ import { createRng, rngInt, seededSequence } from '../runtime-modules/rng'
 // by the logic under test.
 
 const systems: Array<{ fn: (dt: number) => void; name: string }> = []
+const components = new Map<string, unknown>()
 const storageRows = new Map<string, unknown>()
 let storageOk = true
 let storageWrites = 0
 
 vi.mock('@dcl/sdk/ecs', () => {
-  const components = new Map<string, unknown>()
   const engine = {
     defineComponent: (name: string) => {
       const values = new Map<number, { beat: number }>()
@@ -96,6 +96,8 @@ interface Ladder {
 }
 
 interface ServerLifeModule {
+  startServerLife: () => void
+  serverLifeState: () => ServerLifeState
   ServerLifeLadder: new () => Ladder
   SERVER_LIFE_THRESHOLDS: { degradedAfterMs: number; asleepAfterMs: number; wakeTimeoutMs: number }
 }
@@ -338,6 +340,26 @@ describe('_runtime serverLife ladder', () => {
     expect(ladder.ageMs(4_000)).toBe(3_000)
     ladder.observe(1, 5_000)
     expect(ladder.state(10 ** 9)).toBe('asleep')
+  })
+
+  it('stays running while the live server beats beside a previous run\'s heartbeat entity', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(0)
+      serverLife.startServerLife()
+      const heartbeat = components.get('runtime::Heartbeat') as { create: (e: number, v: { beat: number }) => void; getMutable: (e: number) => { beat: number } }
+      heartbeat.create(1, { beat: 5 })
+      heartbeat.create(2, { beat: 10 })
+      const watch = systems.find((system) => system.name === 'runtime-server-life')!
+      for (let now = 0; now <= 60_000; now += 2_000) {
+        vi.setSystemTime(now)
+        heartbeat.getMutable(2).beat = now + 10
+        watch.fn(2)
+      }
+      expect(serverLife.serverLifeState()).toBe('running')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps the degraded threshold at three pulses', () => {

@@ -217,7 +217,6 @@ function handlePickResult(): void {
   if (state.selected.has(picked)) {
     selectEntityInTree(state.snapshot, picked)
     // clicking a model means you want to manipulate it — bring up the move gizmo
-    // (in play mode too: a Cmd+click pick edits the running scene, runtime-only)
     if (state.activeAction === 'select') setActiveAction('translate')
   }
 }
@@ -286,7 +285,7 @@ export function startSelectionHighlight(): void {
   let lastSig = ''
   engine.addSystem(() => {
     if (state.status !== 'ready') return
-    const ids = [...state.selected].sort()
+    const ids = state.frozen || state.playInspect ? [...state.selected].sort() : []
     const sig = ids.join(',')
     if (sig === lastSig) return
     lastSig = sig

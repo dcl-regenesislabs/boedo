@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { state } from '@scene/state'
 import { useStore } from './core/store'
 import { useEditorShortcuts } from './shortcuts'
+import { REBUILDING_FOR_PLAY } from './actions/playback'
 import { getBootPhase, isViewportReady } from './boot/boot'
 import { Toolbar } from './panels/Toolbar'
 import { HierarchyPanel } from './panels/HierarchyPanel'
@@ -77,7 +78,8 @@ function useElementHeight(el: HTMLElement | null): number {
   return h
 }
 
-export function App(): JSX.Element {
+export function App(props: { playing?: boolean }): JSX.Element {
+  const playing = props.playing === true
   const phase = useStore(getBootPhase)
   const viewport = useStore(isViewportReady)
   const ready = phase === 'ready'
@@ -97,6 +99,20 @@ export function App(): JSX.Element {
   const aiMin = useStore(() => aiStore.collapsed)
   const aiMode = useStore(() => aiStore.mode)
   const aiHere = useStore(canAskAssistant)
+  // Play the assistant runs (its playtest) is not the creator's: its turn and its
+  // stop control stay on screen until that Play ends.
+  const turnRunning = useStore(() => aiStore.turnRunning)
+  const [assistantPlay, setAssistantPlay] = useState(false)
+  useEffect(() => {
+    if (!playing) setAssistantPlay(false)
+    else if (turnRunning) setAssistantPlay(true)
+  }, [playing, turnRunning])
+  const dockInPlay = aiMode === 'studio' || assistantPlay || turnRunning
+  // over a full-screen game there is nothing to edit, so a write then is not the creator's
+  const editWarnHere = !playing || dockInPlay
+  useEffect(() => {
+    if (playEditWarn && !editWarnHere) state.playEditWarn = false
+  }, [playEditWarn, editWarnHere])
   // the Studio is the code editor too, with or without an assistant beside it
   const studioHere = aiHere || aiMode === 'studio'
   // Who gets the column's leftover height: the inspector unless it is minimized,
@@ -120,14 +136,19 @@ export function App(): JSX.Element {
   // full-screen from inside this same column and survives the dock being hidden.
   const rightCol = (
     <>
-      <div ref={setColEl} className="eui-right-col" style={{ width: rightWidth }} hidden={(!rightOpen && aiMode !== 'studio') || (!ready && !studioHere)}>
+      <div
+        ref={setColEl}
+        className="eui-right-col"
+        style={{ width: rightWidth }}
+        hidden={(!rightOpen && aiMode !== 'studio') || (!ready && !studioHere) || (playing && !dockInPlay)}
+      >
         {ready && rightOpen && <InspectorPanel min={inspectorMin} onToggleMin={() => setInspectorMin(!inspectorMin)} />}
         {ready && rightOpen && splitShown && (
           <Splitter label="Resize inspector and assistant" value={dockHeight} min={DOCK_MIN_H} max={dockMax} onChange={setAiHeight} />
         )}
         {studioHere && <AiPanel shown={rightOpen} fill={!ready || inspectorMin} height={dockHeight} />}
       </div>
-      {rightOpen && (ready || studioHere) && <RightResize width={rightWidth} onResize={setRightWidth} />}
+      {rightOpen && (!playing || dockInPlay) && (ready || studioHere) && <RightResize width={rightWidth} onResize={setRightWidth} />}
     </>
   )
   const showPrefabs = (): void => {
@@ -169,42 +190,40 @@ export function App(): JSX.Element {
       ) : (
         <>
           <PrefabDropLayer />
-          <Toolbar
-            leftOpen={leftOpen}
-            rightOpen={rightOpen}
-            onToggleLeft={() => setLeftOpen(!leftOpen)}
-            onToggleRight={toggleRightPanel}
-            onShortcuts={() => setShortcutsOpen(true)}
-          />
-          {leftOpen &&
-            (leftView === 'scene' ? (
-              <HierarchyPanel
-                width={leftWidth}
-                onNewEntity={() => setNewEntityOpen(true)}
-                onCreatePrefab={() => setCreatePrefab(true)}
-                onView={setLeftView}
-              />
-            ) : leftView === 'prefabs' ? (
-              <PrefabsPanel
-                width={leftWidth}
-                onView={setLeftView}
-                onCreatePrefab={() => setCreatePrefab(true)}
-              />
-            ) : (
-              <AssetsPanel width={leftWidth} onView={setLeftView} />
-            ))}
-          {leftOpen && <LeftResize width={leftWidth} onResize={setLeftWidth} />}
-          {!frozen && (
-            <div className="eui-play-frame" aria-hidden>
-              <span className="eui-play-badge">● PLAYING — changes won’t be saved</span>
-            </div>
-          )}
+          <div className="eui-play-hide" hidden={playing}>
+            <Toolbar
+              leftOpen={leftOpen}
+              rightOpen={rightOpen}
+              onToggleLeft={() => setLeftOpen(!leftOpen)}
+              onToggleRight={toggleRightPanel}
+              onShortcuts={() => setShortcutsOpen(true)}
+            />
+            {leftOpen &&
+              (leftView === 'scene' ? (
+                <HierarchyPanel
+                  width={leftWidth}
+                  onNewEntity={() => setNewEntityOpen(true)}
+                  onCreatePrefab={() => setCreatePrefab(true)}
+                  onView={setLeftView}
+                />
+              ) : leftView === 'prefabs' ? (
+                <PrefabsPanel
+                  width={leftWidth}
+                  onView={setLeftView}
+                  onCreatePrefab={() => setCreatePrefab(true)}
+                />
+              ) : (
+                <AssetsPanel width={leftWidth} onView={setLeftView} />
+              ))}
+            {leftOpen && <LeftResize width={leftWidth} onResize={setLeftWidth} />}
+          </div>
+          {!frozen && <div className="eui-play-frame" aria-hidden />}
           <Toast />
           {newEntityOpen && <NewEntityDialog onClose={() => setNewEntityOpen(false)} />}
           {createPrefab && (
             <CreatePrefabDialog onClose={() => setCreatePrefab(false)} />
           )}
-          {playEditWarn && <PlayEditWarningDialog />}
+          {playEditWarn && editWarnHere && <PlayEditWarningDialog />}
           {deleteConfirm !== null && <DeleteEntityDialog />}
           {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}
         </>
@@ -219,7 +238,7 @@ function Toast(): JSX.Element | null {
   const msg = useStore(() => state.saveStatus)
   const saveFailed = useStore(() => state.frozen && autoSaveStatus() === 'error')
   useEffect(() => {
-    if (msg === '' || msg === 'saving…') return
+    if (msg === '' || msg === 'saving…' || msg === REBUILDING_FOR_PLAY) return
     const t = setTimeout(() => {
       state.saveStatus = ''
     }, 5000)

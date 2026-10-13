@@ -270,12 +270,22 @@ function warnWhenReadyIsLate(live: ServerLifeDriver): void {
 }
 
 function startClient(): void {
+  // A previous server run's heartbeat entity can outlive it beside the new one,
+  // so any entity's beat changing is a beat; reading only the first went asleep.
+  const lastBeats = new Map<Entity, number>()
+  let beats = 0
   engine.addSystem(
     () => {
       const live = driver()
-      const entity = heartbeatEntity()
-      const value = entity !== null ? Number(Heartbeat.get(entity).beat) : null
-      live.ladder.observe(value, Date.now())
+      let seen = false
+      for (const [entity] of engine.getEntitiesWith(Heartbeat)) {
+        seen = true
+        const beat = Number(Heartbeat.get(entity).beat)
+        if (lastBeats.get(entity) === beat) continue
+        lastBeats.set(entity, beat)
+        beats++
+      }
+      live.ladder.observe(seen ? beats : null, Date.now())
     },
     undefined,
     'runtime-server-life'

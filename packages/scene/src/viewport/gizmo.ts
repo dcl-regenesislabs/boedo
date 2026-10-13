@@ -671,6 +671,8 @@ function gizmoActive(): boolean {
   const mode = state.activeAction
   return (
     state.status === 'ready' &&
+    // Play shows the scene as a player sees it unless the creator inspects it
+    (state.frozen || state.playInspect) &&
     (mode === 'translate' || mode === 'rotate' || mode === 'scale') &&
     state.activeEntity !== null &&
     state.snapshot[state.activeEntity] !== undefined &&

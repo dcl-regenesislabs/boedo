@@ -62,7 +62,7 @@ import { revealInTree } from '../panels/reveal'
 import { resetProjectPrefabs } from '../panels/prefab-store'
 import { resetSceneUi, autoHideSceneUi } from '../engine/scene-ui'
 import { reassertSceneAudio, toggleSceneAudio } from '../engine/audio'
-import { uiPlay, uiPause } from '../actions/playback'
+import { uiTogglePlay } from '../actions/playback'
 import { awaitFreshBundle, noteSceneStale, noteSceneUpToDate } from '../features/editor/scene-health'
 import { sendSpawnPoints } from '../spawn-points'
 import { entityName } from '@scene/custom-components'
@@ -303,8 +303,7 @@ export async function boot(): Promise<void> {
       case 'playpause':
         // ⌘P is the Studio's go-to-file; outside it, it's the transport button.
         if (runStudioChord('goto-file')) break
-        if (state.frozen) void uiPlay()
-        else void uiPause()
+        void uiTogglePlay()
         break
     }
   })
@@ -584,6 +583,7 @@ function handleSceneMessage(msg: SceneToPageMessage): void {
         pivotEach: state.pivotEach,
         showLinks: state.showLinks,
         snap: state.snap,
+        playInspect: state.playInspect,
         baseCorner: baseParcelCorner()
       })
       // and for the mute: the engine's persisted master volume may disagree

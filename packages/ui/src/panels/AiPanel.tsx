@@ -75,6 +75,12 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
     )
   }
   const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    aiStore.turnRunning = busy
+    return () => {
+      aiStore.turnRunning = false
+    }
+  }, [busy])
   const [fileStatus, setFileStatus] = useState<{ text: string; kind: 'dim' | 'ok' | 'err' }>({ text: '', kind: 'dim' })
   const [dirty, setDirty] = useState(false)
   const railKey = useStore(() => aiStore.railVersion)

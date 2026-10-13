@@ -768,13 +768,17 @@ project copy filed to the library cannot vanish with it.
   The shared `respawn` module can supply a personal checkpoint destination;
   otherwise the client uses `respawnAt`. `protectionSeconds` prevents damage and
   repeated fall deaths while the server catches up with the move. Params:
-  `respawnAt`, `maxHealth`, `dieBelowHeight`, `respawnDelay`, `protectionSeconds`.
-  Requires `ALLOW_TO_MOVE_PLAYER_INSIDE_SCENE`.
+  `respawnAt`, `maxHealth`, `dieBelowHeight`, `respawnDelay`, `protectionSeconds`,
+  `healthBar` (publishes `game.state.healthBar`; Run Progress hides hit points
+  only when it is false). Requires `ALLOW_TO_MOVE_PLAYER_INSIDE_SCENE`.
 - **run-progress** ("Run Progress") — independently timed courses, backed by
   server-validated Trigger Area entries. Ordered checkpoints, one pickup per
   collectible, a finish that requires every goal, personal best time and a
   personal restart all share `runtime/runs.ts`. Health & Respawn performs the
-  moves, while `runtime/gameHud.tsx` draws controls, progress and results.
+  moves, while `runtime/gameHud.tsx` draws controls, progress and results; its
+  `hud` param picks the full HUD, one big centred timer, or nothing.
+  A missing spawn marker falls back to its area's floor, then to Health &
+  Respawn.
   Local entries predict HUD progress and hide collected visuals immediately;
   server state confirms them, and rejection or expiry rolls them back.
   Keep custom-script visuals on plain entities and name them in `collectibleVisuals`
@@ -804,7 +808,8 @@ project copy filed to the library cannot vanish with it.
   script keeps is the board every player sees and a late joiner gets it from the
   CRDT snapshot. Creators name their own row fields, so a row is anything with a
   player-ish string (`player`/`p`/`address`/`wallet`/`name`) and a number
-  (`score`/`points`/`pts`/`value`/`seconds`/`time`/`best`); it sorts the rows
+  (`score`/`points`/`pts`/`value`/`seconds`/`time`/`best`), and shows a row's
+  `name`, or a connected player's display name, instead of the wallet; it sorts the rows
   itself, so the writer's order does not matter, and an `asc` board renders its
   scores as m:ss. Two placements on two keys are two boards; two on one key show
   the same places. All-time boards are the documented `game.saved` fold, not a

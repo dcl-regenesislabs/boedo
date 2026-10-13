@@ -96,3 +96,17 @@ describe('HierarchyPanel keyboard', () => {
     view.unmount()
   })
 })
+
+describe('HierarchyPanel folders', () => {
+  it('counts the entities nested inside a folder, not just its top rows', () => {
+    state.snapshot = {
+      '512': row('Board'),
+      '513': row('Panel', { Transform: { parent: 512 } }),
+      '514': row('Trophy')
+    } as Snapshot
+    const view = panel()
+    const folder = view.all('.eui-row').find((el) => el.textContent?.includes('From the start') === true)
+    expect(folder?.querySelector('.count')?.textContent).toBe('3')
+    view.unmount()
+  })
+})

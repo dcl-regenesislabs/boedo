@@ -76,3 +76,22 @@ describe('TooltipLayer placement', () => {
     expect(top + 280).toBeLessThanOrEqual(300)
   })
 })
+
+describe('TooltipLayer and hidden controls', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => {
+    mounted?.unmount()
+    mounted = null
+    vi.useRealTimers()
+  })
+
+  it('closes the tip of a control that gets hidden under the pointer', () => {
+    showTip('Place models/spinning-bar.glb', { top: 300, bottom: 320 }, 30)
+    const control = mounted?.container.querySelector('[data-tip]')
+    act(() => {
+      control?.parentElement?.setAttribute('hidden', '')
+      vi.advanceTimersByTime(500)
+    })
+    expect(document.querySelector('.eui-tip')).toBeNull()
+  })
+})

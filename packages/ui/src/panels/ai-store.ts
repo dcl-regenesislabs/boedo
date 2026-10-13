@@ -37,6 +37,7 @@ interface AiStoreShape {
   // Called after the Studio saves/accepts an edit to `path`, so the inspector can
   // re-read that script's params. Set by whoever opens the Studio.
   onSaved: ((path: string, content: string) => void) | null
+  turnRunning: boolean // a turn is in flight; full-screen Play keeps the dock up for it
 }
 
 // The assistant is never absent: it is half of the right dock, and the dock
@@ -65,7 +66,8 @@ export const aiStore = reactive<AiStoreShape>({
   railVersion: 0,
   revealLine: null,
   codeMove: null,
-  onSaved: null
+  onSaved: null,
+  turnRunning: false
 })
 whenPersisted(() => (aiStore.collapsed = storedFlag('ai-min', false)))
 
