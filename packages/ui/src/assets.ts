@@ -301,7 +301,7 @@ export async function missingModelRefs(files: File[]): Promise<string[]> {
   return await unsatisfiedRefs(missing)
 }
 
-const IMAGE_EXT = /\.(png|jpe?g|webp|ktx2)$/i
+const IMAGE_EXT = /\.(png|jpe?g)$/i
 const DATA_EXT = /\.(json|txt|md)$/i
 const AUDIO_EXT = /\.(mp3|ogg|wav)$/i
 const VIDEO_EXT = /\.mp4$/i
