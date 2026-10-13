@@ -13,7 +13,7 @@ import { announceBuiltModel } from '@ui/features/ai/built-models'
 import { buildCodeModel, overBudget, MODEL_BUDGET } from './code-model'
 import { MATERIAL_MAPS, materialFile } from '@ui/three/materials'
 import { materialBytes } from './material-files'
-import { sceneBudget, sceneTextures } from '@ui/scene-budget'
+import { modelImagePath, sceneBudget, sceneTextures } from '@ui/scene-budget'
 import { isFlatModel, searchModels } from './model-search'
 import { sendToScene } from '@ui/engine/bus'
 import { runRequestText } from '@ui/ai/requests'
@@ -172,8 +172,10 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     await loadModelCatalog()
     const asset = modelById(request.id)
     if (asset === undefined) throw new Error('No catalog model has that id. Use findModels.')
-    const placed = await placeGltf(request, await importCatalogFile(asset), asset.name, signal, settings)
-    return { ...placed, size: sizeOf(asset) }
+    const rel = await importCatalogFile(asset)
+    const cost = await catalogTextureCost(rel)
+    const placed = await placeGltf(request, rel, asset.name, signal, settings)
+    return { ...placed, size: sizeOf(asset), ...cost }
   }
   if (request.type === 'buildModel') {
     // building into a stand-in may leave out the name: the stand-in's own name is the model's
@@ -268,6 +270,24 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
   if (!['attachScript', 'setParams', 'placePrefab'].includes(String(request.type))) throw new Error('Unsupported scene request.')
   if (request.type !== 'placePrefab') entity(request.to)
   return runRequestText(JSON.stringify({ version: 1, requests: [request] }), state.activeEntity)
+}
+
+// A catalog model is placed whatever its textures cost: the answer says what it spends of the scene's limit.
+async function catalogTextureCost(rel: string): Promise<Record<string, unknown>> {
+  let info: ReturnType<typeof inspectModel>
+  try {
+    info = inspectModel(await dataLayerReadFileBytes(rel))
+  } catch {
+    return { warning: 'Its textures could not be counted; run check to see the scene budget.' }
+  }
+  const scene = await sceneTextures()
+  const placedAlready = Object.values(state.snapshot).some((c) => object(c.GltfContainer) && c.GltfContainer.src === rel)
+  const adds = placedAlready ? 0 : info.textures - info.sharedImages.length + info.sharedImages.filter((uri) => !scene.shared.has(modelImagePath(rel, uri))).length
+  const left = scene.limit - scene.used - adds
+  return {
+    textures: info.textures, materials: info.materials.length, sceneTexturesLeft: left,
+    ...(left < 0 ? { warning: `The scene now uses ${scene.used + adds} of its ${scene.limit} textures; explorers warn above that. Swap it for a model with fewer textures, or grow the parcels.` } : {})
+  }
 }
 
 // Puts a model file on a new entity, or turns the `into` stand-in into it in place.

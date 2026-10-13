@@ -27,7 +27,8 @@ const counted = new Map<string, { tick: number; counts: Promise<Counts | null> }
 // another project's files share no paths with this one's
 let countedIn: string | null = null
 
-function projectPath(model: string, uri: string): string {
+// A file a model points at, as its project path.
+export function modelImagePath(model: string, uri: string): string {
   const path = new URL(uri, `file:///${model.slice(0, model.lastIndexOf('/') + 1)}`).pathname.slice(1)
   try {
     return decodeURIComponent(path)
@@ -49,7 +50,7 @@ function countFile(src: string): Promise<Counts | null> {
   const pending: Promise<Counts | null> = dataLayerReadFileBytes(src).then((bytes) => {
     const info = inspectModel(bytes)
     // a texture file beside the model, resolved to its project path so models sharing it count it once
-    const shared = info.sharedImages.map((uri) => projectPath(src, uri))
+    const shared = info.sharedImages.map((uri) => modelImagePath(src, uri))
     return { triangles: info.triangles, primitives: info.primitives, materials: info.materials.length, textures: info.textures - shared.length, bytes: bytes.byteLength, shared, clips: info.animations, warnings: info.warnings }
   }).catch(() => {
     // unreadable or not a model: reported as missing, and read again next time

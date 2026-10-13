@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { browserSceneRequest } from './scene'
 import { state } from '@scene/state'
-import { loadModelCatalog, type ModelAsset } from '@ui/assets'
+import { importCatalogFile, loadModelCatalog, modelById, type ModelAsset } from '@ui/assets'
 import { inspectModel } from '@ui/model-info'
 import { sceneTextures } from '@ui/scene-budget'
 import { buildCodeModel } from './code-model'
@@ -25,7 +25,8 @@ vi.mock('@ui/engine/cmd', () => ({ cmd: { componentSchema: () => Promise.reject(
 vi.mock('@scene/allowed-components', () => ({ isAllowedComponent: () => true }))
 vi.mock('@ui/actions/entities', () => ({ uiAddEntity: vi.fn() }))
 vi.mock('@ui/actions/components', () => ({ uiSetComponentValue: setValue, uiDeleteComponent: deleteValue }))
-vi.mock('@ui/assets', () => ({ importCatalogFile: vi.fn(), loadModelCatalog: vi.fn(async () => []), modelById: () => undefined }))
+vi.mock('@ui/assets', () => ({ importCatalogFile: vi.fn(), loadModelCatalog: vi.fn(async () => []), modelById: vi.fn(() => undefined) }))
+vi.mock('@ui/engine/datalayer', async (real) => ({ ...(await real<object>()), dataLayerReadFileBytes: vi.fn(async () => new Uint8Array(0)) }))
 vi.mock('@ui/engine/bus', () => ({ sendToScene: vi.fn() }))
 vi.mock('./code-model', () => ({ buildCodeModel: vi.fn(async () => { throw new Error('built') }), overBudget: () => [], MODEL_BUDGET: {} }))
 vi.mock('@ui/ai/requests', () => ({ runRequestText: vi.fn() }))
@@ -129,5 +130,14 @@ describe('assistant scene requests', () => {
 
   it('builds into a stand-in without a name, the way the prompt shows it', async () => {
     await expect(browserSceneRequest({ type: 'buildModel', into: '512', code: 'root' }, new AbortController().signal)).rejects.toThrow('built')
+  })
+
+  it('places a catalog model that takes the scene past its texture limit, and says so, counting a file the scene has once', async () => {
+    vi.mocked(modelById).mockReturnValueOnce(asset({ name: 'Stone 03', category: 'nature', tags: [] }))
+    vi.mocked(importCatalogFile).mockResolvedValueOnce('models/catalog/stone-03.glb')
+    vi.mocked(inspectModel).mockReturnValueOnce({ materials: ['Stone'], textures: 3, sharedImages: ['materials/T_Rock_D.jpg'] } as unknown as ReturnType<typeof inspectModel>)
+    vi.mocked(sceneTextures).mockResolvedValueOnce({ used: 9, limit: 10, shared: new Set(['models/catalog/materials/T_Rock_D.jpg']) })
+    const placed = await browserSceneRequest({ type: 'placeModel', id: 'Stone 03', into: '512' }, new AbortController().signal)
+    expect(placed).toMatchObject({ model: 'models/catalog/stone-03.glb', textures: 3, materials: 1, sceneTexturesLeft: -1, warning: expect.stringContaining('11 of its 10 textures') })
   })
 })
