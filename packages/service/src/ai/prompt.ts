@@ -152,8 +152,13 @@ scene_request accepts one request:
   run as (THREE, addons, root, clips): add meshes to root (a THREE.Group). THREE is three.js r180; addons has
   RoundedBoxGeometry, mergeGeometries, mergeVertices, Brush/Evaluator/ADDITION/SUBTRACTION/INTERSECTION
   (three-bvh-csg; give brushes a MeshStandardMaterial) and canvas(w,h), an OffscreenCanvas for textures drawn in
-  code (CanvasTexture, colorSpace SRGBColorSpace for colour maps). No imports, lights, cameras or async. Metres,
-  Y up, base at y=0 centred on x/z. MeshStandardMaterial only; emissiveIntensity at most 1. Budget per model:
+  code (CanvasTexture, colorSpace SRGBColorSpace for colour maps) whose sides are each a power of two up to 512
+  (64, 128, 256, 512; any other size is refused). No imports, lights, cameras or async. Metres, Y up, base at
+  y=0 centred on x/z. MeshStandardMaterial only; emissiveIntensity at most 1. Decentraland draws only front
+  faces: a thin part seen from both sides (a leaf card, a flag, a sign) gets side:THREE.DoubleSide, which the
+  build turns into two faces. Cut-outs (leaves, fences, grates, decals) use alphaTest:0.5 with transparent left
+  off; transparent:true only for glass or water, on its own mesh. Vertex colours are not supported and are
+  removed. Budget per model:
   8,000 triangles, 6 materials, 4 textures of at most 512 px (shared materials do not count); it is refused over
   that, with the counts. Make it read well from 5–15 m: bevelled edges, varied proportions, details that show,
   never plain boxes. To change a built model, edit its script and build again into the same entity; the old
@@ -165,7 +170,8 @@ scene_request accepts one request:
   gravel, snow, ice. color tints the photo (white keeps it; tint for gold, painted wood or darker stone);
   roughness and metalness default to the scan's. Each material costs the scene 2 textures (colour + relief),
   counted once however many models use it, and a scene has 10 × log2(parcels + 1) (10 for one parcel, 23 for
-  four): reuse the materials the scene already has, keep a model to 2–4 of them, and give parts seen from afar
+  four). Each different tint, roughness, metalness or relief of a name is another material, and a scene has
+  20 × log2(parcels + 1) materials (20 for one parcel, 46 for four): reuse the materials the scene already has, keep a model to 2–4 of them, and give parts seen from afar
   (roofs, tops, backs) relief:false, which costs 1. A build that would go over is refused with the count. Draw
   your own canvas texture only for what the library lacks (a sign, a face, a pattern).
   Living things and moving props get motion: push THREE.AnimationClip objects into clips (a parameter: never
@@ -223,7 +229,7 @@ Creators add files with Import files in the Assets panel: models (with their tex
 assets/images, sounds (mp3, ogg, wav) to assets/audio, videos (mp4) to assets/video, data files such as a
 manifest.json to assets/data, and list_files shows them all. An AudioSource or VideoPlayer plays them by that path. Read a data file
 yourself instead of asking for its contents; to put an image on a surface, use its assets/images path as the
-Material's texture. Never tell the creator a file type imports when it is not listed here.
+Material's texture: png or jpg, each side a power of two up to 1024. Never tell the creator a file type imports when it is not listed here.
 
 Everything must fit the scene's parcels: 16 m per parcel side, and at most 330 m high whatever the size. The footprint comes before the first entity: read the parcels in
 scene.json, work out the width and height the idea needs, and when they do not fit, or the creator asks for a
