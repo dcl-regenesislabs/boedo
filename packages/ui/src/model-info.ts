@@ -176,7 +176,7 @@ export function inspectModel(bytes: Uint8Array) {
   const textureProblems = images.flatMap(({ width, height }) =>
     !powerOfTwo(width) || !powerOfTwo(height) ? [`${width}x${height} is not a power of two`]
       : Math.max(width, height) > MAX_TEXTURE_SIDE ? [`${width}x${height} is over ${MAX_TEXTURE_SIDE}`] : [])
-  for (const problem of textureProblems) warnings.add(`A texture is ${problem}.`)
+  for (const problem of textureProblems) warnings.add(`Texture ${problem}.`)
   const coordinates = `SDK local metres, before entity Transform; conservative static visual bounds${animations.length > 0 ? ' that leave out movement during animation' : ''}`
   return {
     bytes: bytes.byteLength, bounds, coordinates,
