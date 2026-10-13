@@ -1,6 +1,9 @@
+// @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { checkCanvasSize, mergeStatic, partNamer, singleSided, stripVertexColors } from './build-passes'
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { checkCanvasSize, mergeStatic, partNamer, singleSided, stripVertexColors, toSceneAxes } from './build-passes'
 
 describe('a model build', () => {
   it('takes only power-of-two canvas sides up to 512', () => {
@@ -88,6 +91,39 @@ describe('a model build', () => {
       a.fromBufferAttribute(position, index[i]); b.fromBufferAttribute(position, index[i + 1]); c.fromBufferAttribute(position, index[i + 2])
       expect(n.subVectors(c, b).cross(a.clone().sub(b)).dot(new THREE.Vector3().fromBufferAttribute(normal, index[i]))).toBeGreaterThan(0)
     }
+  })
+  it('exports a model whose +x is the scene\'s east and +z its north, with a plane\'s face still reading forward', async () => {
+    const east = Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2)), { name: 'East' })
+    east.position.set(1, 0, 0)
+    const sign = Object.assign(new THREE.Mesh(new THREE.PlaneGeometry()), { name: 'Sign' })
+    sign.position.set(0, 0, 1)
+    const root = new THREE.Group().add(east, sign)
+    const clip = new THREE.AnimationClip('Slide', 1, [new THREE.VectorKeyframeTrack('East.position', [0, 1], [1, 0, 0, 2, 0, 0])])
+    toSceneAxes(root, [clip])
+    const glb = await new GLTFExporter().parseAsync(root, { binary: true, animations: [clip] })
+    const gltf = await new GLTFLoader().parseAsync(glb as ArrayBuffer, '')
+    gltf.scene.updateMatrixWorld(true)
+    // Decentraland places glTF with x negated: scene = (-x, y, z)
+    const inScene = (v: THREE.Vector3): number[] => [0 - v.x, v.y, v.z]
+    const at = (name: string): number[] => inScene(gltf.scene.getObjectByName(name)?.getWorldPosition(new THREE.Vector3()) ?? new THREE.Vector3())
+    expect(at('East')).toEqual([1, 0, 0])
+    expect(at('Sign')).toEqual([0, 0, 1])
+    expect(gltf.animations[0].tracks[0].values[3]).toBe(-2)
+    const plane = gltf.scene.getObjectByName('Sign') as THREE.Mesh
+    const { position, uv } = plane.geometry.attributes
+    const [i, j, k] = plane.geometry.index?.array ?? [0, 1, 2]
+    const [a, b, c] = [i, j, k].map((n) => new THREE.Vector3().fromBufferAttribute(position, n))
+    const [ua, ub, uc] = [i, j, k].map((n) => new THREE.Vector2(uv.getX(n), uv.getY(n)))
+    const front = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a))
+    // its front, by winding, faces the scene's north
+    expect(Math.sign(front.z)).toBe(1)
+    // u runs to the right and v up as seen from the front, in the glTF's own right-handed frame
+    const e1 = new THREE.Vector3().subVectors(b, a), e2 = new THREE.Vector3().subVectors(c, a)
+    const [du1, dv1, du2, dv2] = [ub.x - ua.x, ub.y - ua.y, uc.x - ua.x, uc.y - ua.y]
+    const r = 1 / (du1 * dv2 - du2 * dv1)
+    const alongU = e1.clone().multiplyScalar(dv2 * r).addScaledVector(e2, -dv1 * r)
+    const alongV = e2.clone().multiplyScalar(du1 * r).addScaledVector(e1, -du2 * r)
+    expect(alongU.clone().cross(alongV).dot(front)).toBeGreaterThan(0)
   })
 })
 

@@ -9,7 +9,7 @@ import type { ThreeReply, ThreeRequest } from './protocol'
 import { lockDown, refusedSyntax } from './sandbox'
 import { isLibraryName, LIBRARY, libraryMaterialName, metresPerTile, surface, type LibraryName, type MaterialMap } from './materials'
 import { boxProjectUVs, externalizeLibraryImages } from './library-glb'
-import { checkCanvasSize, mergeStatic, partNamer, singleSided, stripVertexColors } from './build-passes'
+import { checkCanvasSize, mergeStatic, partNamer, singleSided, stripVertexColors, toSceneAxes } from './build-passes'
 
 type Axis = 'x' | 'y' | 'z'
 const STEPS = 24
@@ -126,7 +126,9 @@ async function build(code: string, model: string): Promise<void> {
   const root = new THREE.Group()
   const clips: unknown[] = []
   new Function('THREE', 'addons', 'root', 'clips', code)(THREE, addons, root, clips)
+  const animations = clips.filter((clip): clip is THREE.AnimationClip => clip instanceof THREE.AnimationClip)
   root.updateMatrixWorld(true)
+  toSceneAxes(root, animations)
   const warnings = stripVertexColors(root)
   singleSided(root)
   // projected without translation, so copies of one geometry that only move still share one buffer
@@ -146,7 +148,6 @@ async function build(code: string, model: string): Promise<void> {
     }
     node.geometry = geometry
   })
-  const animations = clips.filter((clip): clip is THREE.AnimationClip => clip instanceof THREE.AnimationClip)
   mergeStatic(root, animations)
   namer.nameAll(root)
   const exported = await new GLTFExporter().parseAsync(root, { binary: true, animations })

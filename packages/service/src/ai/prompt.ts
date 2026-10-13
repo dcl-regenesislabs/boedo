@@ -155,9 +155,9 @@ scene_request accepts one request:
   RoundedBoxGeometry, mergeGeometries, mergeVertices, Brush/Evaluator/ADDITION/SUBTRACTION/INTERSECTION
   (three-bvh-csg; give brushes a MeshStandardMaterial) and canvas(w,h), an OffscreenCanvas for textures drawn in
   code (CanvasTexture, colorSpace SRGBColorSpace for colour maps) whose sides are each a power of two up to 512
-  (64, 128, 256, 512; any other size is refused). No imports, lights, cameras or async. Metres, Y up, base at
-  y=0 centred on x/z. MeshStandardMaterial only; emissiveIntensity at most 1. Decentraland draws only front
-  faces: a thin part seen from both sides (a leaf card, a flag, a sign) gets side:THREE.DoubleSide, which the
+  (64, 128, 256, 512; any other size is refused). No imports, lights, cameras or async. Metres, base at
+  y=0 centred on x/z, with the scene's axes: +x east, +y up, +z north for a model placed unturned.
+  MeshStandardMaterial only; emissiveIntensity at most 1. Decentraland draws only front faces: a thin part seen from both sides (a leaf card, a flag, a sign) gets side:THREE.DoubleSide, which the
   build turns into two faces (twice its triangles). Cut-outs (leaves, fences, grates, decals) use alphaTest:0.5 with transparent left
   off; transparent:true only for glass or water, on its own mesh. Vertex colours are not supported and are
   removed. Name only the parts you animate or refer to: unnamed parts are named <Model>_Part01… and static

@@ -46,6 +46,63 @@ export function flipped(geometry: THREE.BufferGeometry, turnNormals = true): THR
   return out
 }
 
+// Decentraland reads glTF with x negated (left-handed), so x is mirrored here to make the script's +x the
+// scene's east; u turns too, so text and images still read forward from the front
+export function toSceneAxes(root: THREE.Object3D, clips: readonly THREE.AnimationClip[]): void {
+  const mirror = new THREE.Matrix4().makeScale(-1, 1, 1)
+  const conjugate = (m: THREE.Matrix4): THREE.Matrix4 => m.premultiply(mirror).multiply(mirror)
+  const negate = (attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined, component: 'X' | 'Y' | 'Z'): void => {
+    if (attribute === undefined) return
+    for (let i = 0; i < attribute.count; i++) attribute[`set${component}`](i, -attribute[`get${component}`](i))
+  }
+  const done = new Map<string, THREE.BufferGeometry>()
+  const mirrored = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => {
+    let out = done.get(geometry.uuid)
+    if (out !== undefined) return out
+    const copy = geometry.clone()
+    for (const name of ['position', 'normal'] as const) {
+      negate(copy.getAttribute(name), 'X')
+      for (const target of copy.morphAttributes[name] ?? []) negate(target, 'X')
+    }
+    // tangent' = -mirror(tangent) once u is turned, which leaves its handedness w as it was
+    negate(copy.getAttribute('tangent'), 'Y')
+    negate(copy.getAttribute('tangent'), 'Z')
+    for (const [name, uv] of Object.entries(copy.attributes)) {
+      if (!/^uv\d*$/.test(name)) continue
+      for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i))
+    }
+    out = flipped(copy, false)
+    done.set(geometry.uuid, out)
+    return out
+  }
+  root.traverse((node) => {
+    node.position.x = -node.position.x
+    node.quaternion.set(node.quaternion.x, -node.quaternion.y, -node.quaternion.z, node.quaternion.w)
+    if (node instanceof THREE.InstancedMesh) {
+      const matrix = new THREE.Matrix4()
+      for (let i = 0; i < node.count; i++) {
+        node.getMatrixAt(i, matrix)
+        node.setMatrixAt(i, conjugate(matrix))
+      }
+    }
+    if (node instanceof THREE.SkinnedMesh) {
+      conjugate(node.bindMatrix)
+      conjugate(node.bindMatrixInverse)
+      for (const inverse of node.skeleton.boneInverses) conjugate(inverse)
+    }
+    if (node instanceof THREE.Mesh) node.geometry = mirrored(node.geometry)
+  })
+  for (const track of new Set(clips.flatMap((clip) => clip.tracks))) {
+    const { propertyName, propertyIndex } = THREE.PropertyBinding.parseTrackName(track.name)
+    const turned = propertyName === 'position' ? ['x'] : propertyName === 'quaternion' ? ['y', 'z'] : []
+    const stride = propertyName === 'position' ? 3 : 4
+    track.values.forEach((value, i) => {
+      if (propertyIndex === undefined ? turned.includes('xyzw'[i % stride]) : turned.includes(propertyIndex)) track.values[i] = -value
+    })
+  }
+  root.updateMatrixWorld(true)
+}
+
 const sides = (mesh: THREE.Mesh): THREE.Side[] => [mesh.material].flat().map((material) => material.side)
 
 // Decentraland culls back faces, so a double-sided part gets a back copy and a back-sided one turns around
