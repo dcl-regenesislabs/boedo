@@ -8,7 +8,6 @@ import { cmd } from '@ui/engine/cmd'
 import { hostV1 } from '@ui/engine/hosted'
 import { errorLines, isServerError } from '@ui/features/editor/log-roles'
 
-// interaction only: timed movement keys cost whole turns and rarely landed a jump
 const KEYS: Record<string, { key: string; code: string; keyCode: number }> = {
   E: { key: 'e', code: 'KeyE', keyCode: 69 }, F: { key: 'f', code: 'KeyF', keyCode: 70 }
 }
