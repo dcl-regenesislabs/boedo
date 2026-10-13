@@ -5,6 +5,7 @@ import { loadModelCatalog, type ModelAsset } from '@ui/assets'
 import { inspectModel } from '@ui/model-info'
 import { sceneTextures } from '@ui/scene-budget'
 import { buildCodeModel } from './code-model'
+import { materialFile } from '@ui/three/materials'
 
 const { setValue, deleteValue, status } = vi.hoisted(() => {
   const status = new Map<string, string>()
@@ -118,10 +119,10 @@ describe('assistant scene requests', () => {
   })
 
   it('refuses a model whose shared materials would take the scene past its texture limit, counting the ones it already has once', async () => {
-    const maps = ['stone-blocks', 'red-brick'].flatMap((name) => [`materials/${name}/color.jpg`, `materials/${name}/normal.jpg`])
+    const maps = (['stone-blocks', 'red-brick'] as const).flatMap((name) => [materialFile(name, 'color'), materialFile(name, 'normal')])
     vi.mocked(buildCodeModel).mockResolvedValueOnce({ bytes: new Uint8Array(8), clips: [], library: ['stone-blocks', 'red-brick'] })
     vi.mocked(inspectModel).mockReturnValueOnce({ triangles: 100, materials: [{}, {}], textures: 4, largestImage: 512, sharedImages: maps, externalResources: maps } as unknown as ReturnType<typeof inspectModel>)
-    vi.mocked(sceneTextures).mockResolvedValueOnce({ used: 8, limit: 10, shared: new Set(['models/materials/stone-blocks/color.jpg']) })
+    vi.mocked(sceneTextures).mockResolvedValueOnce({ used: 8, limit: 10, shared: new Set([`models/${materialFile('stone-blocks', 'color')}`]) })
     await expect(browserSceneRequest({ type: 'buildModel', name: 'Tower', code: 'root', position: { x: 8, y: 0, z: 8 } }, new AbortController().signal))
       .rejects.toThrow('The scene has 2 of its 10 textures left and this model would add 3')
   })
