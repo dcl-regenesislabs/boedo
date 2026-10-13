@@ -1,4 +1,4 @@
-// The scene against the per-parcel limits; each placed copy of a model counts again.
+// The scene against the per-parcel limits: triangles and bodies count every placed copy, textures and materials once per file.
 import { object } from '@dcl-editor/contract'
 import { state, isRuntimeEntity, isUiEntity, provenanceBaseline } from '@scene/state'
 import { entityName } from '@scene/custom-components'
