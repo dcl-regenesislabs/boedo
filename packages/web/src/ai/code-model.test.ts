@@ -28,4 +28,11 @@ describe('a build reply the model script may have forged', () => {
     expect(result.library).toEqual(['stone-blocks'])
     expect(result.clips).toEqual(['Wag'])
   })
+
+  it('keeps only a few short string warnings', async () => {
+    replies.push(built({ warnings: [42, 'x'.repeat(5000), ...Array<string>(20).fill('w')] }))
+    const { warnings } = await buildCodeModel('root.add(x)', new AbortController().signal)
+    expect(warnings).toHaveLength(8)
+    expect(warnings[0]).toHaveLength(300)
+  })
 })

@@ -19,6 +19,7 @@ export type ThreeReply =
   // the worker holds the port: transfers sent before this can be lost on the way
   | { kind: 'ready' }
   // library: the shared materials this model points at, whose files the page writes beside it
-  | { kind: 'built'; glb: ArrayBuffer; clips: string[]; library: string[] }
+  // warnings: what the worker changed so the model meets Decentraland's rules
+  | { kind: 'built'; glb: ArrayBuffer; clips: string[]; library: string[]; warnings: string[] }
   | { kind: 'shown' }
   | { kind: 'failed'; error: string }

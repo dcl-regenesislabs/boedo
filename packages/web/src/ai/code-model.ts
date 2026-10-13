@@ -6,8 +6,8 @@ const MAX_GLB_BYTES = 20 * 1024 * 1024
 
 // The script ran before the worker answered, so it can forge the answer: nothing in it is trusted
 // beyond what is checked here, and the caller measures the model from the GLB itself.
-function checked(reply: Extract<ThreeReply, { kind: 'built' }>): { bytes: Uint8Array<ArrayBuffer>; clips: string[]; library: LibraryName[] } {
-  const { glb, clips, library } = reply
+function checked(reply: Extract<ThreeReply, { kind: 'built' }>): { bytes: Uint8Array<ArrayBuffer>; clips: string[]; library: LibraryName[]; warnings: string[] } {
+  const { glb, clips, library, warnings } = reply
   if (!(glb instanceof ArrayBuffer) || glb.byteLength === 0 || glb.byteLength > MAX_GLB_BYTES) throw new Error('The model is missing or over 20 MB.')
   if (!Array.isArray(library) || library.length > LIBRARY.length) throw new Error('The model names too many shared materials.')
   const materials = [...new Set(library)].map((name) => {
@@ -15,7 +15,8 @@ function checked(reply: Extract<ThreeReply, { kind: 'built' }>): { bytes: Uint8A
     return name
   })
   const names = Array.isArray(clips) ? clips.filter((c): c is string => typeof c === 'string').slice(0, 32).map((c) => c.slice(0, 64)) : []
-  return { bytes: new Uint8Array(glb), clips: names, library: materials }
+  const notes = Array.isArray(warnings) ? warnings.filter((w): w is string => typeof w === 'string').slice(0, 8).map((w) => w.slice(0, 300)) : []
+  return { bytes: new Uint8Array(glb), clips: names, library: materials, warnings: notes }
 }
 
 export const MODEL_BUDGET = { triangles: 8000, materials: 6, textures: 4, largestTexture: 512 }
