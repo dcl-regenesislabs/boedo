@@ -14,6 +14,12 @@ const cleanup: Array<() => Promise<void>> = []
 afterEach(async () => { for (const stop of cleanup.splice(0)) await stop() })
 
 describe('component service', () => {
+  it('names the release it runs on /health, so a deploy can be checked', async () => {
+    const { base, stop } = await createTestService({ vars: { SERVICE_VERSION: 'v9.9.9' } })
+    cleanup.push(stop)
+    expect(await (await fetch(base + '/health')).json()).toEqual({ ok: true, version: 'v9.9.9' })
+  })
+
   it('serves signed storage with its prefix, CORS, binary bodies, health probes and metrics', async () => {
     const { base, origin, stop } = await createTestService()
     cleanup.push(stop)

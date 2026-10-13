@@ -10,6 +10,9 @@ RUN npm ci --workspace @dcl-editor/service --include-workspace-root=false --omit
 
 FROM node:24-alpine
 
+# the release tag, reported by /health so a deploy can be checked
+ARG SERVICE_VERSION=
+ENV SERVICE_VERSION=$SERVICE_VERSION
 ENV NODE_ENV=production \
     HTTP_SERVER_HOST=0.0.0.0 \
     HTTP_SERVER_PORT=8787 \

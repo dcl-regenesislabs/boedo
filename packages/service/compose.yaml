@@ -3,6 +3,8 @@ services:
     build:
       context: ../..
       dockerfile: packages/service/Dockerfile
+      args:
+        SERVICE_VERSION: ${SERVICE_VERSION:-}
     ports:
       - "127.0.0.1:8787:8787"
     env_file: .env

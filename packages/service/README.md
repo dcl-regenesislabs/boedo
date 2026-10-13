@@ -264,6 +264,7 @@ block and directory overhead when sizing the volume; logical byte limits are not
 | `ASSISTANT_REQUESTS_PER_MINUTE` | 60 | per wallet, assistant HTTP routes only |
 | `PURGE_WALLETS_PER_RUN` | 20 | wallets one purge run visits |
 | `ANTHROPIC_OAUTH_SETUP_TOKEN` | none | Node-only Claude setup token; seeds `.auth.json` in a sibling `.assistant` directory unless `--ai-auth` supplies its path |
+| `SERVICE_VERSION` | none | the release this build is; `/health` reports it (the image sets it from the `SERVICE_VERSION` build arg) |
 | `AI_AUTH_PATH` | none | existing OAuth session file (`--ai-auth`) |
 | `AI_MODEL` | `claude-opus-5-5` | assistant model (`--ai-model`); the only model clients may use |
 | `ASSISTANT_WALLETS` | any wallet; **required when `NODE_ENV=production`** and a credential is set | comma-separated wallets that may use the assistant, or `*` for any |

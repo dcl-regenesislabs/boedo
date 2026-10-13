@@ -79,6 +79,8 @@ export interface Env {
   publicUrl?: string
   /** JSON-RPC endpoint for ERC-1654 wallets; unset, they are refused. */
   ethRpcUrl?: string
+  /** the release this build is, reported by /health */
+  version?: string
   limits?: Partial<Limits>
   rateLimiter?: RateLimiter
   uploads?: UploadGate
@@ -111,7 +113,7 @@ const LIMIT_VARS: Record<keyof Limits, string> = {
 }
 
 export async function envFromConfig(config: IConfigComponent, store: BlobStore): Promise<Env> {
-  const names = ['ALLOWED_ORIGINS', 'STORAGE_WALLETS', 'TICKET_SECRET', 'BASE_PATH', 'PUBLIC_URL', 'ETH_RPC_URL', ...Object.values(LIMIT_VARS)]
+  const names = ['ALLOWED_ORIGINS', 'STORAGE_WALLETS', 'TICKET_SECRET', 'BASE_PATH', 'PUBLIC_URL', 'ETH_RPC_URL', 'SERVICE_VERSION', ...Object.values(LIMIT_VARS)]
   const values = await Promise.all(names.map(async (name) => [name, await config.getString(name)] as const))
   return envFromVars(Object.fromEntries(values), store)
 }
@@ -146,6 +148,7 @@ export function envFromVars(vars: Vars, store: BlobStore): Env {
     basePath: (vars.BASE_PATH ?? '').replace(/\/$/, ''),
     publicUrl: vars.PUBLIC_URL?.replace(/\/$/, '') || undefined,
     ethRpcUrl: vars.ETH_RPC_URL || undefined,
+    version: vars.SERVICE_VERSION || undefined,
     limits
   }
 }

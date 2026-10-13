@@ -59,6 +59,16 @@ Publishing a release in the GitHub UI publishes the web editor
 explorer loads. Every push to `main` also publishes a snapshot on the `ci` tag,
 and a manual run publishes the chosen ref on `latest`.
 
+### `deploy-service.yml` — publishing a release
+
+Publishing a release also deploys the project service to its droplet: it copies
+`package.json`, `package-lock.json`, `packages/contract` and `packages/service`
+into `DEPLOY_DIR` (the droplet's `.env`, `compose.override.yaml` and data stay),
+rebuilds the container with the tag as `SERVICE_VERSION`, and fails unless
+`$SERVICE_URL/health` answers with that tag. To redeploy a release, run it on
+its tag. It needs the secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`
+and `DEPLOY_KNOWN_HOSTS`, and the variables `DEPLOY_DIR` and `SERVICE_URL`.
+
 ### `release.yml` — desktop images for a release, by hand
 
 Run it on the release's tag after publishing the release (Actions → release →
