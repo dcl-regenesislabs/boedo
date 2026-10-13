@@ -10,7 +10,7 @@ const TEMPLATE_SOURCES = import.meta.glob<string>('../../../desktop/templates/**
 })
 
 const TEMPLATES: SceneTemplate[] = [
-  { id: 'blank', name: 'Blank', description: 'An empty parcel — start from scratch' },
+  { id: 'blank', name: 'Blank', description: 'An empty 2×2 plot — start from scratch' },
   { id: 'starter', name: 'Example', description: 'A clickable cube with a bit of SDK7 code' }
 ]
 
