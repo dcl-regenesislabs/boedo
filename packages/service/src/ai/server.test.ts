@@ -79,6 +79,30 @@ describe('assistant connection authorization', () => {
     expect(one.ws.protocol).toBe(ASSISTANT_PROTOCOL)
   })
 
+  it('lets one wallet run two turns at once across its tabs, and a third once one ends', async () => {
+    const { ticket, socket } = await setup()
+    const tabs: WebSocket[] = []
+    for (let i = 0; i < 3; i++) { const tab = await socket(await ticket()); await tab.ready; tabs.push(tab.ws) }
+    const next = (ws: WebSocket, kinds = ['call', 'failure']) => new Promise<AssistantServerMessage>((resolve) => {
+      const on = (raw: unknown) => { const m = JSON.parse(String(raw)) as AssistantServerMessage; if (kinds.includes(m.kind)) { ws.off('message', on); resolve(m) } }
+      ws.on('message', on)
+    })
+    const prompt = (ws: WebSocket, turnId: string) => ws.send(JSON.stringify({ kind: 'prompt', turnId, projectId: 'project', params: { provider: 'claude', text: 'Read my file' } }))
+    const calls = []
+    for (const [i, tab] of tabs.slice(0, 2).entries()) { const call = next(tab); prompt(tab, `turn-${i}`); calls.push(await call) }
+    const refused = next(tabs[2])
+    prompt(tabs[2], 'turn-2')
+    expect(await refused).toMatchObject({ kind: 'failure', message: expect.stringContaining('already running') })
+
+    const first = calls[0] as BrowserToolCall
+    const ended = new Promise<void>((resolve) => tabs[0].on('message', (raw: unknown) => { if (JSON.parse(String(raw)).event?.kind === 'done') resolve() }))
+    tabs[0].send(JSON.stringify({ kind: 'result', callId: first.callId, turnId: first.turnId, ok: true, text: 'file' }))
+    await ended
+    const started = next(tabs[2])
+    prompt(tabs[2], 'turn-3')
+    expect((await started).kind).toBe('call')
+  })
+
   it('serves only the listed wallets when ASSISTANT_WALLETS is set', async () => {
     const { base, wallet } = await setup({ ASSISTANT_WALLETS: '0x0000000000000000000000000000000000000001' })
     const response = await wallet.signedFetch(base + '/assistant/connect', { method: 'POST' })

@@ -45,7 +45,8 @@ export function createConnection(options: {
   factory: AgentFactory
   logger: Pick<ILoggerComponent.ILogger, 'error' | 'info'>
   send(message: AssistantServerMessage): void
-  allowTurn(): boolean
+  /** true, or why the turn is refused */
+  allowTurn(): true | string
   usage?: WalletUsage
   memory?: WalletMemory
   toolTimeoutMs?: number
@@ -227,8 +228,9 @@ export function createConnection(options: {
         send({ kind: 'failure', message: 'Invalid prompt. Use up to four images, at most 2 MB each.' })
         return
       }
-      if (active !== null || !options.allowTurn()) {
-        send({ kind: 'failure', message: active !== null ? 'A turn is already running.' : 'Too many requests. Try again shortly.' })
+      const allowed = active !== null ? 'A turn is already running.' : options.allowTurn()
+      if (allowed !== true) {
+        send({ kind: 'failure', message: allowed })
         return
       }
       running = prompt(message.turnId, message.projectId, params, ref)

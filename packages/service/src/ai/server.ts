@@ -29,9 +29,11 @@ export interface AssistantLimits {
   turnsPerMinute: number
   /** Turns one wallet may start per day. */
   turnsPerDay: number
+  /** Turns one wallet may have running at once, across its tabs. */
+  turnsAtOnce: number
 }
 
-export const DEFAULT_ASSISTANT_LIMITS: AssistantLimits = { wallets: null, turnsPerMinute: 30, turnsPerDay: 20_000 }
+export const DEFAULT_ASSISTANT_LIMITS: AssistantLimits = { wallets: null, turnsPerMinute: 30, turnsPerDay: 50, turnsAtOnce: 2 }
 
 const MAX_SOCKETS = 32
 const SOCKETS_PER_WALLET = 3
@@ -53,6 +55,7 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
   const logger = logs.getLogger('assistant')
   const tickets = new Map<string, { wallet: string; origin: string; expires: number }>()
   const sockets = new Map<WebSocket, string>()
+  const connections = new Map<WebSocket, ReturnType<typeof createConnection>>()
   const pending = new Map<string, { wallet: string; timer: ReturnType<typeof setTimeout> }>()
   const limiter = createRateLimiter()
   const closing = new Set<Promise<void>>()
@@ -73,13 +76,15 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
     for (const [token, ticket] of tickets) if (ticket.expires < Date.now()) tickets.delete(token)
     return { all: tickets.size, held: (wallet) => [...tickets.values()].filter((ticket) => ticket.wallet === wallet).length }
   }
-  function allowTurn(wallet: string): boolean {
+  function allowTurn(wallet: string): true | string {
+    const running = [...connections].filter(([socket, connection]) => sockets.get(socket) === wallet && connection.isRunning()).length
+    if (running >= limits.turnsAtOnce) return `${limits.turnsAtOnce} turns are already running in your other tabs. Wait for one to finish.`
     const now = Date.now()
     const day = Math.floor(now / 86_400_000)
     const used = days.get(wallet)
     const count = used?.day === day ? used.count : 0
-    if (count >= limits.turnsPerDay) return false
-    if (limiter.take(wallet, now, 10) > 0 || limiter.take('turns', now, limits.turnsPerMinute) > 0) return false
+    if (count >= limits.turnsPerDay) return `You have used today's ${limits.turnsPerDay} prompts. They reset at 00:00 UTC.`
+    if (limiter.take(wallet, now, 10) > 0 || limiter.take('turns', now, limits.turnsPerMinute) > 0) return 'Too many requests. Try again shortly.'
     if (days.size > 10_000) for (const [other, entry] of days) if (entry.day !== day) days.delete(other)
     days.set(wallet, { day, count: count + 1 })
     return true
@@ -122,6 +127,7 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
       clearTimeout(deadline)
       const usage = options.usage?.forWallet(wallet)
       connection = createConnection({ factory, logger, send, allowTurn: () => allowTurn(wallet), memory: memory?.forWallet(wallet), usage })
+      connections.set(socket, connection)
       send({ kind: 'ready', providers })
     }).catch(() => socket.close(1011, 'Assistant unavailable'))
     socket.on('error', () => socket.close())
@@ -130,6 +136,7 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
       clearTimeout(idle)
       clearInterval(keepalive)
       sockets.delete(socket)
+      connections.delete(socket)
       if (connection !== null) {
         const pending = connection.close().catch(() => { logger.error('Assistant cleanup failed') })
         closing.add(pending)
