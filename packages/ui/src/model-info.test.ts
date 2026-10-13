@@ -54,7 +54,7 @@ describe('model inspection for assistant placement', () => {
 })
 
 describe('embedded texture sizes', () => {
-  it('reads the largest side from the image headers inside a GLB', () => {
+  it('reads the largest side from the image headers inside a GLB, and the sides DCL would not take', () => {
     const png = new Uint8Array(24)
     const p = new DataView(png.buffer)
     p.setUint32(0, 0x89504e47); p.setUint32(16, 1024); p.setUint32(20, 256)
@@ -76,8 +76,11 @@ describe('embedded texture sizes', () => {
     w.setUint32(20 + jsonChunk.length, bin.length, true); w.setUint32(24 + jsonChunk.length, 0x004e4942, true)
     glb.set(bin, 28 + jsonChunk.length)
     expect(inspectModel(glb).largestImage).toBe(1024)
+    expect(inspectModel(glb).textureProblems).toEqual(['300x600 is not a power of two'])
     // the JPEG made 2048 high: now it is the largest
     glb.set([0x08, 0x00], 28 + jsonChunk.length + png.length + 13)
     expect(inspectModel(glb).largestImage).toBe(2048)
+    glb.set([0x01, 0x00], 28 + jsonChunk.length + png.length + 15)
+    expect(inspectModel(glb).textureProblems).toEqual(['256x2048 is over 1024'])
   })
 })

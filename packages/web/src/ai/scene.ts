@@ -190,7 +190,7 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     const outside = info.sharedImages.filter((uri) => !allowed.has(uri))
     if (info.externalResources.some((uri) => !info.sharedImages.includes(uri)) || outside.length > 0) throw new Error('The model refers to files outside the shared materials.')
     const stats = { triangles: info.triangles, materials: info.materials.length, textures: info.textures - info.sharedImages.length, largestTexture: info.largestImage }
-    const over = overBudget(stats)
+    const over = overBudget(stats, info.textureProblems)
     if (over.length > 0) throw new Error(`The model is over budget (${over.join(', ')}); simplify it and build again.`)
     // shared materials cost the scene's texture limit, once each however many models use them
     const textures = await sceneTextures()

@@ -44,20 +44,23 @@ function binChunk(bytes: Uint8Array): Uint8Array {
   return bytes.subarray(at + 8, Math.min(bytes.length, at + 8 + view.getUint32(at, true)))
 }
 
-// The longest side among the images embedded in the file; 0 when none can be read.
-function largestImage(gltf: Record<string, unknown>, bin: Uint8Array): number {
+// The sizes of the images embedded in the file that can be read.
+function embeddedImageSizes(gltf: Record<string, unknown>, bin: Uint8Array): { width: number; height: number }[] {
   const views = rows(gltf.bufferViews)
-  let largest = 0
+  const sizes: { width: number; height: number }[] = []
   for (const image of rows(gltf.images)) {
     if (typeof image.bufferView !== 'number') continue
     const view = views[image.bufferView]
     if (view === undefined || typeof view.byteLength !== 'number') continue
     const start = typeof view.byteOffset === 'number' ? view.byteOffset : 0
     const size = imageSize(bin.subarray(start, start + view.byteLength))
-    if (size !== null) largest = Math.max(largest, size.width, size.height)
+    if (size !== null) sizes.push(size)
   }
-  return largest
+  return sizes
 }
+
+const MAX_TEXTURE_SIDE = 1024
+const powerOfTwo = (n: number): boolean => n > 0 && (n & (n - 1)) === 0
 
 // Width and height from a PNG or JPEG header, without decoding it.
 export function imageSize(image: Uint8Array): { width: number; height: number } | null {
@@ -168,12 +171,19 @@ export function inspectModel(bytes: Uint8Array) {
     .flatMap((item) => typeof item.uri === 'string' && !item.uri.startsWith('data:') ? [item.uri] : [])
   const animations = rows(gltf.animations).map((a, i) => typeof a.name === 'string' ? a.name : `animation ${i}`)
   // a caveat about the bounds, not a problem with the model: it must not reach the creator as a warning
+  const images = embeddedImageSizes(gltf, binChunk(bytes))
+  // DCL's converter wants power-of-two sides and scales anything past 1024 down
+  const textureProblems = images.flatMap(({ width, height }) =>
+    !powerOfTwo(width) || !powerOfTwo(height) ? [`${width}x${height} is not a power of two`]
+      : Math.max(width, height) > MAX_TEXTURE_SIDE ? [`${width}x${height} is over ${MAX_TEXTURE_SIDE}`] : [])
+  for (const problem of textureProblems) warnings.add(`A texture is ${problem}.`)
   const coordinates = `SDK local metres, before entity Transform; conservative static visual bounds${animations.length > 0 ? ' that leave out movement during animation' : ''}`
   return {
     bytes: bytes.byteLength, bounds, coordinates,
     triangles, primitives, materials: rows(gltf.materials).map((m, i) => typeof m.name === 'string' ? m.name : `material ${i}`),
     textures: rows(gltf.images).length,
-    largestImage: largestImage(gltf, binChunk(bytes)),
+    largestImage: images.reduce((largest, size) => Math.max(largest, size.width, size.height), 0),
+    textureProblems,
     sharedImages: rows(gltf.images).flatMap((image) => typeof image.uri === 'string' && !image.uri.startsWith('data:') ? [image.uri] : []),
     animations, colliderNodes, externalResources: resources, warnings: [...warnings]
   }
