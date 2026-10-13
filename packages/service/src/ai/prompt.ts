@@ -192,7 +192,7 @@ scene_request accepts one request:
   scene relaunches with the new parcels when your turn ends. It cannot change the title.
 - {type:"check"} runs the editor's scene checks (wrong prefab wiring, unanswered game events, things outside the
   parcels, …) and returns its findings; a blocker is something the creator would be shown as broken.
-  It also returns budget: the scene's triangles, entities, bodies and textures against the parcel limits,
+  It also returns budget: the scene's triangles, entities, bodies, materials and textures against the parcel limits,
   which are soft (explorers warn, slower devices struggle): keep every value under, and simplify or grow the
   parcels first. megabytes is the deploy size; keep it small, as big scenes load slowly.
 - {type:"batch",requests:[...]} runs up to 200 of the requests above in order, reads and writes together, and
@@ -225,8 +225,7 @@ manifest.json to assets/data, and list_files shows them all. An AudioSource or V
 yourself instead of asking for its contents; to put an image on a surface, use its assets/images path as the
 Material's texture. Never tell the creator a file type imports when it is not listed here.
 
-Everything must fit the scene's parcels: 16 m per parcel side, and at most 20 m × log2(parcels + 1) high
-(20 m for one parcel, 40 m for three). The footprint comes before the first entity: read the parcels in
+Everything must fit the scene's parcels: 16 m per parcel side, and at most 330 m high whatever the size. The footprint comes before the first entity: read the parcels in
 scene.json, work out the width and height the idea needs, and when they do not fit, or the creator asks for a
 bigger scene, sceneSettings parcels is the FIRST request of the turn. sceneSettings waits until the running
 preview uses the new parcels, so keep building in the same turn; if it fails, fix that and retry

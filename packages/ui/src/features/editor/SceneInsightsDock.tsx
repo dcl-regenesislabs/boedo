@@ -240,6 +240,7 @@ function Dock(): JSX.Element {
                 <Meter wide label="Triangles" used={budget.used.triangles} limit={budget.limits.triangles} />
                 <Meter wide label="Entities" used={budget.used.entities} limit={budget.limits.entities} />
                 <Meter wide label="Bodies" used={budget.used.bodies} limit={budget.limits.bodies} />
+                <Meter wide label="Materials" used={budget.used.materials} limit={budget.limits.materials} />
                 <Meter wide label="Textures" used={budget.used.textures} limit={budget.limits.textures} />
               </div>
             )}

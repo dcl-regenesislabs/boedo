@@ -12,7 +12,7 @@ const PRIMITIVE_TRIANGLES: Record<string, number> = { box: 12, plane: 2, cylinde
 // Soft caps the explorers warn about. Size has none here: what a deployment accepts depends on where it goes.
 export function parcelLimits(parcels: number) {
   const log = Math.log2(parcels + 1)
-  return { triangles: parcels * 10_000, entities: parcels * 200, bodies: parcels * 300, textures: Math.floor(log * 10) }
+  return { triangles: parcels * 10_000, entities: parcels * 200, bodies: parcels * 300, materials: Math.floor(log * 20), textures: Math.floor(log * 10) }
 }
 
 type Counts = { triangles: number; primitives: number; materials: number; textures: number; bytes: number; shared: string[]; clips: string[]; warnings: string[] }
@@ -138,6 +138,6 @@ export async function sceneBudget() {
   return {
     parcels, used, limits, over,
     megabytesOf: publishedBytes !== null ? 'every file a deployment carries, before the scene build adds its code' : 'placed model files only',
-    note: 'soft limits: explorers warn above them. megabytes is the deploy size, uncapped here (see megabytesOf); materials are uncapped.'
+    note: 'soft limits: explorers warn above them. megabytes is the deploy size, uncapped here (see megabytesOf).'
   }
 }
