@@ -1,6 +1,7 @@
-# Releasing = creating a release in the GitHub UI (new tag vX.Y.Z on main →
-# Publish). Publishing creates the tag, which triggers this workflow to build
-# the images — the app version is stamped FROM THE TAG at build time
+# Desktop images for a release, built by hand: after creating the release in
+# the GitHub UI (new tag vX.Y.Z on main → Publish, which also publishes the web
+# editor on npm), run this workflow on that tag (Run workflow → Use workflow
+# from → Tags → vX.Y.Z) to build — the app version is stamped FROM THE TAG at build time
 # (extraMetadata.version), so no version-bump commit is needed; the version in
 # packages/desktop/package.json only matters for local dev builds. Uses the
 # same signing secrets as desktop-images.yml; missing secrets degrade to
@@ -12,8 +13,7 @@
 name: release
 
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: read

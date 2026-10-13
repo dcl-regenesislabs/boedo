@@ -52,10 +52,18 @@ The mac dmg uploads as `bevy-editor-macos-arm64` and Windows as
 These builds are the place to **smoke-test before releasing** — see the rules
 below.
 
-### `release.yml` — creating a release in the GitHub UI
+### `web-package.yml` — publishing a release
 
-Runs on `v*` tag push, which in this repo only ever happens by publishing a
-release in the GitHub UI (see the rules below). It:
+Publishing a release in the GitHub UI publishes the web editor
+(`@dcl-regenesislabs/web-editor`) as `X.Y.Z` on npm `latest`, which the
+explorer loads. Every push to `main` also publishes a snapshot on the `ci` tag,
+and a manual run publishes the chosen ref on `latest`.
+
+### `release.yml` — desktop images for a release, by hand
+
+Run it on the release's tag after publishing the release (Actions → release →
+Run workflow → Use workflow from → Tags → `vX.Y.Z`). Until it runs, the release
+has no images and installed desktop apps stay on their version. It:
 
 1. **Guards the tag**: must be `vMAJOR.MINOR.PATCH` — the tag becomes the app
    version verbatim and the in-app updater compares it numerically, so
@@ -105,9 +113,10 @@ The updater depends on these — breaking them silently bricks updates for
 installed apps:
 
 - **Releasing is one action, in the GitHub UI only**: Releases → Draft a new
-  release → new tag `vX.Y.Z` on `main` → Publish. That's it — publishing
-  creates the tag, `release.yml` builds the images (version stamped from the
-  tag, no version-bump commit) and attaches them. A **bare CLI tag is
+  release → new tag `vX.Y.Z` on `main` → Publish. Publishing creates the tag
+  and publishes the web editor; for the desktop app, run `release.yml` on that
+  tag, which builds the images (version stamped from the tag, no version-bump
+  commit) and attaches them. A **bare CLI tag is
   refused**: the publish job errors out if no release with that name exists.
 - Every installed app picks the release up **within hours**, so only release
   a commit whose images you'd ship — the PR/`main` builds from

@@ -1,16 +1,18 @@
 # Publishes the web editor (packages/web/dist) as @dcl-regenesislabs/web-editor. The explorer page
-# loads it by exact version from jsDelivr, pinned by hash, so a version only reaches players
-# through an explorer PR that sets PINNED_EDITOR (`node packages/web/scripts/pin.mjs <version>`).
+# loads whatever version `latest` names, from jsDelivr.
 #
-# Every main push publishes a deterministic oddish snapshot on `next`; a manual dispatch publishes
-# the chosen ref on `latest`. Publishing uses npm OIDC trusted publishing, no token. The first
-# publish of the name has to be done by hand (npm attaches a trusted publisher only to an existing
-# package): `npm publish --access public` in packages/web/dist while logged in, then add this repo
-# and workflow as its trusted publisher on npmjs.com.
+# Every main push publishes a deterministic oddish snapshot on `ci`. Publishing a GitHub release
+# (vX.Y.Z) publishes that tag as X.Y.Z on `latest`; to republish a release, run this workflow on
+# its tag. Publishing uses npm OIDC trusted publishing, no token. The first publish of the name has
+# to be done by hand (npm attaches a trusted publisher only to an existing package): `npm publish
+# --access public` in packages/web/dist while logged in, then add this repo and workflow as its
+# trusted publisher on npmjs.com.
 name: web-package
 
 on:
   workflow_dispatch:
+  release:
+    types: [published]
   push:
     branches: [main]
     paths:
@@ -41,7 +43,15 @@ jobs:
       - run: npm run export-static -w @dcl-editor/scene
       - run: npm run build -w @dcl-editor/web
       - run: node packages/web/scripts/package-dist.mjs
+      # oddish publishes a vX.Y.Z tag as tag-vX.Y.Z and never on latest
+      - name: Publish the release on latest
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: packages/web/dist
+        run: |
+          npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+          npm publish --access public --tag latest --provenance=false
       - name: Publish
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         uses: decentraland/oddish-action@v1
         with:
           cwd: './packages/web/dist'
@@ -50,6 +60,3 @@ jobs:
           access: public
           # npm only accepts provenance from public repositories, and this one is private
           provenance: false
-          # a dispatch is a release: oddish publishes a branch it is told about on that tag
-          custom-tag: ${{ github.event_name == 'workflow_dispatch' && 'latest' || '' }}
-          branch-to-custom-tag: ${{ github.event_name == 'workflow_dispatch' && github.ref_name || '' }}
