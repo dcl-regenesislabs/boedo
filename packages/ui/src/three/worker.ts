@@ -9,7 +9,7 @@ import type { ThreeReply, ThreeRequest } from './protocol'
 import { lockDown, refusedSyntax } from './sandbox'
 import { isLibraryName, LIBRARY, libraryMaterialName, metresPerTile, surface, type LibraryName, type MaterialMap } from './materials'
 import { boxProjectUVs, externalizeLibraryImages } from './library-glb'
-import { checkCanvasSize, stripVertexColors } from './build-passes'
+import { checkCanvasSize, singleSided, stripVertexColors } from './build-passes'
 
 type Axis = 'x' | 'y' | 'z'
 const STEPS = 24
@@ -128,6 +128,7 @@ async function build(code: string): Promise<void> {
   const clips: unknown[] = []
   new Function('THREE', 'addons', 'root', 'clips', code)(THREE, addons, root, clips)
   root.updateMatrixWorld(true)
+  singleSided(root)
   const warnings = stripVertexColors(root)
   // projected without translation, so copies of one geometry that only move still share one buffer
   const projected = new Map<string, THREE.BufferGeometry>()

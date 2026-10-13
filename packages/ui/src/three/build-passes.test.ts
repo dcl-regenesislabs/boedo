@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { checkCanvasSize, stripVertexColors } from './build-passes'
+import { checkCanvasSize, singleSided, stripVertexColors } from './build-passes'
 
 describe('a model build', () => {
   it('takes only power-of-two canvas sides up to 512', () => {
@@ -18,4 +18,25 @@ describe('a model build', () => {
     expect(geometry.getAttribute('color')).toBeUndefined()
     expect(instanced.instanceColor).toBeNull()
   })
+
+  it('gives a double-sided part a one-sided back copy and turns a back-sided part around', () => {
+    const plane = new THREE.PlaneGeometry()
+    const material = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide })
+    const card = new THREE.Mesh(plane, material)
+    card.position.set(1, 2, 3)
+    const inside = new THREE.Mesh(plane, new THREE.MeshStandardMaterial({ side: THREE.BackSide }))
+    singleSided(new THREE.Group().add(card, inside))
+    const [back] = card.children
+    expect(back).toBeInstanceOf(THREE.Mesh)
+    expect(back.getWorldPosition(new THREE.Vector3()).toArray()).toEqual([1, 2, 3])
+    for (const mesh of [back, inside] as THREE.Mesh[]) {
+      expect([...(mesh.geometry.index?.array ?? [])].slice(0, 3)).toEqual([0, 1, 2])
+      expect(mesh.geometry.getAttribute('normal').getZ(0)).toBe(-1)
+      expect(sidesOf(mesh)).toEqual([THREE.FrontSide])
+    }
+    expect([...(plane.index?.array ?? [])].slice(0, 3)).toEqual([0, 2, 1])
+    expect(material.side).toBe(THREE.FrontSide)
+  })
 })
+
+const sidesOf = (mesh: THREE.Mesh): THREE.Side[] => [mesh.material].flat().map((m) => m.side)

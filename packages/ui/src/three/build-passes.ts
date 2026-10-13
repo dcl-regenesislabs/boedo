@@ -25,3 +25,54 @@ export function stripVertexColors(root: THREE.Object3D): string[] {
   })
   return parts === 0 ? [] : [`Removed vertex colours from ${parts} part${parts === 1 ? '' : 's'}: Decentraland ignores them. Colour parts with materials instead.`]
 }
+
+// the same surface facing the other way: reversed winding, and normals turned unless a transform already did
+export function flipped(geometry: THREE.BufferGeometry, turnNormals = true): THREE.BufferGeometry {
+  const out = geometry.clone()
+  if (out.index === null) out.setIndex([...Array(out.getAttribute('position').count).keys()])
+  const index = out.index
+  if (index === null) return out
+  for (let i = 0; i + 2 < index.count; i += 3) {
+    const b = index.getX(i + 1)
+    index.setX(i + 1, index.getX(i + 2))
+    index.setX(i + 2, b)
+  }
+  const normal = out.getAttribute('normal')
+  if (turnNormals && normal !== undefined) {
+    for (let i = 0; i < normal.count; i++) normal.setXYZ(i, -normal.getX(i), -normal.getY(i), -normal.getZ(i))
+  }
+  return out
+}
+
+const sides = (mesh: THREE.Mesh): THREE.Side[] => [mesh.material].flat().map((material) => material.side)
+
+// Decentraland culls back faces, so a double-sided part gets a back copy and a back-sided one turns around
+export function singleSided(root: THREE.Object3D): void {
+  const doubled: THREE.Mesh[] = []
+  const reversed: THREE.Mesh[] = []
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || node instanceof THREE.SkinnedMesh || /_collider/i.test(node.name)) return
+    if (sides(node).every((side) => side === THREE.DoubleSide)) doubled.push(node)
+    else if (sides(node).every((side) => side === THREE.BackSide)) reversed.push(node)
+  })
+  const turned = new Map<string, THREE.BufferGeometry>()
+  const turn = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => {
+    let out = turned.get(geometry.uuid)
+    if (out === undefined) turned.set(geometry.uuid, out = flipped(geometry))
+    return out
+  }
+  for (const mesh of doubled) {
+    // a child at its origin, so it follows the part and anything animating it
+    const back = mesh.clone(false)
+    back.name = ''
+    back.position.set(0, 0, 0)
+    back.quaternion.identity()
+    back.scale.set(1, 1, 1)
+    back.geometry = turn(mesh.geometry)
+    mesh.add(back)
+  }
+  for (const mesh of reversed) mesh.geometry = turn(mesh.geometry)
+  // front and back share the material, now one-sided, so it still counts once
+  for (const mesh of [...doubled, ...reversed]) for (const material of [mesh.material].flat()) material.side = THREE.FrontSide
+  root.updateMatrixWorld(true)
+}
