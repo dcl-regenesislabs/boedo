@@ -11,8 +11,8 @@ function contentKey(bytes: Uint8Array): Promise<string> {
   return key
 }
 
-// The bytes a publish would upload: what .dclignore keeps, identical files stored once as publishing does by content id.
-export async function publishedBytes(files: Map<string, Uint8Array>): Promise<number> {
+// The bytes and files a publish would upload: what .dclignore keeps, identical files stored once as publishing does by content id.
+export async function publishedSize(files: Map<string, Uint8Array>): Promise<{ bytes: number; files: number }> {
   const dclignore = files.get('.dclignore')
   const kept = publishableFiles(files.keys(), dclignore === undefined ? undefined : new TextDecoder().decode(dclignore)).filter((path) => path !== LOCK_FILE)
   const unique = new Map<string, number>()
@@ -20,5 +20,5 @@ export async function publishedBytes(files: Map<string, Uint8Array>): Promise<nu
     const bytes = files.get(path)
     if (bytes !== undefined) unique.set(await contentKey(bytes), bytes.byteLength)
   }
-  return [...unique.values()].reduce((total, size) => total + size, 0)
+  return { bytes: [...unique.values()].reduce((total, size) => total + size, 0), files: unique.size }
 }

@@ -86,6 +86,17 @@ describe('publishing to a world', () => {
     expect([deployment.fileCount, deployment.bytes]).toEqual([6, deployed.reduce((sum, file) => sum + all.get(file)!.length, 0)])
   })
 
+  it('is refused before signing past 200 files a parcel, counting identical files once', async () => {
+    const files = project()
+    // with the 6 the fixture deploys, 400 distinct files: all its 2 parcels allow
+    for (let i = 0; i < 394; i++) files.set(`assets/data/${i}.txt`, text(String(i)))
+    for (let i = 0; i < 10; i++) files.set(`images/copy-${i}.png`, text('png'))
+    const build = () => buildDeployment({ files, outputs: outputs(), world: WORLD, sdkVersion: '7.25.1', timestamp: 1790000000000 })
+    await expect(build()).resolves.toMatchObject({ fileCount: 410 })
+    files.set('assets/data/one-more.txt', text('one more'))
+    await expect(build()).rejects.toMatchObject({ reason: 'invalid-scene', message: expect.stringContaining('401 files') })
+  })
+
   it('is accepted when signed by a wallet that may deploy there, served as a world, and refused in words for any other wallet', async () => {
     const owner = await signer()
     const stranger = await signer()

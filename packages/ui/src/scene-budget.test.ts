@@ -11,7 +11,7 @@ vi.mock('./engine/datalayer', () => ({
   dataLayerPathTick: () => tick.n
 }))
 import { state } from '@scene/state'
-import { sceneBudget, sceneModels, sceneTextures } from './scene-budget'
+import { sceneBudget, sceneModels, sceneTextures, setPublishedSize } from './scene-budget'
 
 const model = (count: number, extra: Record<string, unknown> = {}): Uint8Array => new TextEncoder().encode(JSON.stringify({
   asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0 }],
@@ -54,5 +54,12 @@ describe('scene budget over the project files', () => {
     }
     expect((await sceneBudget()).used.textures).toBe(2)
     expect((await sceneTextures()).used).toBe(2)
+  })
+
+  it('measures the files a deployment carries against 200 a parcel', async () => {
+    setPublishedSize(async () => ({ bytes: 0, files: 201 }))
+    const budget = await sceneBudget()
+    setPublishedSize(null)
+    expect([budget.used.files, budget.limits.files, budget.over]).toEqual([201, 200, ['files']])
   })
 })

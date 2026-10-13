@@ -9,18 +9,20 @@ const MB = 1024 * 1024
 // a primitive's triangles as the engine meshes it
 const PRIMITIVE_TRIANGLES: Record<string, number> = { box: 12, plane: 2, cylinder: 128, sphere: 960 }
 
-// Soft caps the explorers warn about. Size has none here: what a deployment accepts depends on where it goes.
+// Soft caps the explorers warn about, and the file count a deployment refuses above. Size has none here:
+// what a deployment accepts depends on where it goes.
 export function parcelLimits(parcels: number) {
   const log = Math.log2(parcels + 1)
-  return { triangles: parcels * 10_000, entities: parcels * 200, bodies: parcels * 300, materials: Math.floor(log * 20), textures: Math.floor(log * 10) }
+  return { triangles: parcels * 10_000, entities: parcels * 200, bodies: parcels * 300, materials: Math.floor(log * 20), textures: Math.floor(log * 10), files: parcels * 200 }
 }
 
 type Counts = { triangles: number; primitives: number; materials: number; textures: number; bytes: number; shared: string[]; clips: string[]; warnings: string[] }
-// The bytes a deployment would carry, from the host that knows the publish rules; without one only
-// the placed model files are counted.
-let publishedBytes: (() => Promise<number>) | null = null
-export function setPublishedSize(measure: (() => Promise<number>) | null): void {
-  publishedBytes = measure
+// The bytes and distinct files a deployment would carry, from the host that knows the publish rules;
+// without one only the placed model files are counted.
+type PublishedSize = { bytes: number; files: number }
+let publishedSize: (() => Promise<PublishedSize>) | null = null
+export function setPublishedSize(measure: (() => Promise<PublishedSize>) | null): void {
+  publishedSize = measure
 }
 
 const counted = new Map<string, { tick: number; counts: Promise<Counts | null> }>()
@@ -156,19 +158,21 @@ export async function sceneBudget() {
     for (const file of materialTextureFiles(components.Material)) images.add(file)
   }
   for (const f of files.values()) for (const file of f.shared) images.add(file)
-  const modelBytes = [...files.values()].reduce((n, f) => n + f.bytes, 0)
+  const placedOnly = { bytes: [...files.values()].reduce((n, f) => n + f.bytes, 0), files: files.size }
+  const published = publishedSize !== null ? await publishedSize().catch(() => placedOnly) : placedOnly
   const used = {
     triangles,
     entities: authored.length,
     bodies,
     materials: materials.size + [...files.values()].reduce((n, f) => n + f.materials, 0),
     textures: [...files.values()].reduce((n, f) => n + f.textures, 0) + images.size,
-    megabytes: Math.round((publishedBytes !== null ? await publishedBytes().catch(() => modelBytes) : modelBytes) / MB * 10) / 10
+    files: published.files,
+    megabytes: Math.round(published.bytes / MB * 10) / 10
   }
   const over = (Object.keys(limits) as (keyof typeof limits)[]).filter((key) => used[key] > limits[key])
   return {
     parcels, used, limits, over,
-    megabytesOf: publishedBytes !== null ? 'every file a deployment carries, before the scene build adds its code' : 'placed model files only',
-    note: 'soft limits: explorers warn above them. megabytes is the deploy size, uncapped here (see megabytesOf).'
+    megabytesOf: publishedSize !== null ? 'every file a deployment carries, before the scene build adds its code' : 'placed model files only',
+    note: 'soft limits: explorers warn above them, except files, which a deployment refuses above. files and megabytes count what megabytesOf says; megabytes is uncapped here.'
   }
 }

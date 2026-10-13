@@ -9,6 +9,8 @@ import { PublishError } from './errors'
 
 // sdk-commands' limit on one file of a deployment
 const MAX_FILE_BYTES = 50_000_000
+// Decentraland's file count limit, which blocks a deployment above it
+const FILES_PER_PARCEL = 200
 const PARCEL = /^-?\d+,-?\d+$/
 
 export interface DeploymentEntity {
@@ -117,6 +119,10 @@ export async function buildDeployment(input: {
     const id = await contentCid(bytes)
     list.push({ file: path, hash: id })
     files.set(id, bytes)
+  }
+  // identical files upload once, under one hash
+  if (files.size > pointers.length * FILES_PER_PARCEL) {
+    throw invalid(`This scene has ${files.size} files and its ${pointers.length} parcel${pointers.length === 1 ? '' : 's'} allow ${pointers.length * FILES_PER_PARCEL}. Delete files it does not use in Assets, or add parcels.`)
   }
   let bytes = 0
   for (const file of files.values()) bytes += file.length
