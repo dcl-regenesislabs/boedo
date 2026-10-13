@@ -1,5 +1,6 @@
 // What the build worker does to a script's model before export; pure, so it is tested without a worker.
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { pascal } from './materials'
 
 const MAX_CANVAS = 512
@@ -101,4 +102,68 @@ export function partNamer(model: string): { name: (node: THREE.Object3D) => stri
       root.traverse((node) => { if (node !== root && node.name === '') node.name = next() })
     }
   }
+}
+
+const shown = (node: THREE.Object3D, root: THREE.Object3D): boolean => {
+  for (let at: THREE.Object3D | null = node; at !== null && at !== root; at = at.parent) if (!at.visible) return false
+  return root.visible
+}
+
+// what a merge must leave alone: everything a clip moves, with whatever is above or below it
+function animatedNodes(root: THREE.Object3D, clips: readonly THREE.AnimationClip[]): Set<THREE.Object3D> {
+  const targets = new Set(clips.flatMap((clip) => clip.tracks.map((track) => THREE.PropertyBinding.parseTrackName(track.name).nodeName)))
+  const held = new Set<THREE.Object3D>()
+  root.traverse((node) => {
+    if (!targets.has(node.name) && !targets.has(node.uuid)) return
+    node.traverse((below) => held.add(below))
+    node.traverseAncestors((above) => held.add(above))
+  })
+  return held
+}
+
+// Each part is a draw call per material, so many static unnamed parts sharing one become one mesh.
+// Merging copies shared geometry, so small groups stay apart: the file would only grow.
+export function mergeStatic(root: THREE.Object3D, clips: readonly THREE.AnimationClip[], least = 5): void {
+  root.updateMatrixWorld(true)
+  const held = animatedNodes(root, clips)
+  const groups = new Map<string, THREE.Mesh[]>()
+  root.traverse((node) => {
+    // named parts are the script's
+    if (!(node instanceof THREE.Mesh) || node instanceof THREE.InstancedMesh || node instanceof THREE.SkinnedMesh) return
+    if (node.name !== '' || held.has(node) || !shown(node, root)) return
+    const geometry: THREE.BufferGeometry = node.geometry
+    if (Array.isArray(node.material) || Object.keys(geometry.morphAttributes).length > 0) return
+    const material: THREE.Material = node.material
+    const attributes = Object.entries(geometry.attributes)
+      .map(([name, a]) => `${name}:${a.itemSize}:${String(a.normalized)}:${a.array.constructor.name}`).sort().join(',')
+    const key = `${material.uuid}|${String(geometry.index !== null)}|${attributes}`
+    groups.set(key, [...(groups.get(key) ?? []), node])
+  })
+  const toRoot = root.matrixWorld.clone().invert()
+  for (const meshes of groups.values()) {
+    if (meshes.length < least) continue
+    const baked = meshes.map((mesh) => {
+      const matrix = toRoot.clone().multiply(mesh.matrixWorld)
+      const geometry = mesh.geometry.clone().applyMatrix4(matrix)
+      // a mirroring transform turned the faces inside out once baked in
+      return matrix.determinant() < 0 ? flipped(geometry, false) : geometry
+    })
+    const merged = mergeGeometries(baked)
+    if (merged === null) continue
+    for (const mesh of meshes) {
+      let emptied: THREE.Object3D | null = mesh.parent
+      // what hangs below a merged part (a back copy, another material) stays where it is in the world
+      for (const child of [...mesh.children]) emptied?.attach(child)
+      mesh.removeFromParent()
+      // groups the merge emptied would export as stray nodes
+      const group = (node: THREE.Object3D): boolean => node instanceof THREE.Group || node.constructor === THREE.Object3D
+      while (emptied !== null && emptied !== root && group(emptied) && emptied.children.length === 0 && emptied.name === '' && !held.has(emptied)) {
+        const above: THREE.Object3D | null = emptied.parent
+        emptied.removeFromParent()
+        emptied = above
+      }
+    }
+    root.add(new THREE.Mesh(merged, meshes[0].material))
+  }
+  root.updateMatrixWorld(true)
 }

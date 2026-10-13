@@ -9,7 +9,7 @@ import type { ThreeReply, ThreeRequest } from './protocol'
 import { lockDown, refusedSyntax } from './sandbox'
 import { isLibraryName, LIBRARY, libraryMaterialName, metresPerTile, surface, type LibraryName, type MaterialMap } from './materials'
 import { boxProjectUVs, externalizeLibraryImages } from './library-glb'
-import { checkCanvasSize, partNamer, singleSided, stripVertexColors } from './build-passes'
+import { checkCanvasSize, mergeStatic, partNamer, singleSided, stripVertexColors } from './build-passes'
 
 type Axis = 'x' | 'y' | 'z'
 const STEPS = 24
@@ -127,8 +127,8 @@ async function build(code: string, model: string): Promise<void> {
   const clips: unknown[] = []
   new Function('THREE', 'addons', 'root', 'clips', code)(THREE, addons, root, clips)
   root.updateMatrixWorld(true)
-  singleSided(root)
   const warnings = stripVertexColors(root)
+  singleSided(root)
   // projected without translation, so copies of one geometry that only move still share one buffer
   const projected = new Map<string, THREE.BufferGeometry>()
   root.traverse((node) => {
@@ -146,8 +146,9 @@ async function build(code: string, model: string): Promise<void> {
     }
     node.geometry = geometry
   })
-  namer.nameAll(root)
   const animations = clips.filter((clip): clip is THREE.AnimationClip => clip instanceof THREE.AnimationClip)
+  mergeStatic(root, animations)
+  namer.nameAll(root)
   const exported = await new GLTFExporter().parseAsync(root, { binary: true, animations })
   if (!(exported instanceof ArrayBuffer)) throw new Error('the exporter returned no binary')
   const { glb, used } = externalizeLibraryImages(exported)
