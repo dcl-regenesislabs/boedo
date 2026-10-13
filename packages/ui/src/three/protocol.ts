@@ -6,7 +6,8 @@ export interface ModelStats {
 }
 
 export type ThreeRequest =
-  | { kind: 'build'; code: string }
+  // name: the model's, which its unnamed parts are named after
+  | { kind: 'build'; code: string; name: string }
   // the preview: a canvas the worker draws on, and the model's bytes
   // files: what the model points at, by the uri it uses (a built model's shared materials)
   | { kind: 'view'; canvas: OffscreenCanvas; bytes: ArrayBuffer; files?: Record<string, ArrayBuffer>; width: number; height: number; dpr: number }

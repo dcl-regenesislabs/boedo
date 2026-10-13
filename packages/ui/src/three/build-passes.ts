@@ -1,5 +1,6 @@
 // What the build worker does to a script's model before export; pure, so it is tested without a worker.
 import * as THREE from 'three'
+import { pascal } from './materials'
 
 const MAX_CANVAS = 512
 const powerOfTwo = (n: number): boolean => Number.isInteger(n) && n >= 1 && n <= MAX_CANVAS && (n & (n - 1)) === 0
@@ -75,4 +76,29 @@ export function singleSided(root: THREE.Object3D): void {
   // front and back share the material, now one-sided, so it still counts once
   for (const mesh of [...doubled, ...reversed]) for (const material of [mesh.material].flat()) material.side = THREE.FrontSide
   root.updateMatrixWorld(true)
+}
+
+// Decentraland names parts <Model>_Part01…; pascal() leaves no '_', so no name can read as a collider
+export function partNamer(model: string): { name: (node: THREE.Object3D) => string; nameAll: (root: THREE.Object3D) => void } {
+  const prefix = pascal(model).slice(0, 40) || 'Model'
+  const taken = new Set<string>()
+  let count = 0
+  const next = (): string => {
+    let name: string
+    do name = `${prefix}_Part${String(++count).padStart(2, '0')}`
+    while (taken.has(name))
+    taken.add(name)
+    return name
+  }
+  return {
+    name: (node) => {
+      if (node.name === '') node.name = next()
+      return node.name
+    },
+    // never renames a part the script named
+    nameAll: (root) => {
+      root.traverse((node) => { if (node.name !== '') taken.add(node.name) })
+      root.traverse((node) => { if (node !== root && node.name === '') node.name = next() })
+    }
+  }
 }

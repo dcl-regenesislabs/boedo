@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { checkCanvasSize, singleSided, stripVertexColors } from './build-passes'
+import { checkCanvasSize, partNamer, singleSided, stripVertexColors } from './build-passes'
 
 describe('a model build', () => {
   it('takes only power-of-two canvas sides up to 512', () => {
@@ -36,6 +36,19 @@ describe('a model build', () => {
     }
     expect([...(plane.index?.array ?? [])].slice(0, 3)).toEqual([0, 2, 1])
     expect(material.side).toBe(THREE.FrontSide)
+  })
+
+  it('names unnamed parts <Model>_PartNN, keeps the script\'s names and never makes a collider name', () => {
+    const namer = partNamer('gate_collider')
+    const pivot = namer.name(new THREE.Group())
+    const door = Object.assign(new THREE.Mesh(), { name: 'Door' })
+    const root = new THREE.Group().add(Object.assign(new THREE.Group(), { name: pivot }).add(new THREE.Mesh()), door,
+      Object.assign(new THREE.Mesh(), { name: 'GateCollider_Part02' }))
+    namer.nameAll(root)
+    expect(pivot).toBe('GateCollider_Part01')
+    expect(root.name).toBe('')
+    expect(root.children.map((node) => node.name)).toEqual(['GateCollider_Part01', 'Door', 'GateCollider_Part02'])
+    expect(root.children[0].children[0].name).toBe('GateCollider_Part03')
   })
 })
 

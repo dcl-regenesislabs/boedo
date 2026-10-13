@@ -29,7 +29,7 @@ export function overBudget(stats: ModelStats): string[] {
 }
 
 // A fresh worker per build: a script that loops forever is stopped by terminating it.
-export async function buildCodeModel(code: string, signal: AbortSignal): Promise<ReturnType<typeof checked>> {
+export async function buildCodeModel(code: string, name: string, signal: AbortSignal): Promise<ReturnType<typeof checked>> {
   signal.throwIfAborted()
   const starting = startThreeWorker('build')
   // a Stop while the sandbox starts: give up now, and close the worker once it is up
@@ -50,7 +50,7 @@ export async function buildCodeModel(code: string, signal: AbortSignal): Promise
       signal.addEventListener('abort', abort, { once: true })
       if (signal.aborted) abort()
       worker.onmessage = (event: MessageEvent<ThreeReply>) => resolve(event.data)
-      worker.postMessage({ kind: 'build', code } satisfies ThreeRequest)
+      worker.postMessage({ kind: 'build', code, name } satisfies ThreeRequest)
     })
     if (reply.kind !== 'built') throw new Error(`The model script failed: ${reply.kind === 'failed' ? String(reply.error).slice(0, 2000) : 'no model'}`)
     return checked(reply)

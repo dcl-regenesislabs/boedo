@@ -9,16 +9,14 @@ import type { ThreeReply, ThreeRequest } from './protocol'
 import { lockDown, refusedSyntax } from './sandbox'
 import { isLibraryName, LIBRARY, libraryMaterialName, metresPerTile, surface, type LibraryName, type MaterialMap } from './materials'
 import { boxProjectUVs, externalizeLibraryImages } from './library-glb'
-import { checkCanvasSize, singleSided, stripVertexColors } from './build-passes'
+import { checkCanvasSize, partNamer, singleSided, stripVertexColors } from './build-passes'
 
 type Axis = 'x' | 'y' | 'z'
 const STEPS = 24
 
 // a node's tracks address it by name, so every animated node gets one
-function named(node: THREE.Object3D): string {
-  if (node.name === '') node.name = `part_${node.id}`
-  return node.name
-}
+let namer = partNamer('Model')
+const named = (node: THREE.Object3D): string => namer.name(node)
 
 // one turn of a periodic motion, sampled so it loops without a seam
 function sampled(seconds: number, at: (phase: number) => number[]): { times: number[]; values: number[] } {
@@ -118,12 +116,13 @@ function capGeometry(): void {
   }
 }
 
-async function build(code: string): Promise<void> {
+async function build(code: string, model: string): Promise<void> {
   // a build worker runs one script and is thrown away, so it is locked for good
   lockDown(self)
   const refused = refusedSyntax(code)
   if (refused !== null) throw new Error(refused)
   capGeometry()
+  namer = partNamer(model)
   const root = new THREE.Group()
   const clips: unknown[] = []
   new Function('THREE', 'addons', 'root', 'clips', code)(THREE, addons, root, clips)
@@ -147,6 +146,7 @@ async function build(code: string): Promise<void> {
     }
     node.geometry = geometry
   })
+  namer.nameAll(root)
   const animations = clips.filter((clip): clip is THREE.AnimationClip => clip instanceof THREE.AnimationClip)
   const exported = await new GLTFExporter().parseAsync(root, { binary: true, animations })
   if (!(exported instanceof ArrayBuffer)) throw new Error('the exporter returned no binary')
@@ -243,7 +243,7 @@ function handle(event: MessageEvent<ThreeRequest>): void {
     if (request.kind !== 'build' && request.kind !== 'view' && request.kind !== 'clip' && view === null) return
     if ((request.kind === 'build' && mode !== 'build') || (request.kind === 'view' && mode !== 'view')) throw new Error(`a ${String(mode)} worker does not ${request.kind}`)
     if (request.kind === 'build') {
-      build(request.code).catch((error: unknown) => reply({ kind: 'failed', error: error instanceof Error ? error.message : String(error) }))
+      build(request.code, request.name).catch((error: unknown) => reply({ kind: 'failed', error: error instanceof Error ? error.message : String(error) }))
     } else if (request.kind === 'view') {
       show(request)
     } else if (request.kind === 'clip') {
