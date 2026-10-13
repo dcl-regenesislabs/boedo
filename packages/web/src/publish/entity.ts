@@ -9,8 +9,8 @@ import { PublishError } from './errors'
 
 // sdk-commands' limit on one file of a deployment
 const MAX_FILE_BYTES = 50_000_000
-// Decentraland's file count limit, which blocks a deployment above it
-const FILES_PER_PARCEL = 200
+// worlds-content-server's MAX_FILE_COUNT default, over the entity's content entries
+const MAX_FILES = 10_000
 const PARCEL = /^-?\d+,-?\d+$/
 
 export interface DeploymentEntity {
@@ -120,9 +120,8 @@ export async function buildDeployment(input: {
     list.push({ file: path, hash: id })
     files.set(id, bytes)
   }
-  // identical files upload once, under one hash
-  if (files.size > pointers.length * FILES_PER_PARCEL) {
-    throw invalid(`This scene has ${files.size} files and its ${pointers.length} parcel${pointers.length === 1 ? '' : 's'} allow ${pointers.length * FILES_PER_PARCEL}. Delete files it does not use in Assets, or add parcels.`)
+  if (list.length > MAX_FILES) {
+    throw invalid(`This scene has ${list.length.toLocaleString('en')} files and a World takes at most ${MAX_FILES.toLocaleString('en')}. Delete files it does not use in Assets.`)
   }
   let bytes = 0
   for (const file of files.values()) bytes += file.length

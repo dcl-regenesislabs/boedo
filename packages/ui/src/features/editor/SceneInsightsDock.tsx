@@ -79,7 +79,7 @@ function Meter(props: { label: string; used: number; limit: number; unit?: strin
   const share = props.limit > 0 ? Math.min(1, props.used / props.limit) : 0
   const label = `${props.wide === true ? props.used.toLocaleString() : compact(props.used)} / ${props.wide === true ? props.limit.toLocaleString() : compact(props.limit)}${props.unit ?? ''}`
   return (
-    <div className={`eui-insights-meter ${tone(props.used, props.limit)}${props.wide === true ? ' wide' : ''}`} data-tip={`${props.label}: ${props.used.toLocaleString()} of ${props.limit.toLocaleString()}${props.unit ?? ''}${props.hard === true ? '; a deployment above it is refused' : ' (soft limit)'}`}>
+    <div className={`eui-insights-meter ${tone(props.used, props.limit)}${props.wide === true ? ' wide' : ''}`} data-tip={`${props.label}: ${props.used.toLocaleString()} of ${props.limit.toLocaleString()}${props.unit ?? ''}${props.hard === true ? '; Genesis City refuses a deployment above it, a World takes up to 10,000' : ' (soft limit)'}`}>
       <span className="name">{props.label}</span>
       <span className="track"><span className="fill" style={{ width: `${share * 100}%` }} /></span>
       <span className="value">{label}</span>
@@ -168,7 +168,7 @@ function Dock(): JSX.Element {
   const heavy = (models ?? []).filter((m) => triangleLimit > 0 && (m.triangles * m.entities.length) / triangleLimit > HEAVY_SHARE)
   const warnings = [
     ...(budget?.over ?? []).map((key) => key === 'files'
-      ? `Over the ${budget?.parcels}-parcel limit of ${budget?.limits.files} files: publishing is refused until unused files are deleted or parcels added.`
+      ? `Over the ${budget?.parcels}-parcel limit of ${budget?.limits.files} files: Genesis City would refuse it, though a World takes up to 10,000. Delete unused files or add parcels.`
       : `Over the ${budget?.parcels}-parcel soft limit for ${key}: explorers warn about it, and slower devices may struggle.`),
     ...heavy.map((m) => `${m.src} draws ${Math.round(((m.triangles * m.entities.length) / triangleLimit) * 100)}% of the scene's triangle limit.`),
     ...(models ?? []).flatMap((m) => m.warnings.map((w) => `${m.src}: ${w}`)),

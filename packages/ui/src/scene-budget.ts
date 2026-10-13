@@ -9,8 +9,8 @@ const MB = 1024 * 1024
 // a primitive's triangles as the engine meshes it
 const PRIMITIVE_TRIANGLES: Record<string, number> = { box: 12, plane: 2, cylinder: 128, sphere: 960 }
 
-// Soft caps the explorers warn about, and the file count a deployment refuses above. Size has none here:
-// what a deployment accepts depends on where it goes.
+// Soft caps the explorers warn about, and the file count Genesis City refuses a deployment above. Size has
+// none here: what a deployment accepts depends on where it goes.
 export function parcelLimits(parcels: number) {
   const log = Math.log2(parcels + 1)
   return { triangles: parcels * 10_000, entities: parcels * 200, bodies: parcels * 300, materials: Math.floor(log * 20), textures: Math.floor(log * 10), files: parcels * 200 }
@@ -173,6 +173,6 @@ export async function sceneBudget() {
   return {
     parcels, used, limits, over,
     megabytesOf: publishedSize !== null ? 'every file a deployment carries, before the scene build adds its code' : 'placed model files only',
-    note: 'soft limits: explorers warn above them, except files, which a deployment refuses above. files and megabytes count what megabytesOf says; megabytes is uncapped here.'
+    note: 'soft limits: explorers warn above them, except files, which Genesis City refuses a deployment above (a World takes up to 10,000). files and megabytes count what megabytesOf says; megabytes is uncapped here.'
   }
 }
