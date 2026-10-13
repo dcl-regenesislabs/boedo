@@ -28,7 +28,7 @@ export function UnusedFilesChip(): JSX.Element | null {
   const [, setDismissals] = useState(0)
 
   if (unused === null || older === null || hidden) return null
-  const signature = `${unused.length}|${older.length}`
+  const signature = `${[...unused].sort().join('\n')}|${[...older].sort().join('\n')}`
   if (unused.length + older.length === 0 || signature === dismissed) return null
 
   const review = (): void => {

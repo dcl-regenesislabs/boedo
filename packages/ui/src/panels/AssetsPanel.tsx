@@ -71,15 +71,15 @@ function CatalogGrid(props: { entries: typeof state.assetCatalog; resetKey: stri
   )
 }
 
-function LocalGrid(props: { list: string[]; older: string[]; unused: string[]; onUploaded: () => void }): JSX.Element {
+function LocalGrid(props: { list: string[]; older: string[]; olderScanned: boolean; unused: string[]; onUploaded: () => void }): JSX.Element {
   const [pending, setPending] = useState<{ files: File[]; missing: string[] } | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null)
   const [doomed, setDoomed] = useState<{ path: string; also: string[]; users: string[] | null; unchecked?: boolean; busy?: boolean; error?: string } | null>(null)
   const [sweep, setSweep] = useState<{ busy?: boolean; error?: string } | null>(null)
   const sweepAsked = useStore(() => assetsReview.sweep)
   useEffect(() => {
-    if (sweepAsked && props.older.length > 0 && takeSweepRequest()) setSweep({})
-  }, [sweepAsked, props.older])
+    if (sweepAsked && props.olderScanned && takeSweepRequest() && props.older.length > 0) setSweep({})
+  }, [sweepAsked, props.older, props.olderScanned])
   const confirmSweep = async (): Promise<void> => {
     setSweep({ busy: true })
     try {
@@ -429,7 +429,7 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
       )}
       <div className="eui-panel-body">
         <Shelf title="My files" count={models === null ? undefined : local.length}>
-          <LocalGrid list={shownLocal} older={older} unused={unused} onUploaded={refresh} />
+          <LocalGrid list={shownLocal} older={older} olderScanned={files.older !== null} unused={unused} onUploaded={refresh} />
           {capped && (
             <div className="eui-asset-more">
               <LinkButton onClick={() => setAllFiles(true)}>
