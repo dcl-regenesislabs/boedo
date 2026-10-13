@@ -5,7 +5,7 @@
 // Guarded: vitest runs these modules in a node environment, and reading window at
 // import time made merely IMPORTING anything that logs throw there. Every module
 // that pulls in a logger would otherwise be untestable.
-const DEBUG =
+export const DEBUG =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('editorDebug')
 const TAG = '[editor-ui]'
 

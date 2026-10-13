@@ -3,10 +3,11 @@
 // reports its own gates, and the editor scene posts its steps over the bus
 // (scene/boot-trace.ts) because its console only reaches the engine log.
 //
-// Everything lands in the devtools console under `[boot]`, and the full table is
-// available as `__euiBoot.print()` — the answer to "where did those 90 seconds
+// With ?editorDebug everything lands in the devtools console under `[boot]`; the full table is
+// always available as `__euiBoot.print()` — the answer to "where did those 90 seconds
 // go" without having to catch the log live.
 import type { SceneToPageMessage } from '@scene/bridge-protocol'
+import { DEBUG } from '../log'
 
 export interface BootTraceEntry {
   at: number // ms since the page started booting
@@ -22,6 +23,7 @@ const entries: BootTraceEntry[] = []
 function push(e: BootTraceEntry): void {
   entries.push(e)
   const seconds = e.at / 1000
+  if (!DEBUG) return
   const what = `${e.phase}${e.detail === '' ? '' : ` — ${e.detail}`}`
   console.log(`[boot ${seconds.toFixed(1).padStart(5)}s] ${e.source === 'scene' ? 'scene: ' : ''}${what}`)
 }

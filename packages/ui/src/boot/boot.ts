@@ -43,7 +43,7 @@ import {
 } from '../config'
 import { startBusPolling, stopBus, onSceneMessage, sendToScene, sceneRpc } from '../engine/bus'
 import { isHosted } from '../engine/hosted'
-import { log } from '../log'
+import { DEBUG, log } from '../log'
 import { pageTrace, pageTraced, recordSceneTrace, printBootTimeline } from '../engine/boot-trace'
 import {
   pushHistory,
@@ -605,7 +605,7 @@ function handleSceneMessage(msg: SceneToPageMessage): void {
           pageTraced('component_names', loadComponentNames)
         ]).then(() => {
           pageTrace('attach complete')
-          printBootTimeline()
+          if (DEBUG) printBootTimeline()
         })
         void sendSpawnPoints()
         autoHideSceneUi() // the scene's HUD covers the viewport; start with it hidden

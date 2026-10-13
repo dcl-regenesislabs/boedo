@@ -13,6 +13,7 @@
 import { EDITOR_BUS_CHANNEL, type BusEnvelope } from '@scene/editor-channel'
 import type { PageToSceneMessage } from '@scene/bridge-protocol'
 import { isMod } from '../lib/keys'
+import { DEBUG } from '../log'
 
 declare global {
   interface Window {
@@ -99,6 +100,7 @@ async function waitForServer(url: string, timeoutMs: number): Promise<void> {
 // prefix — devtools shows both frames in one console.
 const T0 = Date.now()
 function hostTrace(phase: string): void {
+  if (!DEBUG) return
   console.log(`[boot ${((Date.now() - T0) / 1000).toFixed(1)}s] engine-host: ${phase}`)
 }
 
