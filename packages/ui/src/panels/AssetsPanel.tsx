@@ -111,10 +111,12 @@ function LocalGrid(props: { list: string[]; older: string[]; unused: string[]; o
   const fileRef = useRef<HTMLInputElement>(null)
   const carryRef = useRef<File[]>([])
   const [playing, setPlaying] = useState<string | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  // token bumps on every stop and on unmount, so a read still in flight knows it was superseded
+  const preview = useRef<{ token: number; path: string | null; audio: HTMLAudioElement | null }>({ token: 0, path: null, audio: null })
   const stopPreview = (): void => {
-    const audio = audioRef.current
-    audioRef.current = null
+    const current = preview.current
+    const audio = current.audio
+    preview.current = { token: current.token + 1, path: null, audio: null }
     setPlaying(null)
     if (audio === null) return
     audio.pause()
@@ -122,19 +124,24 @@ function LocalGrid(props: { list: string[]; older: string[]; unused: string[]; o
   }
   useEffect(() => stopPreview, [])
   const togglePreview = async (path: string): Promise<void> => {
-    const was = playing
+    const was = preview.current.path
     stopPreview()
     if (was === path) return
+    const token = preview.current.token
+    preview.current.path = path
+    setPlaying(path)
     try {
       const type = path.toLowerCase().endsWith('.mp3') ? 'audio/mpeg' : path.toLowerCase().endsWith('.wav') ? 'audio/wav' : 'audio/ogg'
-      const audio = new Audio(URL.createObjectURL(new Blob([new Uint8Array(await dataLayerReadFileBytes(path))], { type })))
+      const bytes = await dataLayerReadFileBytes(path)
+      if (preview.current.token !== token) return
+      const audio = new Audio(URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type })))
       audio.onended = () => {
-        if (audioRef.current === audio) stopPreview()
+        if (preview.current.audio === audio) stopPreview()
       }
-      audioRef.current = audio
-      setPlaying(path)
+      preview.current.audio = audio
       await audio.play()
     } catch (e) {
+      if (preview.current.token !== token) return
       stopPreview()
       state.saveStatus = `preview failed: ${String(e)}`
     }
