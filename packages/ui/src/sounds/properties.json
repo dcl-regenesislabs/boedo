@@ -1,0 +1,127 @@
+{
+  "coin": {
+    "description": "bright rising blip: coin or collectible picked up",
+    "durationSeconds": 0.39,
+    "loop": false
+  },
+  "gem": {
+    "description": "glassy chime: gem, crystal or rare item picked up",
+    "durationSeconds": 0.26,
+    "loop": false
+  },
+  "power-up": {
+    "description": "rising synth sweep: power-up or boost",
+    "durationSeconds": 0.89,
+    "loop": false
+  },
+  "point": {
+    "description": "short confirm blip: point scored, checkpoint, correct",
+    "durationSeconds": 0.31,
+    "loop": false
+  },
+  "countdown-tick": {
+    "description": "single beep: each second of a countdown",
+    "durationSeconds": 0.13,
+    "loop": false
+  },
+  "start": {
+    "description": "three rising tones: go, round start",
+    "durationSeconds": 0.6,
+    "loop": false
+  },
+  "win": {
+    "description": "rising 8-bit fanfare: win, level complete",
+    "durationSeconds": 0.81,
+    "loop": false
+  },
+  "lose": {
+    "description": "falling 8-bit jingle: lose, game over",
+    "durationSeconds": 0.81,
+    "loop": false
+  },
+  "time-up": {
+    "description": "falling buzz: time up, round over",
+    "durationSeconds": 1.28,
+    "loop": false
+  },
+  "click": {
+    "description": "soft click: button press",
+    "durationSeconds": 0.05,
+    "loop": false
+  },
+  "open": {
+    "description": "short rise: panel or menu opens",
+    "durationSeconds": 0.18,
+    "loop": false
+  },
+  "close": {
+    "description": "short fall: panel or menu closes",
+    "durationSeconds": 0.18,
+    "loop": false
+  },
+  "error": {
+    "description": "low buzz: wrong, denied, locked",
+    "durationSeconds": 0.24,
+    "loop": false
+  },
+  "jump": {
+    "description": "springy rising zip: jump, bounce pad",
+    "durationSeconds": 0.39,
+    "loop": false
+  },
+  "land": {
+    "description": "soft heavy thud: landing, something dropped",
+    "durationSeconds": 0.55,
+    "loop": false
+  },
+  "hit": {
+    "description": "punch impact: hit, damage taken",
+    "durationSeconds": 0.26,
+    "loop": false
+  },
+  "splat": {
+    "description": "wet squelch: slime, goo, closest to a splash",
+    "durationSeconds": 0.52,
+    "loop": false
+  },
+  "teleport": {
+    "description": "rising phaser sweep: teleport, portal, respawn",
+    "durationSeconds": 0.42,
+    "loop": false
+  },
+  "door-open": {
+    "description": "wooden door creaking open",
+    "durationSeconds": 0.91,
+    "loop": false
+  },
+  "door-close": {
+    "description": "wooden door shutting",
+    "durationSeconds": 0.65,
+    "loop": false
+  },
+  "lever": {
+    "description": "metal latch clack: lever, switch, lock",
+    "durationSeconds": 0.21,
+    "loop": false
+  },
+  "explosion": {
+    "description": "deep boom: explosion, cannon, big impact",
+    "durationSeconds": 2.04,
+    "loop": false
+  },
+  "fire-loop": {
+    "description": "roaring flame: fire, lava, furnace, jet",
+    "durationSeconds": 4.78,
+    "loop": true
+  },
+  "rumble-loop": {
+    "description": "low engine rumble: machinery, cave, earthquake",
+    "durationSeconds": 4.78,
+    "loop": true
+  },
+  "machine-loop": {
+    "description": "busy electronic chatter: computer room, lab, generator, machine",
+    "durationSeconds": 4.55,
+    "loop": true
+  }
+}
