@@ -85,19 +85,18 @@ export function inspectModel(bytes: Uint8Array) {
   let complete = true, primitives = 0, triangles = 0
   const visited = new Set<number>()
   // each mesh read once: a file where many nodes share a mesh of many primitives must not cost their product
-  const summaries = new Map<unknown, { primitives: number; triangles: number; box: { lo: number[]; hi: number[] } | null }>()
+  const summaries = new Map<unknown, { primitives: number; triangles: number; box: { lo: number[]; hi: number[] } | null; unbounded: boolean }>()
   const meshSummary = (index: unknown) => {
     const cached = summaries.get(index)
     if (cached !== undefined) return cached
-    let count = 0, tris = 0
+    let count = 0, tris = 0, unbounded = false
     let lo: number[] | null = null, hi: number[] | null = null
     for (const primitive of rows(at(meshes, index).primitives)) {
       count++
       if (Array.isArray(primitive.targets) && primitive.targets.length > 0) warnings.add('Morph target bounds are not included.')
       const position = object(primitive.attributes) ? at(accessors, primitive.attributes.POSITION) : null
       if (position === null || position.min === undefined || position.max === undefined) {
-        complete = false
-        warnings.add('Some primitives have no declared position bounds.')
+        unbounded = true
         continue
       }
       const pLo = numbers(position.min, 3), pHi = numbers(position.max, 3)
@@ -110,7 +109,7 @@ export function inspectModel(bytes: Uint8Array) {
         else if (primitive.mode === 5 || primitive.mode === 6) tris += Math.max(0, n - 2)
       }
     }
-    const summary = { primitives: count, triangles: tris, box: lo === null || hi === null ? null : { lo, hi } }
+    const summary = { primitives: count, triangles: tris, box: lo === null || hi === null ? null : { lo, hi }, unbounded }
     summaries.set(index, summary)
     return summary
   }
@@ -133,11 +132,16 @@ export function inspectModel(bytes: Uint8Array) {
       complete = false
       warnings.add('Instanced node bounds are unavailable; check the rendered model.')
     }
-    if (node.mesh !== undefined && !collider) {
+    if (node.mesh !== undefined) {
+      // a collider costs the scene's triangles and bodies too, but draws nothing
       const summary = meshSummary(node.mesh)
       primitives += summary.primitives
       triangles += summary.triangles
-      if (summary.box !== null) {
+      if (summary.unbounded && !collider) {
+        complete = false
+        warnings.add('Some primitives have no declared position bounds.')
+      }
+      if (summary.box !== null && !collider) {
         const { lo, hi } = summary.box
         for (let corner = 0; corner < 8; corner++) {
           const p = Vector3.transformCoordinates({ x: (corner & 1 ? hi : lo)[0], y: (corner & 2 ? hi : lo)[1], z: (corner & 4 ? hi : lo)[2] }, world)

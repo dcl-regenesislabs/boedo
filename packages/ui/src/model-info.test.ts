@@ -27,7 +27,7 @@ describe('model inspection for assistant placement', () => {
     expect(info.bounds?.max.z).toBeCloseTo(2)
   })
 
-  it('reads matrix transforms, collider names, dependencies and exact animation names', () => {
+  it('reads matrix transforms, collider names and their triangles outside the bounds, dependencies and exact animation names', () => {
     const info = inspectModel(model({
       nodes: [{ mesh: 0, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 4, 5, 1], children: [1], skin: 0 }, { name: 'wall_collider', mesh: 0, scale: [50, 50, 50] }],
       images: [{ uri: 'textures/paint.png' }, { uri: 'data:image/png;base64,AA==' }],
@@ -35,6 +35,7 @@ describe('model inspection for assistant placement', () => {
     }))
     expect(info.bounds?.min).toEqual({ x: -4, y: 4, z: 5 })
     expect(info.colliderNodes).toEqual(['wall_collider'])
+    expect([info.triangles, info.primitives]).toEqual([24, 2])
     expect(info.externalResources).toEqual(['textures/paint.png'])
     expect(info.animations).toEqual(['Armature|Walk'])
     expect(info.warnings.join(' ')).toContain('rest pose')
