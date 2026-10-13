@@ -4,7 +4,8 @@ import { useStore } from '../core/store'
 import { uiCheckModelRefs, uiFetchCatalog, uiImportAsset, uiLoadLocalModels, uiPlaceLocalModel, uiImportFiles } from '../actions/assets'
 import { opendclUrl } from '../assets'
 import { Button, ContextMenu, IconButton, LinkButton, MenuItem, Modal, SearchField, Select, Shelf } from '../ds'
-import { deleteProjectFile, fileUsers, filesDeletedWith, olderBuilds, unusedModelsKey } from '../project-file-use'
+import { deleteProjectFile, fileUsers, filesDeletedWith, olderBuilds, unusedModelFiles, unusedModelsKey } from '../project-file-use'
+import { assetsReview, takeSweepRequest } from './assets-review'
 import { onDataLayerWrite } from '../engine/datalayer'
 import { canAskAssistant, prefillAssistant } from './ai-store'
 import { threeAvailable } from '../three/client'
@@ -69,11 +70,15 @@ function CatalogGrid(props: { entries: typeof state.assetCatalog; resetKey: stri
   )
 }
 
-function LocalGrid(props: { list: string[]; older: string[]; onUploaded: () => void }): JSX.Element {
+function LocalGrid(props: { list: string[]; older: string[]; unused: string[]; onUploaded: () => void }): JSX.Element {
   const [pending, setPending] = useState<{ files: File[]; missing: string[] } | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null)
   const [doomed, setDoomed] = useState<{ path: string; also: string[]; users: string[] | null; unchecked?: boolean; busy?: boolean; error?: string } | null>(null)
   const [sweep, setSweep] = useState<{ busy?: boolean; error?: string } | null>(null)
+  const sweepAsked = useStore(() => assetsReview.sweep)
+  useEffect(() => {
+    if (sweepAsked && props.older.length > 0 && takeSweepRequest()) setSweep({})
+  }, [sweepAsked, props.older])
   const confirmSweep = async (): Promise<void> => {
     setSweep({ busy: true })
     try {
@@ -168,11 +173,12 @@ function LocalGrid(props: { list: string[]; older: string[]; onUploaded: () => v
           const name = p.split('/').pop() ?? p
           const folder = p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : ''
           const older = props.older.includes(p)
+          const unused = props.unused.includes(p)
           return (
             <div
               key={p}
               className="eui-asset"
-              data-tip={older ? `An earlier build of a model in the scene, kept for undo · right-click to delete` : `Place ${p} · right-click for more`}
+              data-tip={older ? `An earlier build of a model in the scene, kept for undo · right-click to delete` : unused ? `Not placed in the scene or named by a script · right-click to delete` : `Place ${p} · right-click for more`}
               onClick={() => void uiPlaceLocalModel(p)}
               onContextMenu={(e) => {
                 e.preventDefault()
@@ -183,7 +189,7 @@ function LocalGrid(props: { list: string[]; older: string[]; onUploaded: () => v
                 <ModelGlyph />
               </div>
               <span className="name">{name.replace(/\.(glb|gltf)$/i, '')}</span>
-              <span className="pack">{older ? 'older build' : folder.replace(/^assets\//, '') || 'model'}</span>
+              <span className="pack">{older ? 'older build' : unused ? 'unused' : folder.replace(/^assets\//, '') || 'model'}</span>
             </div>
           )
         })}
@@ -306,6 +312,7 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   const [models, setModels] = useState<string[] | null>(null)
   const [allFiles, setAllFiles] = useState(false)
   const [older, setOlder] = useState<string[]>([])
+  const [unused, setUnused] = useState<string[]>([])
   const catalog = useStore(() => state.assetCatalog)
   const busy = useStore(() => state.assetBusy)
   const catalogFailed = useStore(() => state.assetCatalogFailed)
@@ -314,11 +321,15 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
     setModels(null)
     void uiLoadLocalModels().then(setModels)
     void olderBuilds().then(setOlder, () => setOlder([]))
+    void unusedModelFiles().then(setUnused, () => setUnused([]))
   }
   useEffect(refresh, [])
   // which builds are older moves with what the scene places, not only with file writes
   const placedKey = useStore(unusedModelsKey)
-  useEffect(() => void olderBuilds().then(setOlder, () => setOlder([])), [placedKey])
+  useEffect(() => {
+    void olderBuilds().then(setOlder, () => setOlder([]))
+    void unusedModelFiles().then(setUnused, () => setUnused([]))
+  }, [placedKey])
   // a model built, imported or deleted from anywhere shows up here without a manual reload
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -338,7 +349,9 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   useEffect(ensurePrefabsLoaded, [])
 
   const f = filter.toLowerCase()
-  const local = (models ?? []).filter((p) => f === '' || p.toLowerCase().includes(f))
+  // the files to clean up lead, so the preview cap never hides them
+  const flagged = (p: string): number => (older.includes(p) || unused.includes(p) ? 0 : 1)
+  const local = (models ?? []).filter((p) => f === '' || p.toLowerCase().includes(f)).sort((a, b) => flagged(a) - flagged(b))
   const entries = catalog.filter(
     (a) => (category === '' || a.category === category) && catalogMatches(a, f)
   )
@@ -371,7 +384,7 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
       )}
       <div className="eui-panel-body">
         <Shelf title="My files" count={models === null ? undefined : local.length}>
-          <LocalGrid list={shownLocal} older={older} onUploaded={refresh} />
+          <LocalGrid list={shownLocal} older={older} unused={unused} onUploaded={refresh} />
           {capped && (
             <div className="eui-asset-more">
               <LinkButton onClick={() => setAllFiles(true)}>

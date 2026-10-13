@@ -244,6 +244,8 @@ parcels' texture limit is refused. When the choice is yours, the chat shows cata
 turn around in 3D, beside a "Build it in code" card; a model it built shows in its reply with a 3D view and
 **Make changes**, and Assets has a **Create with AI** tile to start one. The toolbar's gauge button opens **Scene insights**: the
 engine's frame rate, the scene against its parcel limits, deploy size, each model's triangles, and warnings.
+Model files nothing uses, and older builds kept for undo, are counted in a dismissible notice over the viewport whose
+**Review** opens Assets.
 For self-hosting, use the [service Docker deployment](./packages/service/README.md#container-deployment).
 The web assistant includes [Decentraland SDK skills](./packages/service/skills/README.md)
 for scene scripting, interactions, UI, animation and other SDK features, loaded on demand.

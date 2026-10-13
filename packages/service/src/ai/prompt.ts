@@ -165,7 +165,8 @@ scene_request accepts one request:
   8,000 triangles, 6 materials, 4 textures of at most 512 px (shared materials do not count); it is refused over
   that, with the counts. Make it read well from 5–15 m: bevelled edges, varied proportions, details that show,
   never plain boxes. To change a built model, edit its script and build again into the same entity; the old
-  file stays for undo.
+  file stays for undo. After a rebuild, tell the creator the older builds can be deleted from Assets; never
+  delete them yourself.
   For surfaces use addons.material(name,{color,roughness,metalness,relief}): photo-scanned sets, UVs done for
   you, one shared copy per name for every model in the scene; the same name and settings is one material
   however many parts use it. name is one of stone-blocks, red-brick, old-brick, cobblestone, rock, mossy-rock,

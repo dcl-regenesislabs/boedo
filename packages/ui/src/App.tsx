@@ -20,6 +20,7 @@ import { isLeftView, type LeftView } from './panels/left-view'
 import { hasReadyMadePrefabs, sceneEmptiness } from './panels/empty-scene'
 import { prefabStore } from './panels/prefab-store'
 import { renameRequested } from './panels/reveal'
+import { assetsReview } from './panels/assets-review'
 import { storedValue, usePersistentEnum, usePersistentFlag, usePersistentNum } from './core/persist'
 import { autoSaveStatus } from './core/autosave'
 import { Splitter, Toast as DsToast } from './ds'
@@ -169,6 +170,15 @@ export function App(props: { playing?: boolean }): JSX.Element {
     if (prefabReveal === null && libraryReveal === null) return
     showPrefabs()
   }, [prefabReveal, libraryReveal])
+  const reviewAsks = useStore(() => assetsReview.asks)
+  // App remounts when the chrome comes back: only an ask made since then opens the panel
+  const seenAsks = useRef(reviewAsks)
+  useEffect(() => {
+    if (reviewAsks === seenAsks.current) return
+    seenAsks.current = reviewAsks
+    setLeftOpen(true)
+    setLeftView('assets')
+  }, [reviewAsks])
   const renamePending = useStore(renameRequested)
   useEffect(() => {
     if (!renamePending) return
