@@ -22,10 +22,13 @@ function checked(reply: Extract<ThreeReply, { kind: 'built' }>): { bytes: Uint8A
 export const MODEL_BUDGET = { triangles: 8000, materials: 6, textures: 4, largestTexture: 512 }
 const BUILD_TIMEOUT_MS = 20_000
 
-export function overBudget(stats: ModelStats): string[] {
-  return (Object.keys(MODEL_BUDGET) as (keyof ModelStats)[])
-    .filter((key) => stats[key] > MODEL_BUDGET[key])
-    .map((key) => `${key} ${stats[key]} > ${MODEL_BUDGET[key]}`)
+export function overBudget(stats: ModelStats, textureProblems: readonly string[] = []): string[] {
+  return [
+    ...(Object.keys(MODEL_BUDGET) as (keyof ModelStats)[])
+      .filter((key) => stats[key] > MODEL_BUDGET[key])
+      .map((key) => `${key} ${stats[key]} > ${MODEL_BUDGET[key]}`),
+    ...textureProblems.map((problem) => `${problem}; use 64/128/256/512`)
+  ]
 }
 
 // A fresh worker per build: a script that loops forever is stopped by terminating it.

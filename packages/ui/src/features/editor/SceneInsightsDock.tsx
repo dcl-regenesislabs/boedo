@@ -75,11 +75,11 @@ const tone = (used: number, limit: number): string => (limit > 0 && used / limit
 
 const compact = (n: number): string => (n >= 10_000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString())
 
-function Meter(props: { label: string; used: number; limit: number; unit?: string; wide?: boolean }): JSX.Element {
+function Meter(props: { label: string; used: number; limit: number; unit?: string; wide?: boolean; hard?: boolean }): JSX.Element {
   const share = props.limit > 0 ? Math.min(1, props.used / props.limit) : 0
   const label = `${props.wide === true ? props.used.toLocaleString() : compact(props.used)} / ${props.wide === true ? props.limit.toLocaleString() : compact(props.limit)}${props.unit ?? ''}`
   return (
-    <div className={`eui-insights-meter ${tone(props.used, props.limit)}${props.wide === true ? ' wide' : ''}`} data-tip={`${props.label}: ${props.used.toLocaleString()} of ${props.limit.toLocaleString()}${props.unit ?? ''} (soft limit)`}>
+    <div className={`eui-insights-meter ${tone(props.used, props.limit)}${props.wide === true ? ' wide' : ''}`} data-tip={`${props.label}: ${props.used.toLocaleString()} of ${props.limit.toLocaleString()}${props.unit ?? ''}${props.hard === true ? '; Genesis City refuses a deployment above it, a World takes up to 10,000' : ' (soft limit)'}`}>
       <span className="name">{props.label}</span>
       <span className="track"><span className="fill" style={{ width: `${share * 100}%` }} /></span>
       <span className="value">{label}</span>
@@ -167,7 +167,9 @@ function Dock(): JSX.Element {
   const triangleLimit = budget?.limits.triangles ?? 0
   const heavy = (models ?? []).filter((m) => triangleLimit > 0 && (m.triangles * m.entities.length) / triangleLimit > HEAVY_SHARE)
   const warnings = [
-    ...(budget?.over ?? []).map((key) => `Over the ${budget?.parcels}-parcel soft limit for ${key}: explorers warn about it, and slower devices may struggle.`),
+    ...(budget?.over ?? []).map((key) => key === 'files'
+      ? `Over the ${budget?.parcels}-parcel limit of ${budget?.limits.files} files: Genesis City would refuse it, though a World takes up to 10,000. Delete unused files or add parcels.`
+      : `Over the ${budget?.parcels}-parcel soft limit for ${key}: explorers warn about it, and slower devices may struggle.`),
     ...heavy.map((m) => `${m.src} draws ${Math.round(((m.triangles * m.entities.length) / triangleLimit) * 100)}% of the scene's triangle limit.`),
     ...(models ?? []).flatMap((m) => m.warnings.map((w) => `${m.src}: ${w}`)),
     ...unused.map((f) => `${f} is not used by any entity or script.`),
@@ -242,6 +244,7 @@ function Dock(): JSX.Element {
                 <Meter wide label="Bodies" used={budget.used.bodies} limit={budget.limits.bodies} />
                 <Meter wide label="Materials" used={budget.used.materials} limit={budget.limits.materials} />
                 <Meter wide label="Textures" used={budget.used.textures} limit={budget.limits.textures} />
+                <Meter wide hard label="Files" used={budget.used.files} limit={budget.limits.files} />
               </div>
             )}
           </section>

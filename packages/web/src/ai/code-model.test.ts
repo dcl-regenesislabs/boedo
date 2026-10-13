@@ -11,7 +11,7 @@ vi.mock('@ui/three/client', () => ({
     return worker
   }
 }))
-import { buildCodeModel } from './code-model'
+import { buildCodeModel, overBudget } from './code-model'
 
 const built = (extra: Record<string, unknown>) => ({ kind: 'built', glb: new ArrayBuffer(8), clips: [], library: [], ...extra })
 
@@ -34,5 +34,12 @@ describe('a build reply the model script may have forged', () => {
     const { warnings } = await buildCodeModel('root.add(x)', 'Tower', new AbortController().signal)
     expect(warnings).toHaveLength(8)
     expect(warnings[0]).toHaveLength(300)
+  })
+})
+
+describe('a built model against its budget', () => {
+  it('is refused for a texture that is not a power of two', () => {
+    expect(overBudget({ triangles: 10, materials: 1, textures: 1, largestTexture: 300 }, ['300x150 is not a power of two']))
+      .toEqual(['300x150 is not a power of two; use 64/128/256/512'])
   })
 })
