@@ -27,6 +27,15 @@ const counted = new Map<string, { tick: number; counts: Promise<Counts | null> }
 // another project's files share no paths with this one's
 let countedIn: string | null = null
 
+function projectPath(model: string, uri: string): string {
+  const path = new URL(uri, `file:///${model.slice(0, model.lastIndexOf('/') + 1)}`).pathname.slice(1)
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
+}
+
 function countFile(src: string): Promise<Counts | null> {
   const realm = dataLayerRealm() ?? ''
   if (realm !== countedIn) {
@@ -40,8 +49,7 @@ function countFile(src: string): Promise<Counts | null> {
   const pending: Promise<Counts | null> = dataLayerReadFileBytes(src).then((bytes) => {
     const info = inspectModel(bytes)
     // a texture file beside the model, resolved to its project path so models sharing it count it once
-    const dir = src.slice(0, src.lastIndexOf('/') + 1)
-    const shared = info.sharedImages.map((uri) => new URL(uri, `file:///${dir}`).pathname.slice(1))
+    const shared = info.sharedImages.map((uri) => projectPath(src, uri))
     return { triangles: info.triangles, primitives: info.primitives, materials: info.materials.length, textures: info.textures - shared.length, bytes: bytes.byteLength, shared, clips: info.animations, warnings: info.warnings }
   }).catch(() => {
     // unreadable or not a model: reported as missing, and read again next time
@@ -62,6 +70,11 @@ export function materialTextureFiles(material: unknown): string[] {
     const file = object(slot) && object(slot.tex) && object(slot.tex.texture) ? slot.tex.texture.src : undefined
     return typeof file === 'string' && file !== '' ? [file] : []
   }))
+}
+
+// The image files beside a model it points at, as project paths; null when it cannot be read.
+export async function modelImageFiles(src: string): Promise<string[] | null> {
+  return (await countFile(src))?.shared ?? null
 }
 
 function authoredEntities(): [string, Record<string, unknown>][] {
