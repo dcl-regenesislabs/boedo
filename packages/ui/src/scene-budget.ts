@@ -52,6 +52,18 @@ function countFile(src: string): Promise<Counts | null> {
   return pending
 }
 
+const MATERIAL_TEXTURES = ['texture', 'bumpTexture', 'emissiveTexture', 'alphaTexture'] as const
+
+// The image files a Material component draws with; avatar and video textures are no file.
+export function materialTextureFiles(material: unknown): string[] {
+  if (!object(material) || !object(material.material)) return []
+  return Object.values(material.material).flatMap((variant) => !object(variant) ? [] : MATERIAL_TEXTURES.flatMap((key) => {
+    const slot = variant[key]
+    const file = object(slot) && object(slot.tex) && object(slot.tex.texture) ? slot.tex.texture.src : undefined
+    return typeof file === 'string' && file !== '' ? [file] : []
+  }))
+}
+
 function authoredEntities(): [string, Record<string, unknown>][] {
   const baseline = provenanceBaseline()
   return Object.entries(state.snapshot)
@@ -89,17 +101,19 @@ export async function sceneModels(): Promise<ModelRow[]> {
   return rows.sort((a, b) => b.triangles * b.entities.length - a.triangles * a.entities.length)
 }
 
-// What the scene's models already spend of its texture limit, and which shared files they point at:
-// a new model's shared file costs nothing when another model already uses it.
+// What the scene's models and Materials already spend of its texture limit, and which image files they
+// point at: a new model's shared file costs nothing when the scene already uses it.
 export async function sceneTextures(): Promise<{ used: number; limit: number; shared: ReadonlySet<string> }> {
   const files = new Map<string, Counts>()
+  const images: string[] = []
   for (const [, components] of authoredEntities()) {
+    images.push(...materialTextureFiles(components.Material))
     const gltf = components.GltfContainer
     if (!object(gltf) || typeof gltf.src !== 'string' || files.has(gltf.src)) continue
     const counts = await countFile(gltf.src)
     if (counts !== null) files.set(gltf.src, counts)
   }
-  const shared = new Set([...files.values()].flatMap((f) => f.shared))
+  const shared = new Set([...files.values()].flatMap((f) => f.shared).concat(images))
   const used = [...files.values()].reduce((n, f) => n + f.textures, 0) + shared.size
   return { used, limit: parcelLimits(Math.max(1, state.scene?.parcels.length ?? 1)).textures, shared }
 }
@@ -112,6 +126,7 @@ export async function sceneBudget() {
   let bodies = 0
   const files = new Map<string, Counts>()
   const materials = new Set<string>()
+  const images = new Set<string>()
   for (const [, components] of authored) {
     const gltf = components.GltfContainer
     if (object(gltf) && typeof gltf.src === 'string') {
@@ -124,14 +139,16 @@ export async function sceneBudget() {
       bodies++
     }
     if (components.Material !== undefined) materials.add(JSON.stringify(components.Material))
+    for (const file of materialTextureFiles(components.Material)) images.add(file)
   }
+  for (const f of files.values()) for (const file of f.shared) images.add(file)
   const modelBytes = [...files.values()].reduce((n, f) => n + f.bytes, 0)
   const used = {
     triangles,
     entities: authored.length,
     bodies,
     materials: materials.size + [...files.values()].reduce((n, f) => n + f.materials, 0),
-    textures: [...files.values()].reduce((n, f) => n + f.textures, 0) + new Set([...files.values()].flatMap((f) => f.shared)).size,
+    textures: [...files.values()].reduce((n, f) => n + f.textures, 0) + images.size,
     megabytes: Math.round((publishedBytes !== null ? await publishedBytes().catch(() => modelBytes) : modelBytes) / MB * 10) / 10
   }
   const over = (Object.keys(limits) as (keyof typeof limits)[]).filter((key) => used[key] > limits[key])
