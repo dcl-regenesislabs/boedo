@@ -57,7 +57,8 @@ For the same reason (unsigned builds), SmartScreen may warn on first run. Click
    gizmos, tweak them in the inspector. The **Assets** panel has a catalog of
    ready-made models, plus a tile to add your own `.glb` / `.gltf` files from
    your computer — if a model keeps its textures in separate files, select
-   them together with it and the editor brings them all in. The **Prefabs**
+   them together with it and the editor brings them all in. Right-click one of
+   your files there to delete it; the dialog says what still uses it. The **Prefabs**
    tab next to it holds the prefabs you've saved for reuse — in this scene, in
    your own cross-scene library, or shipped with the editor.
 3. Press **▶** to run the scene and walk around in it; **⏹** stops it and puts
@@ -225,6 +226,13 @@ Usage and context meters are hidden; hosting limits are documented in the servic
 The assistant can import library prefabs, inspect model bounds and animation names, and use viewport images
 and runtime diagnostics to refine the result. For new games it blocks out with primitives first, then turns
 them into catalog models in place; model searches run alongside scene edits.
+When nothing in the catalog fits, or you ask for something specific, it builds the model in code (three.js,
+run in a sandbox with no network) and saves the script next to it in `models/src/`, so "make the roof taller"
+edits and rebuilds it. Built models can move (a looping clip plays on its own) and share a library of tiling
+materials stored once in `models/materials/`. When the choice is yours, the chat shows catalog cards you can
+turn around in 3D, beside a "Build it in code" card; a model it built shows in its reply with a 3D view and
+**Make changes**, and Assets has a **Create with AI** tile to start one. The toolbar's gauge button opens **Scene insights**: the
+engine's frame rate, the scene against its parcel limits, deploy size, each model's triangles, and warnings.
 For self-hosting, use the [service Docker deployment](./packages/service/README.md#container-deployment).
 The web assistant includes [Decentraland SDK skills](./packages/service/skills/README.md)
 for scene scripting, interactions, UI, animation and other SDK features, loaded on demand.

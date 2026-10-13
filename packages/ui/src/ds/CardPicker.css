@@ -8,3 +8,7 @@
 .eui-ds-pick .nm { font-weight: 600; font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .eui-ds-pick .num { font-size: var(--fs-xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .eui-ds-pick .box { flex: none; }
+.eui-ds-pick-wrap { position: relative; display: block; }
+.eui-ds-pick-wrap > .eui-ds-pick { padding-right: 44px; }
+.eui-ds-pick-preview { position: absolute; top: 50%; right: var(--space-2); transform: translateY(-50%); display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; cursor: pointer; color: var(--text-2); background: var(--surface); border: 1px solid var(--divider-soft); border-radius: var(--r-control); }
+.eui-ds-pick-preview:hover { color: var(--text); border-color: var(--primary-border); }

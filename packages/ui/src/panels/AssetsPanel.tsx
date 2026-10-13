@@ -3,7 +3,11 @@ import { state } from '@scene/state'
 import { useStore } from '../core/store'
 import { uiCheckModelRefs, uiFetchCatalog, uiImportAsset, uiLoadLocalModels, uiPlaceLocalModel, uiImportFiles } from '../actions/assets'
 import { opendclUrl } from '../assets'
-import { Button, IconButton, LinkButton, Modal, SearchField, Select, Shelf } from '../ds'
+import { Button, ContextMenu, IconButton, LinkButton, MenuItem, Modal, SearchField, Select, Shelf } from '../ds'
+import { deleteProjectFile, fileUsers, filesDeletedWith, olderBuilds, unusedModelsKey } from '../project-file-use'
+import { onDataLayerWrite } from '../engine/datalayer'
+import { canAskAssistant, prefillAssistant } from './ai-store'
+import { threeAvailable } from '../three/client'
 import { LeftTabs, type LeftView } from './left-view'
 import { ensurePrefabsLoaded } from './prefab-store'
 import { SearchEmpty } from './SearchEmpty'
@@ -65,8 +69,40 @@ function CatalogGrid(props: { entries: typeof state.assetCatalog; resetKey: stri
   )
 }
 
-function LocalGrid(props: { list: string[]; onUploaded: () => void }): JSX.Element {
+function LocalGrid(props: { list: string[]; older: string[]; onUploaded: () => void }): JSX.Element {
   const [pending, setPending] = useState<{ files: File[]; missing: string[] } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null)
+  const [doomed, setDoomed] = useState<{ path: string; also: string[]; users: string[] | null; unchecked?: boolean; busy?: boolean; error?: string } | null>(null)
+  const [sweep, setSweep] = useState<{ busy?: boolean; error?: string } | null>(null)
+  const confirmSweep = async (): Promise<void> => {
+    setSweep({ busy: true })
+    try {
+      for (const path of props.older) await deleteProjectFile(path)
+      setSweep(null)
+      props.onUploaded()
+    } catch (e) {
+      setSweep({ error: e instanceof Error ? e.message : String(e) })
+      props.onUploaded()
+    }
+  }
+  const askDelete = (path: string): void => {
+    setMenu(null)
+    setDoomed({ path, also: [], users: null })
+    void Promise.all([fileUsers(path), filesDeletedWith(path)]).then(
+      ([u, also]) => setDoomed((d) => (d?.path === path ? { path, also, users: [...u.entities.map((e) => `entity ${e}`), ...u.scripts.map((f) => `script ${f}`)] } : d)),
+      () => setDoomed((d) => (d?.path === path ? { path, also: [], users: [], unchecked: true } : d))
+    )
+  }
+  const confirmDelete = async (path: string): Promise<void> => {
+    setDoomed((d) => (d === null ? d : { ...d, busy: true }))
+    try {
+      await deleteProjectFile(path)
+      setDoomed(null)
+      props.onUploaded()
+    } catch (e) {
+      setDoomed((d) => (d === null ? d : { ...d, busy: false, error: e instanceof Error ? e.message : String(e) }))
+    }
+  }
   const fileRef = useRef<HTMLInputElement>(null)
   const carryRef = useRef<File[]>([])
 
@@ -121,25 +157,101 @@ function LocalGrid(props: { list: string[]; onUploaded: () => void }): JSX.Eleme
           <span className="name">Import files</span>
           <span className="pack">from your computer</span>
         </label>
+        {threeAvailable() && canAskAssistant() && (
+          <button type="button" className="eui-asset eui-asset-upload" data-tip="Describe a model: the assistant finds one in the catalog or builds it in code" onClick={() => prefillAssistant('Make a model of ')}>
+            <div className="glyph">✦</div>
+            <span className="name">Create with AI</span>
+            <span className="pack">describe it</span>
+          </button>
+        )}
         {props.list.map((p) => {
           const name = p.split('/').pop() ?? p
           const folder = p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : ''
+          const older = props.older.includes(p)
           return (
             <div
               key={p}
               className="eui-asset"
-              data-tip={`Place ${p}`}
+              data-tip={older ? `An earlier build of a model in the scene, kept for undo · right-click to delete` : `Place ${p} · right-click for more`}
               onClick={() => void uiPlaceLocalModel(p)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setMenu({ x: e.clientX, y: e.clientY, path: p })
+              }}
             >
               <div className="glyph">
                 <ModelGlyph />
               </div>
               <span className="name">{name.replace(/\.(glb|gltf)$/i, '')}</span>
-              <span className="pack">{folder.replace(/^assets\//, '') || 'model'}</span>
+              <span className="pack">{older ? 'older build' : folder.replace(/^assets\//, '') || 'model'}</span>
             </div>
           )
         })}
       </div>
+      {menu !== null && (
+        <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
+          <MenuItem danger onClick={() => askDelete(menu.path)}>Delete file…</MenuItem>
+          {props.older.includes(menu.path) && props.older.length > 1 && (
+            <MenuItem danger onClick={() => { setMenu(null); setSweep({}) }}>Delete all {props.older.length} older builds…</MenuItem>
+          )}
+        </ContextMenu>
+      )}
+      {doomed !== null && (
+        <Modal
+          title="Delete file?"
+          onClose={() => setDoomed(null)}
+          footer={
+            <>
+              <Button onClick={() => setDoomed(null)}>Cancel</Button>
+              <Button variant="danger" disabled={doomed.users === null || doomed.busy === true} onClick={() => void confirmDelete(doomed.path)}>
+                Delete
+              </Button>
+            </>
+          }
+        >
+          <p>
+            <code>{doomed.path}</code> is removed from the project{doomed.also.length > 0 ? <>, with <code>{doomed.also.join(', ')}</code></> : null}. This can’t be undone.
+          </p>
+          {doomed.unchecked === true && <p role="alert">Couldn’t check what uses it: entities or scripts may still need it.</p>}
+          {doomed.users === null && <p>Checking what uses it…</p>}
+          {doomed.users !== null && doomed.users.length > 0 && (
+            <>
+              <p>Still used by:</p>
+              <ul>
+                {doomed.users.map((u) => (
+                  <li key={u}>{u}</li>
+                ))}
+              </ul>
+              <p>Those will show nothing where the model was.</p>
+            </>
+          )}
+          {doomed.error !== undefined && <p role="alert">{doomed.error}</p>}
+        </Modal>
+      )}
+      {sweep !== null && (
+        <Modal
+          title="Delete older builds?"
+          onClose={() => setSweep(null)}
+          footer={
+            <>
+              <Button onClick={() => setSweep(null)}>Cancel</Button>
+              <Button variant="danger" disabled={sweep.busy === true} onClick={() => void confirmSweep()}>
+                Delete
+              </Button>
+            </>
+          }
+        >
+          <p>These earlier builds are removed from the project. The builds in your scene stay. Undo can’t go back to a deleted build.</p>
+          <ul>
+            {props.older.map((p) => (
+              <li key={p}>
+                <code>{p}</code>
+              </li>
+            ))}
+          </ul>
+          {sweep.error !== undefined && <p role="alert">{sweep.error}</p>}
+        </Modal>
+      )}
       {pending !== null && (
         <Modal
           title="Missing model files"
@@ -193,6 +305,7 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   const [category, setCategory] = useState('')
   const [models, setModels] = useState<string[] | null>(null)
   const [allFiles, setAllFiles] = useState(false)
+  const [older, setOlder] = useState<string[]>([])
   const catalog = useStore(() => state.assetCatalog)
   const busy = useStore(() => state.assetBusy)
   const catalogFailed = useStore(() => state.assetCatalogFailed)
@@ -200,8 +313,25 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   const refresh = (): void => {
     setModels(null)
     void uiLoadLocalModels().then(setModels)
+    void olderBuilds().then(setOlder, () => setOlder([]))
   }
   useEffect(refresh, [])
+  // which builds are older moves with what the scene places, not only with file writes
+  const placedKey = useStore(unusedModelsKey)
+  useEffect(() => void olderBuilds().then(setOlder, () => setOlder([])), [placedKey])
+  // a model built, imported or deleted from anywhere shows up here without a manual reload
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const off = onDataLayerWrite((paths) => {
+      if (!paths.some((p) => /\.(glb|gltf)$/i.test(p))) return
+      clearTimeout(timer)
+      timer = setTimeout(refresh, 300)
+    })
+    return () => {
+      off()
+      clearTimeout(timer)
+    }
+  }, [])
   useEffect(() => {
     if (state.assetCatalog.length === 0) void uiFetchCatalog()
   }, [])
@@ -241,7 +371,7 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
       )}
       <div className="eui-panel-body">
         <Shelf title="My files" count={models === null ? undefined : local.length}>
-          <LocalGrid list={shownLocal} onUploaded={refresh} />
+          <LocalGrid list={shownLocal} older={older} onUploaded={refresh} />
           {capped && (
             <div className="eui-asset-more">
               <LinkButton onClick={() => setAllFiles(true)}>

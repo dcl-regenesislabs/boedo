@@ -497,3 +497,10 @@
 }
 .eui-qopen-row.on { background: var(--primary-selected, rgba(152, 45, 226, 0.22)); }
 .eui-qopen-none { color: var(--text-3); font-size: 12.5px; padding: 14px; text-align: center; }
+.eui-ai-model-view { position: relative; display: flex; align-items: center; justify-content: center; height: min(60vh, 480px); color: var(--text-2); background: var(--input); border-radius: var(--r-control); overflow: hidden; }
+.eui-ai-model-view > canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+.eui-ai-built { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-2) 0; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); background: var(--input); border: 1px solid var(--divider-soft); border-radius: var(--r-control); }
+.eui-ai-built .what { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: var(--fs-sm); }
+.eui-ai-built .what b { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eui-ai-built .what span { color: var(--text-3); font-size: var(--fs-xs); }
+.eui-ai-built .actions { flex: none; display: flex; gap: 2px; }

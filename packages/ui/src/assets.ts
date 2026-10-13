@@ -40,6 +40,12 @@ async function resolveProxy(): Promise<string | null> {
   return proxyBase
 }
 
+// the catalog CDN, directly or through the dev proxy: the only place a preview may fetch a model from
+export function catalogUrl(url: string): boolean {
+  const parsed = URL.canParse(url, location.href) ? new URL(url, location.href) : null
+  return parsed !== null && (parsed.origin === OPENDCL_ORIGIN || (proxyBase === '/opendcl' && parsed.origin === location.origin && parsed.pathname.startsWith('/opendcl/')))
+}
+
 export function opendclUrl(u: string | undefined): string | undefined {
   if (u === undefined) return undefined
   if (proxyBase === '/opendcl' && u.startsWith(OPENDCL_ORIGIN)) {

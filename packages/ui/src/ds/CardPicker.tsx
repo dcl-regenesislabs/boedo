@@ -1,6 +1,7 @@
 import css from './CardPicker.css?inline'
 import { Checkbox } from '.'
 import { registerCss } from './styles/registry'
+import type { ReactNode } from 'react'
 
 registerCss('ds/CardPicker', 'primitives', css)
 
@@ -11,6 +12,8 @@ export interface PickerItem {
   image?: string | null
   tip?: string
   disabledReason?: string | null
+  // a small button beside the card, for a look before choosing
+  preview?: { label: string; icon: ReactNode; onClick: () => void }
 }
 
 export function CardPicker(props: {
@@ -54,7 +57,7 @@ export function CardPicker(props: {
             </label>
           )
         }
-        return (
+        const pick = (
           <button
             key={it.key}
             type="button"
@@ -66,6 +69,15 @@ export function CardPicker(props: {
           >
             {body}
           </button>
+        )
+        if (it.preview === undefined) return pick
+        return (
+          <span key={it.key} className="eui-ds-pick-wrap">
+            {pick}
+            <button type="button" className="eui-ds-pick-preview" aria-label={it.preview.label} data-tip={it.preview.label} onClick={it.preview.onClick}>
+              {it.preview.icon}
+            </button>
+          </span>
         )
       })}
     </div>

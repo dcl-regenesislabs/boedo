@@ -51,3 +51,32 @@ describe('model inspection for assistant placement', () => {
     expect(() => inspectModel(new Uint8Array([0x67, 0x6c, 0x54, 0x46]))).toThrow('header')
   })
 })
+
+describe('embedded texture sizes', () => {
+  it('reads the largest side from the image headers inside a GLB', () => {
+    const png = new Uint8Array(24)
+    const p = new DataView(png.buffer)
+    p.setUint32(0, 0x89504e47); p.setUint32(16, 1024); p.setUint32(20, 256)
+    // a JPEG with one APP0 segment, then a baseline start-of-frame of 300 wide by 600 high
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x02, 0x58, 0x01, 0x2c, 0x03, 0, 0, 0, 0])
+    const bin = new Uint8Array(png.length + jpeg.length + 2)
+    bin.set(png); bin.set(jpeg, png.length)
+    const json = new TextEncoder().encode(JSON.stringify({
+      asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [] }],
+      bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: png.length }, { buffer: 0, byteOffset: png.length, byteLength: jpeg.length }],
+      images: [{ bufferView: 0, mimeType: 'image/png' }, { bufferView: 1, mimeType: 'image/jpeg' }]
+    }))
+    const jsonChunk = new Uint8Array((json.length + 3) & ~3).fill(0x20)
+    jsonChunk.set(json)
+    const glb = new Uint8Array(28 + jsonChunk.length + bin.length)
+    const w = new DataView(glb.buffer)
+    w.setUint32(0, 0x46546c67, true); w.setUint32(4, 2, true); w.setUint32(8, glb.length, true)
+    w.setUint32(12, jsonChunk.length, true); w.setUint32(16, 0x4e4f534a, true); glb.set(jsonChunk, 20)
+    w.setUint32(20 + jsonChunk.length, bin.length, true); w.setUint32(24 + jsonChunk.length, 0x004e4942, true)
+    glb.set(bin, 28 + jsonChunk.length)
+    expect(inspectModel(glb).largestImage).toBe(1024)
+    // the JPEG made 2048 high: now it is the largest
+    glb.set([0x08, 0x00], 28 + jsonChunk.length + png.length + 13)
+    expect(inspectModel(glb).largestImage).toBe(2048)
+  })
+})

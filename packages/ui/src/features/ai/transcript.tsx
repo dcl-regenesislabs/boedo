@@ -3,12 +3,14 @@ import { Spinner } from '../../ds'
 import { IconBot } from '../../icons'
 import { ActivityGroup, groupTools, MUTATION_TOOLS, toolLabel, type ToolUse } from './activity'
 import { MarkdownText } from './markdown'
+import { BuiltModelCard } from './BuiltModelCard'
+import type { BuiltModel } from './built-models'
 import { CheckIcon } from './icons'
 import { EXAMPLES, friendlyError, SETUP } from './chat-helpers'
 
 export type ChatMsg =
   | { role: 'user'; text: string; images?: string[] }
-  | { role: 'assistant'; turnId?: string; text: string; tools: ToolUse[]; done: boolean; error?: string; paused?: string }
+  | { role: 'assistant'; turnId?: string; text: string; tools: ToolUse[]; done: boolean; error?: string; paused?: string; models?: BuiltModel[] }
   | { role: 'note'; text: string }
 
 export function AiSetup(props: {
@@ -85,6 +87,8 @@ export function MessageList(props: {
   onRetry?: () => void
   onContinue?: () => void
   onShowDetail: (detail: string) => void
+  // answers a choice the last reply offers
+  onChoose?: (text: string) => void
 }): JSX.Element {
   return (
     <>
@@ -120,9 +124,10 @@ export function MessageList(props: {
                 })}
               </div>
             )}
+            {m.models?.map((model) => <BuiltModelCard key={model.path} model={model} />)}
             {m.text !== '' && (
               <div className="eui-ai-text">
-                <MarkdownText text={m.text} />
+                <MarkdownText text={m.text} onChoose={m.done && i === props.messages.length - 1 ? props.onChoose : undefined} />
               </div>
             )}
             {!m.done && m.text === '' && m.tools.length === 0 && (

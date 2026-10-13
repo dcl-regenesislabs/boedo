@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { browserSceneRequest } from './scene'
 import { state } from '@scene/state'
+import { loadModelCatalog, type ModelAsset } from '@ui/assets'
 
 const { setValue, deleteValue, status } = vi.hoisted(() => {
   const status = new Map<string, string>()
@@ -22,11 +23,30 @@ vi.mock('@ui/actions/entities', () => ({ uiAddEntity: vi.fn() }))
 vi.mock('@ui/actions/components', () => ({ uiSetComponentValue: setValue, uiDeleteComponent: deleteValue }))
 vi.mock('@ui/assets', () => ({ importCatalogFile: vi.fn(), loadModelCatalog: vi.fn(async () => []), modelById: () => undefined }))
 vi.mock('@ui/engine/bus', () => ({ sendToScene: vi.fn() }))
+vi.mock('./code-model', () => ({ buildCodeModel: vi.fn(async () => { throw new Error('built') }), overBudget: () => [], MODEL_BUDGET: {} }))
 vi.mock('@ui/ai/requests', () => ({ runRequestText: vi.fn() }))
 vi.mock('@ui/ai/request-format', () => ({ resolveEntityRef: (_: unknown, ref: string) => ref }))
 vi.mock('@ui/features/editor/scene-check-context', () => ({
   refreshSceneChecks: async () => [{ id: 'empty-prefab-ref', level: 'blocker', title: 'Nothing picked', detail: 'Pick a prefab', entityId: '512', fix: { label: 'x', action: 'y' } }]
 }))
+
+// real catalog entries, only the fields the search reads
+const asset = (a: Omit<ModelAsset, 'id' | 'filename' | 'url' | 'collection'>): ModelAsset => ({ id: a.name, filename: '', url: '', collection: '', ...a })
+const catalog = [
+  asset({ name: 'Basenji Dog Photo Print', category: 'decoration', subcategory: 'picture', tags: ['frame', 'textured', 'picture', 'basenji', 'dog', 'flat', 'low-poly', 'photo'], description: 'A flat picture or photo of a Basenji dog, suitable as wall art or decoration.', width: 0.79, height: 0, depth: 1, triangles: 6 }),
+  asset({ name: 'METADOGE Dough Cut', category: 'prop', subcategory: 'cookie-cutter', tags: ['cookie', 'dough', 'baking', 'minigame', 'flat', 'low-poly', 'dog-shaped', 'textured', 'cutout'], description: 'A flat dog-shaped dough cutout with a printed texture, used as a cookie-cutter game piece.', width: 0.79, height: 0, depth: 1, triangles: 6 }),
+  asset({ name: 'Block Dog.1', category: 'character', subcategory: 'dog', tags: ['walking', 'blocky', 'pet', 'dog', 'low-poly', 'cute', 'animated', 'textured'], description: 'An animated blocky dog character with standing, idle, drinking, walking, and sitting animations.', width: 1.58, height: 0.47, depth: 0.87, triangles: 126 }),
+  asset({ name: 'Doge NPC Anim4', category: 'character', subcategory: 'dog', tags: ['idle', 'NPC', 'wave', 'high-poly', 'dog', 'talk', 'walk', 'animated', 'doge', 'textured'], description: 'An animated Doge NPC character with walk, talk, wave, thinking, and idle animations.', width: 1.42, height: 1.75, depth: 0.8, triangles: 1970 }),
+  asset({ name: 'Cemetery Tombstones & Gravestones Set', category: 'decoration', subcategory: 'tombstone', tags: ['textured', 'high-poly', 'large-scale', 'tombs', 'gravestones', 'cemetery', 'halloween', 'spiderweb', 'graveyard'], description: 'A collection of cemetery tombstones and grave markers with spider webs spread across a large area.', width: 76.28, height: 4.12, depth: 74.39, triangles: 117666 }),
+  asset({ name: 'Stone 03', category: 'nature', subcategory: 'rock', tags: ['textured', 'stone', 'rock', 'boulder', 'fantasy', 'dark', 'collider'], description: 'Dark rocky boulder with collider, suitable for fantasy landscape decoration.', width: 2.93, height: 1.22, depth: 2.57, triangles: 488 }),
+  asset({ name: 'Rock01 Rework', category: 'nature', subcategory: 'rock', tags: ['animated', 'textured', 'low-poly', 'rock', 'stone', 'boulder', 'interactive', 'nature'], description: 'A dark low-poly rock with tap interaction animation, suitable for meadow and nature environments.', width: 1.81, height: 1, depth: 1.79, triangles: 135 })
+]
+
+async function found(query: string): Promise<string[]> {
+  vi.mocked(loadModelCatalog).mockResolvedValueOnce(catalog)
+  const reply = await browserSceneRequest({ type: 'findModels', query }, new AbortController().signal) as { models: { name: string }[] }
+  return reply.models.map((m) => m.name)
+}
 
 describe('assistant scene requests', () => {
   it('writes a oneof the model gave in the SDK form the way the engine reads it', async () => {
@@ -41,6 +61,7 @@ describe('assistant scene requests', () => {
   it('answers check with the editor\'s findings, naming the entity each one is about', async () => {
     expect(await browserSceneRequest({ type: 'check' }, new AbortController().signal)).toEqual({
       visuals: { modelEntities: 0, modelPaths: [], primitiveEntities: 0 }, liveParcels: [],
+      budget: expect.objectContaining({ parcels: 1, over: [] }),
       findings: [{ level: 'blocker', title: 'Nothing picked', detail: 'Pick a prefab', entity: 'Box' }]
     })
   })
@@ -72,5 +93,17 @@ describe('assistant scene requests', () => {
       await expect(browserSceneRequest({ type: 'removeComponent', to: '512', component }, new AbortController().signal)).rejects.toThrow('cannot be removed')
     }
     expect(deleteValue).toHaveBeenCalledTimes(1)
+  })
+
+  it('finds the models a request means: whole words, real props before flat pictures', async () => {
+    const dog = await found('dog')
+    expect(dog.slice(0, 2).sort()).toEqual(['Block Dog.1', 'Doge NPC Anim4'])
+    expect(dog.slice(2).sort()).toEqual(['Basenji Dog Photo Print', 'METADOGE Dough Cut'])
+    const stones = await found('stones')
+    expect(stones.slice(0, 2).sort()).toEqual(['Rock01 Rework', 'Stone 03'])
+  })
+
+  it('builds into a stand-in without a name, the way the prompt shows it', async () => {
+    await expect(browserSceneRequest({ type: 'buildModel', into: '512', code: 'root' }, new AbortController().signal)).rejects.toThrow('built')
   })
 })

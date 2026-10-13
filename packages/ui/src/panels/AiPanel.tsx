@@ -20,6 +20,7 @@ import { state, entityLabel, type Snapshot } from '@scene/state'
 import { entityName } from '@scene/custom-components'
 import { type CodeEditorHandle } from '../script/code-editor'
 import { IconBot, IconChevron, IconNewChat } from '../icons'
+import { onBuiltModel } from '../features/ai/built-models'
 import { aiStore, canAskAssistant, clearRevealLine, closeDoc, leaveStudio, openDoc, openStudio, refreshFileRail, setMode, setSelection, setStudioChordHandler, setStudioFile, toggleAssistantCollapsed, vendorRuntimeAfterTurn } from './ai-store'
 import { uiSelectEntity } from '../actions/selection'
 import { QuickOpen } from '../features/ai/QuickOpen'
@@ -300,6 +301,16 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
     }
   }, [reveal, file])
 
+  // a model the assistant built shows as a card in the reply being written
+  useEffect(() => onBuiltModel((model) => setMessages((prev) => {
+    let i = prev.length - 1
+    while (i >= 0 && prev[i].role !== 'assistant') i--
+    if (i < 0) return prev
+    const msg = prev[i] as Extract<ChatMsg, { role: 'assistant' }>
+    const next = [...prev]
+    next[i] = { ...msg, models: [...(msg.models ?? []).filter((m) => m.name !== model.name), model] }
+    return next
+  })), [])
   const prefill = useStore(() => aiStore.prefill)
   useEffect(() => {
     if (prefill === null) return
@@ -542,12 +553,12 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
           <>
             <div className="eui-ai-note">Earlier conversation — the assistant doesn’t remember it</div>
             <div className="eui-ai-earlier">
-              <MessageList messages={history} hosted={current?.transport === 'service'} onShowDetail={setErrorDetail} />
+              <MessageList messages={history} hosted={current?.transport === 'service'} onShowDetail={setErrorDetail} onChoose={messages.length === 0 ? (text) => send(text) : undefined} />
             </div>
             {messages.length > 0 && <div className="eui-ai-note">New conversation</div>}
           </>
         )}
-        <MessageList messages={messages} hosted={current?.transport === 'service'} onRetry={retry} onContinue={resume} onShowDetail={setErrorDetail} />
+        <MessageList messages={messages} hosted={current?.transport === 'service'} onRetry={retry} onContinue={resume} onShowDetail={setErrorDetail} onChoose={(text) => send(text)} />
       </div>
       <Composer
         available={available}

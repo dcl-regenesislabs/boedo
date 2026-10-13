@@ -139,6 +139,14 @@ components; see the [service README](../packages/service/README.md).
   a script, set script parameters, or place an existing prefab. These use the same
   editor actions as the UI, with undo and autosave. Component replacement requires
   the previously inspected value. Mutations require edit mode.
+  `buildModel` runs a three.js script the assistant writes and places the GLB it exports.
+  The script runs in a worker inside a sandboxed frame with an origin of its own and a
+  policy that allows no network; the page checks the reply (size caps, known material
+  names) and counts the model from the GLB against a per-model budget (8,000 triangles,
+  6 materials, 4 textures up to 512 px). It writes `models/<name>-<hash>.glb`, the script
+  to `models/src/` (kept out of the published scene) and shared materials to
+  `models/materials/`. A rebuild keeps the previous file so undo still works.
+  `check` also returns the scene's budget against the parcel limits and its deploy size.
 - `build`: compile the current browser project, run the bundle once and return compiler
   diagnostics plus scene/client/server errors. This does not simulate a full playthrough.
 - `view`: capture the viewport, optionally framing an entity or setting the camera pose.

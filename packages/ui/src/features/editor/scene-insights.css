@@ -1,0 +1,47 @@
+/* docked at the bottom centre until dragged; the detail opens above the strip */
+.eui-insights-dock { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; flex-direction: column; max-width: min(760px, 70vw); pointer-events: auto; background: var(--surface); border: 1px solid var(--divider); border-radius: var(--r-panel); box-shadow: var(--shadow-panel); overflow: hidden; }
+.eui-insights-dock.expanded { width: min(760px, 70vw); max-height: 72vh; }
+
+.eui-insights-strip { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: 4px 6px; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.eui-insights-grip { flex: none; cursor: grab; touch-action: none; opacity: 0.5; box-sizing: content-box; width: 10px; height: 20px; padding: 5px 4px; background-image: radial-gradient(circle, var(--text-3) 1px, transparent 1.15px); background-size: 5px 5px; background-origin: content-box; background-clip: content-box; }
+.eui-insights-grip:hover, .eui-insights-grip:active { opacity: 1; }
+.eui-insights-grip:active { cursor: grabbing; }
+.eui-insights-fps { color: var(--text-3); }
+.eui-insights-fps b { font-size: var(--fs-md); color: var(--text); }
+.eui-insights-fps.good b, .eui-insights-stats b.good { color: var(--success); }
+.eui-insights-fps.normal b, .eui-insights-stats b.normal { color: var(--warning); }
+.eui-insights-fps.bad b, .eui-insights-stats b.bad { color: var(--error); }
+.eui-insights-warn { font: inherit; color: var(--text-3); background: var(--input); border: 0; border-radius: var(--r-control); padding: 3px 8px; cursor: pointer; }
+.eui-insights-warn.some { color: var(--warning); }
+
+.eui-insights-meter { display: inline-grid; grid-template-columns: auto 32px auto; align-items: center; gap: 6px; color: var(--text-3); }
+.eui-insights-meter .name { color: var(--text-3); }
+.eui-insights-meter .value { color: var(--text-2); }
+.eui-insights-meter .track { height: 4px; background: var(--input); border-radius: 2px; overflow: hidden; }
+.eui-insights-meter .fill { display: block; height: 100%; background: var(--primary); }
+.eui-insights-meter.near .fill { background: var(--warning); }
+.eui-insights-meter.near .value { color: var(--warning); }
+.eui-insights-meter.over .fill { background: var(--error); }
+.eui-insights-meter.over .value { color: var(--error); }
+.eui-insights-meter.wide { display: grid; grid-template-columns: 110px 1fr 140px; gap: var(--space-2); padding: 3px 0; }
+.eui-insights-meter.wide .name { color: var(--text-2); }
+.eui-insights-meter.wide .track { height: 6px; border-radius: 3px; }
+.eui-insights-meter.wide .value { text-align: right; }
+
+.eui-insights { display: flex; flex-direction: column; gap: var(--space-4); overflow-y: auto; padding: var(--space-3) var(--space-4) var(--space-4); border-bottom: 1px solid var(--divider); }
+.eui-insights h3 { margin: 0 0 var(--space-2); font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.eui-insights p { margin: 0; color: var(--text-3); font-size: var(--fs-sm); }
+.eui-insights-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: var(--space-2); }
+.eui-insights-stats > div { display: flex; flex-direction: column; gap: 2px; padding: var(--space-2) var(--space-3); background: var(--input); border-radius: var(--r-control); }
+.eui-insights-stats b { font-size: 18px; font-variant-numeric: tabular-nums; color: var(--text); }
+.eui-insights-stats span { font-size: var(--fs-xs); color: var(--text-3); }
+.eui-insights-models { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.eui-insights-models th { text-align: left; font-weight: 500; font-size: var(--fs-xs); color: var(--text-3); padding: 4px 6px; border-bottom: 1px solid var(--divider); }
+.eui-insights-models td { padding: 5px 6px; border-bottom: 1px solid var(--divider-soft); color: var(--text-2); }
+.eui-insights-models tbody tr { cursor: pointer; }
+.eui-insights-models tbody tr:hover td { background: var(--paper-hi); color: var(--text); }
+.eui-insights-models tr.heavy td:first-child { color: var(--warning); }
+.eui-insights-warnings { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--text-2); }
+.eui-insights-fps small, .eui-insights-stats b small { font-size: var(--fs-xs); font-weight: 400; color: var(--text-3); }
+.eui-insights-size { color: var(--text-3); }
+.eui-insights-size b { color: var(--text-2); font-weight: 500; }

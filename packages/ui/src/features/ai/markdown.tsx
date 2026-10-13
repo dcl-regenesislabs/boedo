@@ -1,3 +1,5 @@
+import { ModelChoices } from './ModelChoices'
+
 // Tiny, safe markdown for assistant replies — no dependency, no HTML passthrough.
 // Handles fenced code blocks, bullet lists, up-to-h3 headings, `code` and **bold**.
 
@@ -52,7 +54,9 @@ function Prose(props: { text: string }): JSX.Element {
   return <>{blocks}</>
 }
 
-export function MarkdownText(props: { text: string }): JSX.Element {
+const lastLine = (text: string): string => text.trim().split('\n').pop()?.trim() ?? ''
+
+export function MarkdownText(props: { text: string; onChoose?: (text: string) => void }): JSX.Element {
   const parts: JSX.Element[] = []
   const re = /```(\w*)\n?([\s\S]*?)```/g
   let last = 0
@@ -61,9 +65,13 @@ export function MarkdownText(props: { text: string }): JSX.Element {
   while ((m = re.exec(props.text)) !== null) {
     if (m.index > last) parts.push(<Prose key={k++} text={props.text.slice(last, m.index)} />)
     parts.push(
-      <pre key={k++} className="eui-ai-code">
-        <code>{m[2].replace(/\n$/, '')}</code>
-      </pre>
+      m[1] === 'models' ? (
+        <ModelChoices key={k++} source={m[2]} question={lastLine(props.text.slice(0, m.index))} onChoose={props.onChoose} />
+      ) : (
+        <pre key={k++} className="eui-ai-code">
+          <code>{m[2].replace(/\n$/, '')}</code>
+        </pre>
+      )
     )
     last = re.lastIndex
   }

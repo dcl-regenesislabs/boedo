@@ -35,6 +35,46 @@ function document(bytes: Uint8Array): Record<string, unknown> {
   return parsed
 }
 
+// The GLB's binary chunk, where embedded images live; empty for a .gltf file.
+function binChunk(bytes: Uint8Array): Uint8Array {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  if (bytes.length < 20 || view.getUint32(0, true) !== 0x46546c67) return new Uint8Array(0)
+  const at = 20 + view.getUint32(12, true)
+  if (at + 8 > bytes.length) return new Uint8Array(0)
+  return bytes.subarray(at + 8, Math.min(bytes.length, at + 8 + view.getUint32(at, true)))
+}
+
+// The longest side among the images embedded in the file; 0 when none can be read.
+function largestImage(gltf: Record<string, unknown>, bin: Uint8Array): number {
+  const views = rows(gltf.bufferViews)
+  let largest = 0
+  for (const image of rows(gltf.images)) {
+    if (typeof image.bufferView !== 'number') continue
+    const view = views[image.bufferView]
+    if (view === undefined || typeof view.byteLength !== 'number') continue
+    const start = typeof view.byteOffset === 'number' ? view.byteOffset : 0
+    const size = imageSize(bin.subarray(start, start + view.byteLength))
+    if (size !== null) largest = Math.max(largest, size.width, size.height)
+  }
+  return largest
+}
+
+// Width and height from a PNG or JPEG header, without decoding it.
+export function imageSize(image: Uint8Array): { width: number; height: number } | null {
+  const view = new DataView(image.buffer, image.byteOffset, image.byteLength)
+  if (image.length >= 24 && view.getUint32(0) === 0x89504e47) return { width: view.getUint32(16), height: view.getUint32(20) }
+  if (image.length < 4 || view.getUint16(0) !== 0xffd8) return null
+  for (let at = 2; at + 9 < image.length;) {
+    if (image[at] !== 0xff) return null
+    const marker = image[at + 1]
+    const length = view.getUint16(at + 2)
+    // a start-of-frame segment carries the size; the others are skipped by their length
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) return { width: view.getUint16(at + 7), height: view.getUint16(at + 5) }
+    at += 2 + length
+  }
+  return null
+}
+
 export function inspectModel(bytes: Uint8Array) {
   const gltf = document(bytes)
   const nodes = rows(gltf.nodes), meshes = rows(gltf.meshes), accessors = rows(gltf.accessors)
@@ -44,6 +84,36 @@ export function inspectModel(bytes: Uint8Array) {
   const min = { x: Infinity, y: Infinity, z: Infinity }, max = { x: -Infinity, y: -Infinity, z: -Infinity }
   let complete = true, primitives = 0, triangles = 0
   const visited = new Set<number>()
+  // each mesh read once: a file where many nodes share a mesh of many primitives must not cost their product
+  const summaries = new Map<unknown, { primitives: number; triangles: number; box: { lo: number[]; hi: number[] } | null }>()
+  const meshSummary = (index: unknown) => {
+    const cached = summaries.get(index)
+    if (cached !== undefined) return cached
+    let count = 0, tris = 0
+    let lo: number[] | null = null, hi: number[] | null = null
+    for (const primitive of rows(at(meshes, index).primitives)) {
+      count++
+      if (Array.isArray(primitive.targets) && primitive.targets.length > 0) warnings.add('Morph target bounds are not included.')
+      const position = object(primitive.attributes) ? at(accessors, primitive.attributes.POSITION) : null
+      if (position === null || position.min === undefined || position.max === undefined) {
+        complete = false
+        warnings.add('Some primitives have no declared position bounds.')
+        continue
+      }
+      const pLo = numbers(position.min, 3), pHi = numbers(position.max, 3)
+      if (pLo.some((n, axis) => n > pHi[axis])) throw new Error('Invalid glTF bounds.')
+      lo = lo === null ? pLo : lo.map((n, axis) => Math.min(n, pLo[axis]))
+      hi = hi === null ? pHi : hi.map((n, axis) => Math.max(n, pHi[axis]))
+      const n = primitive.indices === undefined ? position.count : at(accessors, primitive.indices).count
+      if (typeof n === 'number' && Number.isInteger(n) && n >= 0) {
+        if (primitive.mode === undefined || primitive.mode === 4) tris += Math.floor(n / 3)
+        else if (primitive.mode === 5 || primitive.mode === 6) tris += Math.max(0, n - 2)
+      }
+    }
+    const summary = { primitives: count, triangles: tris, box: lo === null || hi === null ? null : { lo, hi } }
+    summaries.set(index, summary)
+    return summary
+  }
   const walk = (index: unknown, parent: Matrix.ReadonlyMatrix, depth: number): void => {
     const node = at(nodes, index)
     if (depth > 128 || visited.has(index as number)) throw new Error('Invalid glTF node hierarchy.')
@@ -64,17 +134,11 @@ export function inspectModel(bytes: Uint8Array) {
       warnings.add('Instanced node bounds are unavailable; check the rendered model.')
     }
     if (node.mesh !== undefined && !collider) {
-      for (const primitive of rows(at(meshes, node.mesh).primitives)) {
-        primitives++
-        if (Array.isArray(primitive.targets) && primitive.targets.length > 0) warnings.add('Morph target bounds are not included.')
-        const position = object(primitive.attributes) ? at(accessors, primitive.attributes.POSITION) : null
-        if (position === null || position.min === undefined || position.max === undefined) {
-          complete = false
-          warnings.add('Some primitives have no declared position bounds.')
-          continue
-        }
-        const lo = numbers(position.min, 3), hi = numbers(position.max, 3)
-        if (lo.some((n, axis) => n > hi[axis])) throw new Error('Invalid glTF bounds.')
+      const summary = meshSummary(node.mesh)
+      primitives += summary.primitives
+      triangles += summary.triangles
+      if (summary.box !== null) {
+        const { lo, hi } = summary.box
         for (let corner = 0; corner < 8; corner++) {
           const p = Vector3.transformCoordinates({ x: (corner & 1 ? hi : lo)[0], y: (corner & 2 ? hi : lo)[1], z: (corner & 4 ? hi : lo)[2] }, world)
           // Bevy rotates GLB roots 180° about Y, then SDK coordinates mirror Z.
@@ -83,11 +147,6 @@ export function inspectModel(bytes: Uint8Array) {
             if (!Number.isFinite(p[axis])) throw new Error('Invalid transformed model bounds.')
             min[axis] = Math.min(min[axis], p[axis]); max[axis] = Math.max(max[axis], p[axis])
           }
-        }
-        const count = primitive.indices === undefined ? position.count : at(accessors, primitive.indices).count
-        if (typeof count === 'number' && Number.isInteger(count) && count >= 0) {
-          if (primitive.mode === undefined || primitive.mode === 4) triangles += Math.floor(count / 3)
-          else if (primitive.mode === 5 || primitive.mode === 6) triangles += Math.max(0, count - 2)
         }
       }
     }
@@ -104,10 +163,14 @@ export function inspectModel(bytes: Uint8Array) {
   const resources = [...rows(gltf.images), ...rows(gltf.buffers)]
     .flatMap((item) => typeof item.uri === 'string' && !item.uri.startsWith('data:') ? [item.uri] : [])
   const animations = rows(gltf.animations).map((a, i) => typeof a.name === 'string' ? a.name : `animation ${i}`)
-  if (animations.length > 0) warnings.add('Static bounds exclude movement during animation.')
+  // a caveat about the bounds, not a problem with the model: it must not reach the creator as a warning
+  const coordinates = `SDK local metres, before entity Transform; conservative static visual bounds${animations.length > 0 ? ' that leave out movement during animation' : ''}`
   return {
-    bytes: bytes.byteLength, bounds, coordinates: 'SDK local metres, before entity Transform; conservative static visual bounds',
+    bytes: bytes.byteLength, bounds, coordinates,
     triangles, primitives, materials: rows(gltf.materials).map((m, i) => typeof m.name === 'string' ? m.name : `material ${i}`),
+    textures: rows(gltf.images).length,
+    largestImage: largestImage(gltf, binChunk(bytes)),
+    sharedImages: rows(gltf.images).flatMap((image) => typeof image.uri === 'string' && !image.uri.startsWith('data:') ? [image.uri] : []),
     animations, colliderNodes, externalResources: resources, warnings: [...warnings]
   }
 }

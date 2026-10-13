@@ -1,5 +1,7 @@
 // Icon set: lucide-react, one size and stroke everywhere.
 import {
+  Gauge,
+  Maximize2,
   MousePointer2,
   Move,
   RotateCw,
@@ -64,6 +66,8 @@ const wrap = (C: LucideIcon) => {
 export const IconSelect = wrap(MousePointer2)
 export const IconMove = wrap(Move)
 export const IconRotate = wrap(RotateCw)
+export const IconExpand = wrap(Maximize2)
+export const IconInsights = wrap(Gauge)
 export const IconScale = wrap(Scaling)
 export const IconPlay = wrap(Play)
 export const IconPause = wrap(Pause)

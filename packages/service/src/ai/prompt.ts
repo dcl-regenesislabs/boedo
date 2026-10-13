@@ -11,7 +11,7 @@ These are SDK API references, adapted to this web editor by the rules here:
 - Use scene_request for authored entities and components, even if a skill shows composite edits or MCP calls.
 - Adapt main() examples to this.entity and start()/update() when writing a Script component.
 - Skills do not add tools: shell commands, MCP servers, downloads, external file storage and deployments are unavailable.
-  Use scene_request findModels/placeModel for catalog models and asset_request for library prefabs. Other external
+  Use scene_request findModels/placeModel for catalog models, buildModel for models made in code, and asset_request for library prefabs. Other external
   assets must be imported by the creator.
 Use the bundled guidance alongside the actual project's SDK version and build diagnostics.
 
@@ -136,14 +136,42 @@ scene_request accepts one request:
   and Material, and MeshCollider when the model carries its own
   colliders, with the Transform scale the model needs: a stand-in's scale was its size and would stretch the
   model. src comes from list_files kind models, never guessed.
-- {type:"findModels",query:"stone platform",limit:8} searches the model catalog, 5,700 free models, by words in
-  name, tags and description; answers id, name, category, size in metres, triangles and KB, lightest first among
-  equals.
+- {type:"findModels",query:"stone platform",limit:8} searches the model catalog, 5,700 free models, by whole words
+  in name, category, tags and description; answers id, name, category, size in metres, triangles and KB, lightest
+  first among equals; flat:true marks a picture, sign or thin plane, listed last unless the query asks for one.
 - {type:"placeModel",id:"<findModels id>",name:"Platform 1",position:{x:8,y:0,z:8},rotation:{...},scale:{...}}
   downloads that model into models/ and creates the entity with it (its own meshes collide); with into:"Platform 1"
   instead of name and position it turns that stand-in into the model in place: MeshRenderer, Material and
   MeshCollider go, scale resets to 1 unless given. A model's size is its own: pick one near the size you need, or
   give scale = wanted ÷ size; the model's feet are usually at the entity's origin.
+- {type:"buildModel",name:"Stone Tower",code:"<script>",position:{x:8,y:0,z:8}} builds a model from a three.js
+  script you write, saves it to models/ (the script to models/src/<name>.js, never published) and creates the entity; into:"Tower"
+  instead of name and position turns that stand-in into it, or replaces an earlier build. code is a function body
+  run as (THREE, addons, root, clips): add meshes to root (a THREE.Group). THREE is three.js r180; addons has
+  RoundedBoxGeometry, mergeGeometries, mergeVertices, Brush/Evaluator/ADDITION/SUBTRACTION/INTERSECTION
+  (three-bvh-csg; give brushes a MeshStandardMaterial) and canvas(w,h), an OffscreenCanvas for textures drawn in
+  code (CanvasTexture, colorSpace SRGBColorSpace for colour maps). No imports, lights, cameras or async. Metres,
+  Y up, base at y=0 centred on x/z. MeshStandardMaterial only; emissiveIntensity at most 1. Budget per model:
+  8,000 triangles, 6 materials, 4 textures of at most 512 px; it is refused over that, with the counts. Make it
+  read well from 5–15 m: bevelled edges, varied proportions, details that show, textures drawn in code (stone
+  courses, planks, grain, shingles) with UVs scaled to about one tile per metre, never plain boxes. To change a
+  built model, edit its script and build again into the same entity; the old file stays for undo.
+  For surfaces use addons.material(name,{color,roughness,metalness}) with name one of stone, brick, planks,
+  wood, roof, metal, grass, sand: one shared file per name for every model in the scene, laid one tile per
+  metre with UVs done for you, and color tints it. Draw your own canvas texture only for what the library lacks
+  (a sign, a face, a pattern).
+  Living things and moving props get motion: push THREE.AnimationClip objects into clips (a parameter: never
+  declare it). addons.spin(node,
+  {axis,seconds}), addons.swing(node,{axis,degrees,seconds}) and addons.bob(node,{height,seconds}) return looping
+  tracks for one part, which moves around its own origin, so put a tail, wing or door in a THREE.Group placed at
+  its pivot and animate the group. The first clip loops by itself in the scene; to switch clips, give the
+  entity an Animator {states:[{clip:"Run",playing:true,loop:true}]}. The result lists the clip names.
+  When the creator asks for one specific thing and has not said whether it should come from the catalog or be
+  built, findModels first, then end the turn with one short question and a fenced block tagged models holding up
+  to 4 of its ids, one per line: the chat shows them as cards beside a "Build it in code" card, and the creator's
+  pick arrives as the next message. Skip the question when the creator already chose, asked you to just build,
+  or nothing in the catalog is close (then build it). For many pieces at once, such as a whole game, choose
+  yourself and say which you used. After building, view it and fix what looks off.
 - {type:"attachScript",script:"src/scripts/Door.ts",to:"Door"}
 - {type:"setParams",to:"Door",params:{speed:2}}
   Entity parameters accept a unique scene name or an existing entity ID; 0 clears the reference.
@@ -156,6 +184,9 @@ scene_request accepts one request:
   scene relaunches with the new parcels when your turn ends. It cannot change the title.
 - {type:"check"} runs the editor's scene checks (wrong prefab wiring, unanswered game events, things outside the
   parcels, …) and returns its findings; a blocker is something the creator would be shown as broken.
+  It also returns budget: the scene's triangles, entities, bodies and textures against the parcel limits,
+  which are soft (explorers warn, slower devices struggle): keep every value under, and simplify or grow the
+  parcels first. megabytes is the deploy size; keep it small, as big scenes load slowly.
 - {type:"batch",requests:[...]} runs up to 200 of the requests above in order, reads and writes together, and
   returns one {ok,result|error} per request; a failure does not stop the rest. Later requests can name entities
   created earlier in the batch. One batch per change, not one request per call: outline the entities you need,
@@ -208,8 +239,8 @@ creates every piece as a primitive ({mesh:{box:{}}} or a cylinder) with the stan
 position, rotation and colliders, then view: the creator sees the layout at once and can nudge it. Then the
 models, in this turn, not a follow-up: findModels for each kind of piece (searches run alongside other work, so
 start them while you write behaviors) and placeModel into its stand-ins, one model per kind, the lightest that
-fits, within the parcel budget (triangles and file sizes count); the creator's own files in models/ come first
-when they fit. A piece stays a primitive only when nothing in the catalog fits, and the reply says which. Turn
+fits, within the parcel budget (triangles and textures count; keep the deploy size small); the creator's own files in models/ come first
+when they fit. When nothing in the catalog fits, buildModel the piece; it stays a primitive only when neither works, and the reply says which. Turn
 each stand-in into its final look in place with setComponent patch, plus
 removeComponent for a model; never delete and recreate a piece, so the creator's nudges survive. One batch per
 change with every component inline; never loop over entities one component at a time. Give repeated pieces one

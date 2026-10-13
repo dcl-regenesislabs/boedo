@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { toggleInsights, useInsightsOpen } from '../features/editor/SceneInsightsDock'
 import { state } from '@scene/state'
 import { isLocalScene } from '@scene/inspector'
 import { type EditorTool } from '@scene/bridge-protocol'
@@ -32,6 +33,7 @@ import {
   IconSidebarRight,
   IconCamera,
   IconFrame,
+  IconInsights,
   IconGrid,
   IconUndo,
   IconRedo,
@@ -66,6 +68,7 @@ export function Toolbar(props: {
   onShortcuts: () => void
 }): JSX.Element | null {
   const [menuOpen, setMenuOpen] = useState(false)
+  const insightsOpen = useInsightsOpen()
   const saveStatus = useStore(() => state.saveStatus)
   const sceneUiHidden = useStore(() => sceneUi.hidden)
   const muted = useStore(() => sceneAudio.muted)
@@ -282,6 +285,10 @@ export function Toolbar(props: {
       )}
 
       <MoreMenu open={menuOpen} setOpen={setMenuOpen} />
+
+      <button className={`eui-btn icon${insightsOpen ? ' active' : ''}`} aria-pressed={insightsOpen} {...labelTip(insightsOpen ? 'Hide scene insights' : 'Scene insights: performance, budget, models, warnings')} onClick={toggleInsights}>
+        <IconInsights />
+      </button>
 
       <button
         className="eui-btn icon"

@@ -3,7 +3,7 @@ import { state } from '@scene/state'
 import { listLibrary, copyLibraryPrefabIntoProject } from '@ui/prefabs/library'
 import { readPrefabData } from '@ui/prefabs/storage'
 import type { BrowserProject } from './tools'
-import { inspectModel } from './model-info'
+import { inspectModel } from '@ui/model-info'
 
 const PAGE_SIZE = 30
 

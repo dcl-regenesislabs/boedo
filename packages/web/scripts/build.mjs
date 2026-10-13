@@ -6,6 +6,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import zlib from 'node:zlib'
 import { fileURLToPath } from 'node:url'
+import { build as bundle } from 'esbuild'
 import { build } from 'vite'
 import { sri, writePrefabCatalog } from './prefab-catalog.mjs'
 
@@ -35,6 +36,14 @@ const integrity = {}
 for (const file of ['worker.js', 'esbuild.wasm', 'sdk-snapshot.json']) {
   integrity[`web-build/${file}`] = sri(fs.readFileSync(path.join(webBuildDist, file)))
 }
+
+// three.js lives only in this worker, fetched the first time a model is built or previewed
+await bundle({
+  entryPoints: [path.join(repo, 'packages/ui/src/three/worker.ts')],
+  outfile: path.join(dist, 'three/worker.js'),
+  bundle: true, minify: true, format: 'iife', target: 'es2022', legalComments: 'none', logLevel: 'warning'
+})
+integrity['three/worker.js'] = sri(fs.readFileSync(path.join(dist, 'three/worker.js')))
 
 const catalog = writePrefabCatalog(path.join(repo, 'packages/desktop/prefabs'), dist)
 integrity[catalog.file] = catalog.integrity

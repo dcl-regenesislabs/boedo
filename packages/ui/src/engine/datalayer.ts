@@ -324,11 +324,27 @@ export function dataLayerWriteTick(): number {
   return writeTick
 }
 
+// the tick of the last write or removal of one path, so a cache can drop just that file
+const pathTicks = new Map<string, number>()
+export function dataLayerPathTick(path: string): number {
+  return pathTicks.get(path) ?? 0
+}
+const writeListeners = new Set<(paths: string[]) => void>()
+export function onDataLayerWrite(listener: (paths: string[]) => void): () => void {
+  writeListeners.add(listener)
+  return () => writeListeners.delete(listener)
+}
+function touched(paths: string[]): void {
+  writeTick += 1
+  for (const path of paths) pathTicks.set(path, writeTick)
+  for (const listener of writeListeners) listener(paths)
+}
+
 export async function dataLayerSaveFileBytes(path: string, content: Uint8Array): Promise<void> {
   const client = await getClient()
   try {
     await client.saveFile({ path, content })
-    writeTick += 1
+    touched([path])
     availableFlag = true
   } catch (e) {
     // Drop the cached client so the next call reconnects, but don't mark the data
@@ -372,6 +388,7 @@ export async function dataLayerListFiles(ignore: string[] = []): Promise<string[
 export async function dataLayerRemoveFile(path: string): Promise<boolean> {
   const client = await getClient()
   const { failed } = await client.removeFiles({ filePaths: [path] })
+  touched([path])
   return !failed.includes(path)
 }
 
@@ -380,5 +397,6 @@ export async function dataLayerRemoveFiles(paths: string[]): Promise<string[]> {
   if (paths.length === 0) return []
   const client = await getClient()
   const { failed } = await client.removeFiles({ filePaths: paths })
+  touched(paths)
   return failed
 }
