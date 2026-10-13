@@ -1,5 +1,5 @@
-# Build installable desktop images (macOS dmg, Windows installer) on every PR
-# and on every push to main, attach them as workflow artifacts, and gate their
+# Build installable desktop images (macOS dmg, Windows installer) when run by
+# hand (Actions → desktop images → Run workflow), attach them as workflow artifacts, and gate their
 # size against the latest main build's measurements (see the `size` job at the
 # bottom; budgets live in app-size.json).
 #
@@ -16,10 +16,10 @@
 # .pfx), WIN_CSC_KEY_PASSWORD.
 name: desktop images
 
+# Manual only: the mac and Windows runners are the slowest, costliest jobs and most changes never
+# touch the desktop app. Tag releases (release.yml) still build both.
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read

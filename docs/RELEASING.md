@@ -27,28 +27,27 @@ under `userData` and installs its deps there.
 
 `npm run size` measures the packaged image (installer, installed,
 per-component breakdown); `npm run size:check` checks it against the
-`app-size.json` budgets. On PRs, CI additionally compares against the latest
-`main` build's measurements (see the CONTRIBUTING link above).
+`app-size.json` budgets. A PR branch built by hand also compares against the latest
+successful `main` build's measurements (see the CONTRIBUTING link above).
 
 ---
 
 ## CI builds
 
-### `desktop-images.yml` — every PR and every push to `main`
+### `validate.yml` — every PR and every push to `main`
 
-Builds a macOS `.dmg` and a Windows `.exe`, uploads them as workflow
-artifacts, and runs the app-size gate.
+`npm run validate` (typecheck, unit tests, build) on Linux.
 
-| Trigger | Signing | mac arches |
-|---|---|---|
-| every PR | always **unsigned** — PR builds see no signing secrets at all (fork PRs can't see secrets anyway, and unsigned is faster for review artifacts) | arm64 only |
-| every push to `main` | signed when the cert secrets exist; mac notarized when **all three** `APPLE_*` secrets exist too | arm64 + x64 |
+### `desktop-images.yml` — by hand
 
-The mac dmgs upload as **separate per-arch artifacts**
-(`bevy-editor-macos-arm64` / `bevy-editor-macos-x64`) so a download is one
-architecture, not both (the x64 artifact exists on `main` builds only, since
-PRs build arm64 only). Windows uploads as `bevy-editor-windows`. On PRs a
-sticky per-platform comment links the artifact download.
+Run it from Actions → **desktop images** → Run workflow, on the branch to test.
+It builds a macOS `.dmg` and a Windows `.exe`, uploads them as workflow
+artifacts, and runs the app-size gate. These manual builds are **unsigned**
+(signing is for `push` builds, and release builds come from `release.yml`), mac
+arm64 only.
+
+The mac dmg uploads as `bevy-editor-macos-arm64` and Windows as
+`bevy-editor-windows`.
 
 These builds are the place to **smoke-test before releasing** — see the rules
 below.

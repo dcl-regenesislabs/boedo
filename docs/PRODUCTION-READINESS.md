@@ -7,7 +7,7 @@ everything is done.
 > **Status:** the codebase is well-architected, type-safe, builds + tests clean
 > from the root, and has been hardened on the points below. It is **ready to hand
 > off and develop against**, and it **is packaged for distribution**: CI produces
-> installable macOS/Windows images on every PR and `main` push, with signing +
+> installable macOS/Windows images on demand and on every release, with signing +
 > notarization wired behind repo secrets (see README "Desktop images & releases").
 
 ---
@@ -59,7 +59,7 @@ hold up and were **not** acted on as written:
 ### 1. Distribution & packaging — ✅ done (see README "Desktop images & releases")
 
 Implemented with `electron-builder` (`packages/desktop/electron-builder.yml`):
-`.dmg` (arm64 + x64) and Windows NSIS `.exe` on every PR and `main` push
+`.dmg` (arm64 + x64) and Windows NSIS `.exe` built by hand
 (`.github/workflows/desktop-images.yml`), GitHub Releases on `v*` tags
 (`release.yml`). Images bundle the engine package, UI, templates, the editor
 scene (contract vendored in, first-run copy to `userData`), and a Node runtime
