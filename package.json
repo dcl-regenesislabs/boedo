@@ -1,6 +1,7 @@
 {
   "name": "dcl-editor",
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "private": true,
   "description": "Decentraland scene editor — monorepo (in-world web + Electron desktop). The engine (bevy-explorer) is an external dependency consumed as a wasm build.",
   "workspaces": [

@@ -1,0 +1,6 @@
+bevy-editor
+Copyright 2026 Decentraland Regenesis Labs
+
+This product includes software developed by Decentraland Regenesis Labs.
+packages/service/skills bundles Decentraland SDK skills under their own Apache-2.0 license
+(packages/service/skills/LICENSE).

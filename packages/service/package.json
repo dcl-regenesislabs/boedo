@@ -1,6 +1,7 @@
 {
   "name": "@dcl-editor/service",
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "private": true,
   "description": "Private per-wallet project storage for the web editor: content-addressed files and a versioned manifest behind Decentraland signed fetch. Runs on Node 24 (filesystem) and Cloudflare Workers (R2).",
   "type": "module",

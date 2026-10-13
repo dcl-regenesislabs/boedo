@@ -1,6 +1,7 @@
 {
   "name": "@dcl-editor/web",
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "private": true,
   "description": "The editor's web target: the editor UI as one ES module (editor.js) that a page already running the engine loads and mounts, plus the files it serves next to it (in-browser build, editor scene).",
   "type": "module",

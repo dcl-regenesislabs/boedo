@@ -1,6 +1,7 @@
 {
   "name": "@dcl-editor/web-build",
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "private": true,
   "description": "In-browser scene build: bundles an SDK7 scene with esbuild-wasm in a Web Worker over an in-memory file system, and writes the result into the preview realm store the service worker serves.",
   "type": "module",

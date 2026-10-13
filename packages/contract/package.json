@@ -1,6 +1,7 @@
 {
   "name": "@dcl-editor/contract",
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "private": true,
   "description": "Single source of truth for the editor's cross-process contracts: the page↔scene editor bus protocol and the Electron host↔renderer IPC surface.",
   "type": "module",

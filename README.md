@@ -303,3 +303,7 @@ bevy-explorer engine). To build from source or contribute:
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — how the pieces fit together
 - [`AGENTS.md`](./AGENTS.md) — the modify → build → validate loop (for AI
   agents and humans alike)
+
+## License
+
+Apache-2.0: see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE). Copyright 2026 Decentraland Regenesis Labs.

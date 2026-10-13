@@ -1,6 +1,7 @@
 {
   "name": "@dcl-editor/scene",
   "version": "1.0.0",
+  "license": "Apache-2.0",
   "description": "Super-user SDK7 scene: the editor's in-engine agent (gizmos, markers, overlays, CRDT bridge)",
   "scripts": {
     "start": "sdk-commands start",
