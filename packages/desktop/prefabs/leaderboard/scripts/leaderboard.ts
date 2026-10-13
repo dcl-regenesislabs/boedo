@@ -19,7 +19,8 @@ import { mountLeaderboardHud } from './leaderboard-hud'
 
 const NAME_REFRESH_S = 1
 
-const EMPTY = 'Nothing to show yet — set the board key the server writes to.'
+const EMPTY_TIMES = 'No times yet — be the first!'
+const EMPTY_SCORES = 'No scores yet — be the first!'
 
 export class Leaderboard {
   private panel: Entity | null = null
@@ -77,7 +78,7 @@ export class Leaderboard {
     const rows = boardRows(game.state[runs ? runBoardKey(this.courseId) : this.boardKey], sort, clampRows(this.rows))
       .map((row) => ({ ...row, name: playerName(row.player) ?? row.name }))
     return { title: this.title, sort, rows,
-      empty: runs ? 'Complete a run to set the first time.' : EMPTY }
+      empty: sort === 'asc' ? EMPTY_TIMES : EMPTY_SCORES }
   }
 
   // The text lives on a child so the model can be replaced without touching it.
@@ -97,6 +98,6 @@ export class Leaderboard {
       shape.text = text
       return
     }
-    TextShape.createOrReplace(panel, { text, fontSize: 0.8 })
+    TextShape.createOrReplace(panel, { text, fontSize: 0.6, textWrapping: true, width: 1.5 })
   }
 }

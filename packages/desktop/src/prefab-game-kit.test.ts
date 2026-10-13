@@ -854,7 +854,7 @@ describe('Leaderboard', () => {
     const module = await vi.importActual<LeaderboardModule>('../prefabs/leaderboard/scripts/leaderboard')
     const board = new module.Leaderboard('', 4, 'Course Times', 'unused', 'desc', 8, 'Run best times', 'race')
     board.start()
-    expect(String(host.textShape.get(5).text)).toContain('Complete a run')
+    expect(String(host.textShape.get(5).text)).toContain('No times yet — be the first!')
     await arrive('run:race:leaderboard', [{ player: 'bo', score: 30 }, { player: 'ana', score: 12.5 }])
     expect(String(host.textShape.get(5).text)).toContain('1. ana   0:12')
     expect(String(host.textShape.get(5).text)).toContain('2. bo   0:30')
@@ -879,7 +879,7 @@ describe('Leaderboard', () => {
     host.textShape.create(5, { text: '' })
     const board = await place('bestTimes', 'asc')
     board.start()
-    expect(String(host.textShape.get(5).text)).toContain('Nothing to show yet')
+    expect(String(host.textShape.get(5).text)).toContain('No times yet — be the first!')
 
     await arrive('bestTimes', [{ p: 'bo', time: 95 }, { p: 'ana', time: 12 }])
 
@@ -897,6 +897,6 @@ describe('Leaderboard', () => {
     board.start()
 
     await arrive('leaderboard', [{ p: 'ana', score: 3 }])
-    expect(String(host.textShape.get(5).text)).toContain('Nothing to show yet')
+    expect(String(host.textShape.get(5).text)).toContain('No scores yet — be the first!')
   })
 })

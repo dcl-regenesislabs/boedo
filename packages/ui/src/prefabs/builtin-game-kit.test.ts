@@ -332,13 +332,12 @@ describe('the leaderboard', () => {
     expect(asc).toBe('BEST TIMES\n\n1. ana   1:35')
   })
 
-  // The empty state is the card's teaching line: it must name the next gesture.
   it('paints its empty state, and the panel ships with the same words', () => {
-    expect(renderPanel('Leaderboard', [], 'desc', 'Nothing to show yet — set the board key your game writes to.')).toBe(
-      'LEADERBOARD\n\nNothing to show yet — set the board key your game writes to.'
+    expect(renderPanel('Leaderboard', [], 'desc', 'No scores yet — be the first!')).toBe(
+      'LEADERBOARD\n\nNo scores yet — be the first!'
     )
     const text = composite(FOLDER).components.find((component) => component.name === 'core::TextShape')
     const json = text?.data['513']?.json
-    expect(isRecord(json) && String(json.text)).toContain('Nothing to show yet — set the board key')
+    expect(isRecord(json) && String(json.text)).toContain('No scores yet — be the first!')
   })
 })
