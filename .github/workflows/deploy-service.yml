@@ -4,8 +4,8 @@
 # /health answers with the tag it just deployed.
 #
 # Repository secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY (a key only this workflow uses) and
-# DEPLOY_KNOWN_HOSTS (`ssh-keyscan <host>`). Variables: DEPLOY_DIR (the copy on the droplet, e.g.
-# /opt/dcl-editor) and SERVICE_URL (its public base, e.g. https://web-editor-dev.dclregenesislabs.xyz).
+# DEPLOY_KNOWN_HOSTS (`ssh-keyscan <host>`). Variable: DEPLOY_DIR (the copy on the droplet, e.g.
+# /opt/dcl-editor).
 name: deploy-service
 
 on:
@@ -56,14 +56,15 @@ jobs:
           ssh -i ~/.ssh/deploy "$TARGET" "cd '$DIR/packages/service' && \
             files='-f compose.yaml'; [ -f compose.override.yaml ] && files=\"\$files -f compose.override.yaml\"; \
             SERVICE_VERSION='$GITHUB_REF_NAME' docker compose \$files up --build -d --force-recreate"
+      # on the droplet itself: Cloudflare answers GitHub's runners with a 403
       - name: Check /health names this release
         env:
-          URL: ${{ vars.SERVICE_URL }}
+          TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
         run: |
           for i in $(seq 1 30); do
-            version=$(curl -fsS "$URL/health" | jq -r '.version // empty' || true)
+            version=$(ssh -i ~/.ssh/deploy "$TARGET" 'curl -fsS http://127.0.0.1:8787/health' | jq -r '.version // empty' || true)
             if [ "$version" = "$GITHUB_REF_NAME" ]; then echo "live: $version"; exit 0; fi
             sleep 10
           done
-          echo "::error::$URL/health answers '${version:-nothing}', expected $GITHUB_REF_NAME"
+          echo "::error::the droplet's /health answers '${version:-nothing}', expected $GITHUB_REF_NAME"
           exit 1
