@@ -11,6 +11,7 @@
 //     thing in the editor. The list of relevant files is the cheap change
 //     detector; a TTL catches edits made to a file's contents.
 import { isRuntimeEntity, provenanceBaseline, state } from '@scene/state'
+import { isReservedEntity } from '@dcl-editor/contract'
 import { dataLayerAvailable, dataLayerListFiles, dataLayerReadFile, dataLayerWriteTick } from '../../engine/datalayer'
 import { authoredOnly } from '../../prefabs/capture'
 import { prefabFoldersIn, readPrefabFolder } from '../../prefabs/storage'
@@ -89,7 +90,7 @@ export async function collectSceneCheckContext(): Promise<SceneCheckContext | nu
   const { prefabs, scripts } = await readProject()
   const baseline = provenanceBaseline()
   return {
-    snapshot: authoredOnly(state.snapshot, (id) => Number(id) >= 512 && isRuntimeEntity(id, baseline)),
+    snapshot: authoredOnly(state.snapshot, (id) => !isReservedEntity(id) && isRuntimeEntity(id, baseline)),
     prefabs,
     scripts,
     gameConfig: findGameConfig(state.snapshot)?.value ?? null,

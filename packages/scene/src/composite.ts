@@ -8,6 +8,7 @@ import * as ecs from '@dcl/sdk/ecs'
 import { Composite } from '@dcl/sdk/ecs'
 import { customComponentDefs, isCustomComponent } from './custom-components'
 import { projectInert } from './inert'
+import { isReservedEntity } from './bridge-protocol'
 import { state } from './state'
 
 type CompositeDef = { componentName: string; jsonSchema: unknown }
@@ -68,11 +69,10 @@ export function snapshotComponentName(compositeName: string): string | undefined
 
 type AuthoredData = Record<string, Record<string, unknown>>
 
-// Entities 1..511 are reserved for the engine (player, camera, etc.) — they're referenced by
-// scenes but never authored, and writing scene components onto them breaks composite instancing.
-// The authored set is the root (0) plus scene entities (>=512).
+// Reserved entities (player, camera, etc.) are referenced by scenes but never authored, and writing
+// scene components onto them breaks composite instancing. The authored set is the root plus scene entities.
 export function isAuthoredEntity(eid: number): boolean {
-  return eid === 0 || eid >= 512
+  return eid === 0 || (Number.isFinite(eid) && !isReservedEntity(eid))
 }
 
 // Whether a component is one we can author into a composite: we must have its SDK definition (for

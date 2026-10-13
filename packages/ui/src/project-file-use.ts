@@ -1,5 +1,5 @@
 // Who still needs a project file, so deleting one can say what it would break.
-import { object } from '@dcl-editor/contract'
+import { isReservedEntity, object } from '@dcl-editor/contract'
 import { state } from '@scene/state'
 import { entityName } from '@scene/custom-components'
 import { dataLayerListFiles, dataLayerReadFile, dataLayerRemoveFiles, dataLayerWriteTick } from './engine/datalayer'
@@ -12,7 +12,7 @@ const BUILT = /^models\/([a-z0-9-]+)-[0-9a-f]{8}\.glb$/
 
 export async function fileUsers(path: string): Promise<{ entities: string[]; scripts: string[] }> {
   const entities = Object.entries(state.snapshot)
-    .filter(([id, c]) => Number(id) >= 512 && object(c.GltfContainer) && c.GltfContainer.src === path)
+    .filter(([id, c]) => !isReservedEntity(id) && object(c.GltfContainer) && c.GltfContainer.src === path)
     .map(([id]) => entityName(state.snapshot, id) ?? `#${id}`)
   const files = await dataLayerListFiles(IGNORED_DIRS)
   const scripts: string[] = []

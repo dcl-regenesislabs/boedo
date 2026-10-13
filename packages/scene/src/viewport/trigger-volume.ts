@@ -24,6 +24,7 @@ import {
 } from '@dcl/sdk/ecs'
 import { Vector3, Color4 } from '@dcl/sdk/math'
 import { state } from '../state'
+import { isReservedEntity } from '../bridge-protocol'
 import { worldTransformOf } from '../world-pos'
 import { TRIGGER_AREA } from '../allowed-components'
 import { TRIGGER_SPHERE } from './zone-pick'
@@ -100,7 +101,7 @@ function shownTriggers(): string[] {
   const selected: string[] = []
   const rest: string[] = []
   for (const [id, comps] of Object.entries(state.snapshot)) {
-    if (comps[TRIGGER_AREA] === undefined || Number(id) < 512) continue
+    if (comps[TRIGGER_AREA] === undefined || isReservedEntity(id)) continue
     if (state.selected.has(id)) selected.push(id)
     else rest.push(id)
   }

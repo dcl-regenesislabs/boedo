@@ -1,4 +1,4 @@
-import { object } from '@dcl-editor/contract'
+import { isReservedEntity, object } from '@dcl-editor/contract'
 import { state, componentKey, isUiEntity, isRuntimeEntity, provenanceBaseline } from '@scene/state'
 import { buildFromSchema, getSchema, type ComponentSchema } from '@scene/schema'
 import { cmd } from '@ui/engine/cmd'
@@ -26,7 +26,7 @@ import type { AssistantSceneSettings } from '../shell/scene-json'
 function entity(ref: unknown): string {
   if (typeof ref !== 'string') throw new Error('An entity id or unique name is required.')
   const id = resolveEntityRef(state.snapshot, ref)
-  if (id === null || Number(id) < 512 || isUiEntity(state.snapshot, id)) throw new Error('No editable entity matches that reference.')
+  if (id === null || isReservedEntity(id) || isUiEntity(state.snapshot, id)) throw new Error('No editable entity matches that reference.')
   return id
 }
 
@@ -131,7 +131,7 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     // the editor's own scene checks, as the Scene checks card shows them
     const findings = await refreshSceneChecks()
     const baseline = provenanceBaseline()
-    const authored = Object.entries(state.snapshot).filter(([id]) => Number(id) >= 512 && !isRuntimeEntity(id, baseline))
+    const authored = Object.entries(state.snapshot).filter(([id]) => !isReservedEntity(id) && !isRuntimeEntity(id, baseline))
     const models = authored.filter(([, c]) => object(c.GltfContainer) && typeof c.GltfContainer.src === 'string')
     return {
       visuals: {
@@ -152,7 +152,7 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     const match = typeof request.match === 'string' ? request.match.toLowerCase() : ''
     const offset = typeof request.offset === 'number' && request.offset > 0 ? Math.floor(request.offset) : 0
     const entries = Object.entries(state.snapshot).filter(([id]) =>
-      Number(id) >= 512 && !isUiEntity(state.snapshot, id) && (entityName(state.snapshot, id) ?? '').toLowerCase().includes(match))
+      !isReservedEntity(id) && !isUiEntity(state.snapshot, id) && (entityName(state.snapshot, id) ?? '').toLowerCase().includes(match))
     return {
       selected: [...state.selected], editMode: state.frozen, total: entries.length, offset,
       entities: entries.slice(offset, offset + 150).map(([id, components]) => ({

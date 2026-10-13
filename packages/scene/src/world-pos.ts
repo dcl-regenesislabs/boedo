@@ -1,5 +1,6 @@
 import { Vector3, Quaternion } from '@dcl/sdk/math'
 import { type Snapshot, isUiEntity } from './state'
+import { isReservedEntity } from './bridge-protocol'
 import { NAME_COMPONENT } from './custom-components'
 import { rotateVec3ByQuat } from './camera/perspective-to-screen'
 
@@ -216,11 +217,11 @@ function isZeroOffset(t: TransformValue): boolean {
   return Math.abs(p.x) + Math.abs(p.y) + Math.abs(p.z) < 1e-5
 }
 
-// Whether to draw a marker for an entity: skip reserved entities (< 512) and
+// Whether to draw a marker for an entity: skip reserved entities and
 // skip nested entities that sit exactly on their parent (a non-root parent with
 // no positional offset), whose marker would just overlap the parent's.
 export function shouldMark(snapshot: Snapshot, id: string): boolean {
-  if (Number(id) < 512) return false
+  if (isReservedEntity(id)) return false
   // only authored entities (those with a Name) are selectable/markable
   if (snapshot[id]?.[NAME_COMPONENT] === undefined) return false
   // UI nodes (leaderboard rows, buttons…) are not world objects — selecting
