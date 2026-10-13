@@ -9,6 +9,7 @@ import type { ThreeReply, ThreeRequest } from './protocol'
 import { lockDown, refusedSyntax } from './sandbox'
 import { isLibraryName, LIBRARY, libraryMaterialName, metresPerTile, surface, type LibraryName, type MaterialMap } from './materials'
 import { boxProjectUVs, externalizeLibraryImages } from './library-glb'
+import { checkCanvasSize } from './build-passes'
 
 type Axis = 'x' | 'y' | 'z'
 const STEPS = 24
@@ -82,7 +83,10 @@ const addons = {
   material: libraryMaterial,
   RoundedBoxGeometry, mergeGeometries, mergeVertices,
   Brush, Evaluator, ADDITION, SUBTRACTION, INTERSECTION,
-  canvas: (width: number, height: number) => new OffscreenCanvas(width, height),
+  canvas: (width: number, height: number) => {
+    checkCanvasSize(width, height)
+    return new OffscreenCanvas(width, height)
+  },
   // tracks for an AnimationClip; a part moves around its own origin, so put it in a group at the pivot
   spin: (node: THREE.Object3D, o: { axis?: Axis; seconds?: number } = {}) => turned(node, o.axis ?? 'y', (p) => p, o.seconds ?? 4),
   swing: (node: THREE.Object3D, o: { axis?: Axis; degrees?: number; seconds?: number } = {}) =>
