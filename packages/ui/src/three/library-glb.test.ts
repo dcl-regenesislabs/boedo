@@ -47,7 +47,10 @@ describe('library images leaving a GLB', () => {
     const { glb: out, used } = externalizeLibraryImages(glb())
     const { json, bin, slice, length } = read(out)
     expect(used).toEqual(['stone-blocks'])
-    expect(json.images.slice(0, 2).map((image: { uri: string }) => image.uri)).toEqual(['materials/stone-blocks/color.jpg', 'materials/stone-blocks/normal.jpg'])
+    expect(json.images.slice(0, 2)).toEqual([
+      { uri: 'materials/T_StoneBlocks_D.jpg', name: 'T_StoneBlocks_D' },
+      { uri: 'materials/T_StoneBlocks_N.jpg', name: 'T_StoneBlocks_N' }
+    ])
     expect(slice(0)).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
     expect(slice(3)).toEqual([7, 7, 7, 7])
     expect(bin.length).toBe(12)
