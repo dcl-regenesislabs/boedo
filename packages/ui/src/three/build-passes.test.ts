@@ -102,13 +102,22 @@ describe('a model build', () => {
       expect(n.subVectors(c, b).cross(a.clone().sub(b)).dot(new THREE.Vector3().fromBufferAttribute(normal, index[i]))).toBeGreaterThan(0)
     }
   })
-  it('exports a model whose +x is the scene\'s east and +z its north, with a plane\'s face still reading forward', async () => {
+  it('exports a model whose +x is the scene\'s east and +z its north, with a plane\'s face still reading forward and shared skeletons and tracks turned once', async () => {
     const east = Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2)), { name: 'East' })
     east.position.set(1, 0, 0)
     const sign = Object.assign(new THREE.Mesh(new THREE.PlaneGeometry()), { name: 'Sign' })
     sign.position.set(0, 0, 1)
     const root = new THREE.Group().add(east, sign)
     const clip = new THREE.AnimationClip('Slide', 1, [new THREE.VectorKeyframeTrack('East.position', [0, 1], [1, 0, 0, 2, 0, 0])])
+    const bone = new THREE.Bone()
+    const skeleton = new THREE.Skeleton([bone], [new THREE.Matrix4().makeTranslation(1, 0, 0)])
+    const skinned = [0, 1].map(() => new THREE.SkinnedMesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()))
+    for (const mesh of skinned) mesh.bind(skeleton, new THREE.Matrix4())
+    const values = new Float32Array([1, 0, 0])
+    const echoes = ['A', 'B'].map((name) => Object.assign(new THREE.VectorKeyframeTrack(`${name}.position`, [0], [0, 0, 0]), { values }))
+    toSceneAxes(new THREE.Group().add(bone, ...skinned), [new THREE.AnimationClip('Echo', 1, echoes)])
+    expect(new THREE.Vector3().setFromMatrixPosition(skeleton.boneInverses[0]).x).toBe(-1)
+    expect(values[0]).toBe(-1)
     toSceneAxes(root, [clip])
     const glb = await new GLTFExporter().parseAsync(root, { binary: true, animations: [clip] })
     const gltf = await new GLTFLoader().parseAsync(glb as ArrayBuffer, '')

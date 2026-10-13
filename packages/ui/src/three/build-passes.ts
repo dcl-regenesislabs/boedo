@@ -84,8 +84,9 @@ export function toSceneAxes(root: THREE.Object3D, clips: readonly THREE.Animatio
     for (let i = 0; i < attribute.count; i++) attribute[`set${component}`](i, -attribute[`get${component}`](i))
   }
   const done = new Map<string, THREE.BufferGeometry>()
-  const mirrored = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => {
-    let out = done.get(geometry.uuid)
+  const mirrored = (geometry: THREE.BufferGeometry, faces: boolean): THREE.BufferGeometry => {
+    const key = `${geometry.uuid}:${faces}`
+    let out = done.get(key)
     if (out !== undefined) return out
     const copy = geometry.clone()
     for (const name of ['position', 'normal'] as const) {
@@ -99,13 +100,16 @@ export function toSceneAxes(root: THREE.Object3D, clips: readonly THREE.Animatio
       if (!/^uv\d*$/.test(name)) continue
       for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i))
     }
-    out = flipped(copy, false)
-    done.set(geometry.uuid, out)
+    // lines and points have no faces to turn, and their vertex order is their shape
+    out = faces ? flipped(copy, false) : copy
+    done.set(key, out)
     return out
   }
+  const skeletons = new Set<THREE.Skeleton>()
   root.traverse((node) => {
     node.position.x = -node.position.x
     node.quaternion.set(node.quaternion.x, -node.quaternion.y, -node.quaternion.z, node.quaternion.w)
+    if (!node.matrixAutoUpdate) conjugate(node.matrix)
     if (node instanceof THREE.InstancedMesh) {
       const matrix = new THREE.Matrix4()
       for (let i = 0; i < node.count; i++) {
@@ -116,11 +120,18 @@ export function toSceneAxes(root: THREE.Object3D, clips: readonly THREE.Animatio
     if (node instanceof THREE.SkinnedMesh) {
       conjugate(node.bindMatrix)
       conjugate(node.bindMatrixInverse)
-      for (const inverse of node.skeleton.boneInverses) conjugate(inverse)
+      if (!skeletons.has(node.skeleton)) {
+        skeletons.add(node.skeleton)
+        for (const inverse of node.skeleton.boneInverses) conjugate(inverse)
+      }
     }
-    if (node instanceof THREE.Mesh) node.geometry = mirrored(node.geometry)
+    if ('geometry' in node && node.geometry instanceof THREE.BufferGeometry) node.geometry = mirrored(node.geometry, node instanceof THREE.Mesh)
   })
+  // a track keeps the values array it was given, so tracks can share one
+  const turnedValues = new Set<ArrayLike<number>>()
   for (const track of new Set(clips.flatMap((clip) => clip.tracks))) {
+    if (turnedValues.has(track.values)) continue
+    turnedValues.add(track.values)
     const { propertyName, propertyIndex } = THREE.PropertyBinding.parseTrackName(track.name)
     const turned = propertyName === 'position' ? ['x'] : propertyName === 'quaternion' ? ['y', 'z'] : []
     const stride = propertyName === 'position' ? 3 : 4
