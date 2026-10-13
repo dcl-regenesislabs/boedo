@@ -1,8 +1,8 @@
 // Who still needs a project file, so deleting one can say what it would break.
-import { object } from '@dcl-editor/contract'
+import { isReservedEntity, object } from '@dcl-editor/contract'
 import { state } from '@scene/state'
 import { entityName } from '@scene/custom-components'
-import { dataLayerListFiles, dataLayerReadFile, dataLayerRemoveFiles, dataLayerWriteTick } from './engine/datalayer'
+import { dataLayerListFiles, dataLayerReadFile, dataLayerRemoveFiles } from './engine/datalayer'
 import { IGNORED_DIRS } from './script/project-files'
 import { materialTextureFiles, modelImageFiles } from './scene-budget'
 
@@ -10,9 +10,14 @@ const SCRIPT = /^src\/.*\.(ts|tsx|js)$/
 // a model the assistant built in code: models/<name>-<hash>.glb, its script models/src/<name>.js
 const BUILT = /^models\/([a-z0-9-]+)-[0-9a-f]{8}\.glb$/
 
+const fileFields: [component: string, field: string][] = [['GltfContainer', 'src'], ['AudioSource', 'audioClipUrl'], ['AudioStream', 'url']]
+
 export async function fileUsers(path: string): Promise<{ entities: string[]; scripts: string[] }> {
   const entities = Object.entries(state.snapshot)
-    .filter(([id, c]) => Number(id) >= 512 && object(c.GltfContainer) && c.GltfContainer.src === path)
+    .filter(([id, c]) => !isReservedEntity(id) && fileFields.some(([component, field]) => {
+      const value = c[component]
+      return object(value) && value[field] === path
+    }))
     .map(([id]) => entityName(state.snapshot, id) ?? `#${id}`)
   const files = await dataLayerListFiles(IGNORED_DIRS)
   const scripts: string[] = []
@@ -71,9 +76,15 @@ export async function olderBuilds(): Promise<string[]> {
   return files.filter((f) => !placed.has(f) && building.has(BUILT.exec(f)?.[1] ?? ''))
 }
 
-// what the dock's unused-files check depends on: any file change, or a different set of placed models or Material images
+// only writes the scan reads count, so an autosave of the scene does not rescan every model
+let filesTick = 0
+export function noteFileWrite(paths: string[]): void {
+  if (paths.some((p) => MODEL.test(p) || MATERIAL_IMAGE.test(p) || SCRIPT.test(p))) filesTick++
+}
+
+// what the unused-files scan depends on: a model, material image or script written, or a different set of placed models or Material images
 export function unusedModelsKey(): string {
-  return `${dataLayerWriteTick()}|${[...placedModels()].sort().join(',')}|${[...materialImagesInUse()].sort().join(',')}`
+  return `${filesTick}|${[...placedModels()].sort().join(',')}|${[...materialImagesInUse()].sort().join(',')}`
 }
 
 // A built model's script goes with its last build, and a model's shared material images with the last model using them.

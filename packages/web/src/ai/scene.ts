@@ -1,4 +1,4 @@
-import { object } from '@dcl-editor/contract'
+import { isReservedEntity, object } from '@dcl-editor/contract'
 import { state, componentKey, isUiEntity, isRuntimeEntity, provenanceBaseline } from '@scene/state'
 import { buildFromSchema, getSchema, type ComponentSchema } from '@scene/schema'
 import { cmd } from '@ui/engine/cmd'
@@ -12,7 +12,8 @@ import { inspectModel } from '@ui/model-info'
 import { announceBuiltModel } from '@ui/features/ai/built-models'
 import { buildCodeModel, overBudget, MODEL_BUDGET } from './code-model'
 import { MATERIAL_MAPS, materialFile } from '@ui/three/materials'
-import { materialBytes } from './material-files'
+import { materialBytes, soundBytes } from './library-files'
+import { SOUNDS, isSoundName, soundInfo, soundProjectPath } from '@ui/sounds'
 import { modelImagePath, sceneBudget, sceneTextures } from '@ui/scene-budget'
 import { isFlatModel, searchModels } from './model-search'
 import { sendToScene } from '@ui/engine/bus'
@@ -25,7 +26,7 @@ import type { AssistantSceneSettings } from '../shell/scene-json'
 function entity(ref: unknown): string {
   if (typeof ref !== 'string') throw new Error('An entity id or unique name is required.')
   const id = resolveEntityRef(state.snapshot, ref)
-  if (id === null || Number(id) < 512 || isUiEntity(state.snapshot, id)) throw new Error('No editable entity matches that reference.')
+  if (id === null || isReservedEntity(id) || isUiEntity(state.snapshot, id)) throw new Error('No editable entity matches that reference.')
   return id
 }
 
@@ -130,7 +131,7 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     // the editor's own scene checks, as the Scene checks card shows them
     const findings = await refreshSceneChecks()
     const baseline = provenanceBaseline()
-    const authored = Object.entries(state.snapshot).filter(([id]) => Number(id) >= 512 && !isRuntimeEntity(id, baseline))
+    const authored = Object.entries(state.snapshot).filter(([id]) => !isReservedEntity(id) && !isRuntimeEntity(id, baseline))
     const models = authored.filter(([, c]) => object(c.GltfContainer) && typeof c.GltfContainer.src === 'string')
     return {
       visuals: {
@@ -151,7 +152,7 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     const match = typeof request.match === 'string' ? request.match.toLowerCase() : ''
     const offset = typeof request.offset === 'number' && request.offset > 0 ? Math.floor(request.offset) : 0
     const entries = Object.entries(state.snapshot).filter(([id]) =>
-      Number(id) >= 512 && !isUiEntity(state.snapshot, id) && (entityName(state.snapshot, id) ?? '').toLowerCase().includes(match))
+      !isReservedEntity(id) && !isUiEntity(state.snapshot, id) && (entityName(state.snapshot, id) ?? '').toLowerCase().includes(match))
     return {
       selected: [...state.selected], editMode: state.frozen, total: entries.length, offset,
       entities: entries.slice(offset, offset + 150).map(([id, components]) => ({
@@ -167,6 +168,14 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
     return { models: searchModels(assets, request.query, limit).map(describe), total: assets.length }
   }
   if (!state.frozen) throw new Error('Stop Play before changing the scene.')
+  if (request.type === 'addSound') {
+    if (!isSoundName(request.name)) throw new Error(`addSound needs name, one of: ${SOUNDS.join(', ')}.`)
+    const path = soundProjectPath(request.name)
+    if (!(await dataLayerListFiles()).includes(path)) await dataLayerSaveFileBytes(path, await soundBytes(request.name))
+    await ensureContentMapped(path)
+    const { durationSeconds, loop } = soundInfo(request.name)
+    return { path, durationSeconds, loop }
+  }
   if (request.type === 'placeModel') {
     if (typeof request.id !== 'string') throw new Error('placeModel needs the id of a findModels result.')
     await loadModelCatalog()

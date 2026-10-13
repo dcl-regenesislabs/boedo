@@ -52,6 +52,15 @@ export interface CameraGesture {
   zoom: number
 }
 
+// SDK7 reserves the first 512 entity ids for the engine and players. Ids carry a version in the
+// upper 16 bits, so a player who rejoins as 65573 is still reserved slot 37.
+export const RESERVED_ENTITIES = 512
+
+export function isReservedEntity(id: number | string): boolean {
+  const n = Number(id)
+  return Number.isFinite(n) && (n & 0xffff) < RESERVED_ENTITIES
+}
+
 export type PageToSceneMessage =
   // page UI announces itself; scene hides its panels and replies scene-ready. baseCorner: the
   // edited scene's base parcel corner in metres, which the world frame is rebuilt from

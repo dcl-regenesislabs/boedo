@@ -1,5 +1,5 @@
 // The scene against the per-parcel limits: triangles and bodies count every placed copy, textures and materials once per file.
-import { object } from '@dcl-editor/contract'
+import { isReservedEntity, object } from '@dcl-editor/contract'
 import { state, isRuntimeEntity, isUiEntity, provenanceBaseline } from '@scene/state'
 import { entityName } from '@scene/custom-components'
 import { dataLayerPathTick, dataLayerReadFileBytes, dataLayerRealm } from './engine/datalayer'
@@ -83,7 +83,7 @@ export async function modelImageFiles(src: string): Promise<string[] | null> {
 function authoredEntities(): [string, Record<string, unknown>][] {
   const baseline = provenanceBaseline()
   return Object.entries(state.snapshot)
-    .filter(([id]) => Number(id) >= 512 && !isRuntimeEntity(id, baseline) && !isUiEntity(state.snapshot, id))
+    .filter(([id]) => !isReservedEntity(id) && !isRuntimeEntity(id, baseline) && !isUiEntity(state.snapshot, id))
 }
 
 export interface ModelRow {

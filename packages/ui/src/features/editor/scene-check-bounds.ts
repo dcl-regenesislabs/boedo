@@ -1,4 +1,5 @@
 import { isUiEntity } from '@scene/state'
+import { isReservedEntity } from '@dcl-editor/contract'
 import { insideParcels } from '@scene/out-of-bounds'
 import { computeWorldPositions } from '@scene/world-pos'
 import { entityName } from '@scene/custom-components'
@@ -14,7 +15,7 @@ export const sceneBoundsCheck: SceneCheck = ({ snapshot, parcels }) => {
   if (positions === null) return []
   const height = MAX_SCENE_HEIGHT
   const flagged = new Set([...positions].flatMap(([id, position]) => {
-    if (Number(id) < 512 || snapshot[id]?.Transform === undefined || isUiEntity(snapshot, id) || snapshot[id]?.[INERT_COMPONENT] !== undefined) return []
+    if (isReservedEntity(id) || snapshot[id]?.Transform === undefined || isUiEntity(snapshot, id) || snapshot[id]?.[INERT_COMPONENT] !== undefined) return []
     return insideParcels(position, parcels) && position.y <= height ? [] : [id]
   }))
   const parentOf = (id: string): string | undefined => {

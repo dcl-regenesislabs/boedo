@@ -3,15 +3,12 @@
 // finds it at all, which is why a scriptless entity used to answer "what does
 // this do?" with "No components on this entity".
 import { SCRIPT_COMPONENT } from '@scene/allowed-components'
+import { isReservedEntity } from '@dcl-editor/contract'
 import { reactive } from '../core/store'
 
-// SDK7 reserves the first ids for the engine. Scene root, Player and Camera are
-// engine surfaces, not entities a creator writes scripts for.
-const FIRST_AUTHORED_ID = 512
-
+// Scene root, Player and Camera are engine surfaces, not entities a creator writes scripts for.
 export function isAuthoredEntity(entityId: string): boolean {
-  const n = Number(entityId)
-  return Number.isFinite(n) && n >= FIRST_AUTHORED_ID
+  return Number.isFinite(Number(entityId)) && !isReservedEntity(entityId)
 }
 
 // Whether the inspector draws a Script card for an entity that has no Script

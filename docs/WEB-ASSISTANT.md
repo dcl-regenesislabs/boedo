@@ -153,14 +153,21 @@ components; see the [service README](../packages/service/README.md).
   are named `<Model>_PartNN` and static parts sharing a material are merged. A rebuild keeps
   the previous file so undo still works; deleting a model also deletes material images
   nothing else uses, and Assets lists unused ones.
+  `addSound` copies one of 25 CC0 sounds from Kenney's packs (mono mp3s, bundled with the editor
+  beside the materials, fetched against their hashes) into `assets/audio/library/<name>.mp3` if it is not
+  there yet, and answers its path, length and whether it loops. The prompt lists the names and has
+  the assistant play them with an AudioSource: created once, retriggered with `AudioSource.playSound`.
+  `packages/ui/scripts/pack-sounds.mjs` regenerates them; the packs have no wind, crowd, water or
+  music loop, so the library has none.
   `check` also returns the scene's budget against the parcel limits and its deploy size.
 - `build`: compile the current browser project, run the bundle once and return compiler
   diagnostics plus scene/client/server errors. This does not simulate a full playthrough.
 - `view`: capture the viewport, optionally framing an entity or setting the camera pose.
   There is no shell, package installation, deletion or publishing tool.
 - `playtest`: start or stop Play, read the player's position, HUD and runtime errors,
-  walk with the movement controller, hold movement/jump keys, or click a viewport
-  position. Each movement or wait lasts at most five seconds. Stop restores the
+  walk on the ground with the movement controller, press the E/F interaction keys,
+  or click a viewport position. It cannot jump or steer with movement keys: routes
+  that need a jump are left for the creator to try. Each movement or wait lasts at most five seconds. Stop restores the
   authored scene; playtest actions do not grant progress or teleport the player.
   A client reload can retain multiplayer server progress. Use the game's restart
   control and verify its initial HUD before testing a fresh attempt.

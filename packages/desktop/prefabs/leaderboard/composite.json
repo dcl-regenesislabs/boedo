@@ -53,8 +53,10 @@
       "data": {
         "513": {
           "json": {
-            "text": "LEADERBOARD\n\nNothing to show yet — set the board key your game writes to.",
-            "fontSize": 0.8,
+            "text": "LEADERBOARD\n\nNo scores yet — be the first!",
+            "fontSize": 0.6,
+            "textWrapping": true,
+            "width": 1.5,
             "textColor": { "r": 0.08, "g": 0.09, "b": 0.11, "a": 1 },
             "outlineColor": { "r": 1, "g": 1, "b": 1 },
             "outlineWidth": 0

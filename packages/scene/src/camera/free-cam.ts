@@ -15,6 +15,7 @@ import { Quaternion, Vector3 } from '@dcl/sdk/math'
 import { state } from '../state'
 import { worldTransformOf, computeWorldPositions, rootLocalForWorld } from '../world-pos'
 import { cameraFovY } from './camera-projection'
+import { CAMERA_FLOOR, minOrbitPitch } from './ground'
 import { rotateVec3ByQuat } from './perspective-to-screen'
 import type { CameraGesture } from '../bridge-protocol'
 
@@ -111,6 +112,8 @@ function lookRotation(): Quaternion {
   return Quaternion.multiply(yawQ, pitchQ)
 }
 
+const aboveFloor = (p: Vector3): Vector3 => (p.y >= CAMERA_FLOOR ? p : Vector3.create(p.x, CAMERA_FLOOR, p.z))
+
 function aimAlong(dir: Vector3): void {
   const horiz = Math.sqrt(dir.x * dir.x + dir.z * dir.z)
   yaw = Math.atan2(dir.x, dir.z)
@@ -133,6 +136,12 @@ function startTween(toPos: Vector3, lookDir: Vector3): void {
     toPitch: clampPitch(Math.atan2(-lookDir.y, horiz)),
     elapsed: 0
   }
+}
+
+// A move that would end underground ends on the floor instead, aimed at what it frames.
+function startTweenAbove(toPos: Vector3, lookDir: Vector3, focus: Vector3): void {
+  const to = aboveFloor(toPos)
+  startTween(to, to === toPos ? lookDir : Vector3.subtract(focus, to))
 }
 
 // The entity the orbit camera is locked onto. Captured when target mode is
@@ -195,8 +204,8 @@ export function setCameraPose(position: Vector3, lookAt: Vector3 | null): void {
   setCamMode('free')
   tween = null
   const t = Transform.getMutable(camEntity)
-  t.position = { ...position }
-  if (lookAt !== null) aimAlong(Vector3.subtract(lookAt, position))
+  t.position = aboveFloor({ ...position })
+  if (lookAt !== null) aimAlong(Vector3.subtract(lookAt, t.position))
   t.rotation = lookRotation()
 }
 
@@ -248,7 +257,7 @@ export function frameEntityOnce(id: string): void {
   // The camera's OWN forward. Passing it as the look direction makes startTween's
   // yaw/pitch deltas zero, so the tween moves the position and nothing else.
   const forward = Vector3.rotate(Vector3.Forward(), lookRotation())
-  startTween(Vector3.subtract(target, Vector3.scale(forward, standoff)), forward)
+  startTweenAbove(Vector3.subtract(target, Vector3.scale(forward, standoff)), forward, target)
 }
 
 const FRAME_PAD = 2 // metres: entity positions are origins, the meshes reach past them
@@ -271,7 +280,7 @@ export function frameEntitiesOnce(ids: string[]): void {
   const dist = Math.min(Math.max(radius / Math.sin(halfFov), MIN_DIST), FRAME_MAX_DIST)
   setCamMode('free')
   const forward = Vector3.rotate(Vector3.Forward(), lookRotation())
-  startTween(Vector3.subtract(center, Vector3.scale(forward, dist)), forward)
+  startTweenAbove(Vector3.subtract(center, Vector3.scale(forward, dist)), forward, center)
 }
 
 // Free fly takes over exactly where the camera is — no re-framing tween.
@@ -362,9 +371,8 @@ function cameraSystem(dt: number): void {
       yaw = tween.fromYaw + (tween.toYaw - tween.fromYaw) * e
       pitch = tween.fromPitch + (tween.toPitch - tween.fromPitch) * e
       const tw = Transform.getMutable(camEntity)
-      tw.position = Vector3.add(
-        tween.fromPos,
-        Vector3.scale(Vector3.subtract(tween.toPos, tween.fromPos), e)
+      tw.position = aboveFloor(
+        Vector3.add(tween.fromPos, Vector3.scale(Vector3.subtract(tween.toPos, tween.fromPos), e))
       )
       tw.rotation = lookRotation()
       if (u >= 1) tween = null
@@ -405,6 +413,7 @@ function flyStep(dt: number, lookDx: number, lookDy: number, g: CameraGesture): 
     Vector3.add(Vector3.scale(right, g.panX * step), Vector3.scale(Vector3.rotate(Vector3.Up(), rotation), -g.panY * step))
   )
   if (Vector3.lengthSquared(glide) > 0) t.position = Vector3.add(t.position, glide)
+  t.position = aboveFloor(t.position)
   t.rotation = rotation
 }
 
@@ -430,16 +439,20 @@ function orbitStep(dt: number, lookDx: number, lookDy: number, g: CameraGesture)
   if (inputSystem.isPressed(InputAction.IA_BACKWARD)) distance += DOLLY_SPEED * dt
   distance = Math.max(MIN_DIST, distance * Math.exp(-g.zoom * GESTURE_ZOOM))
 
-  const rotation = lookRotation()
-  const forward = Vector3.rotate(Vector3.Forward(), rotation)
   if (g.panX !== 0 || g.panY !== 0) {
-    const right = Vector3.rotate(Vector3.Right(), rotation)
-    const up = Vector3.rotate(Vector3.Up(), rotation)
+    const panRotation = lookRotation()
+    const right = Vector3.rotate(Vector3.Right(), panRotation)
+    const up = Vector3.rotate(Vector3.Up(), panRotation)
     const slide = distance * GESTURE_PAN
     orbitOffset = Vector3.add(orbitOffset, Vector3.add(Vector3.scale(right, g.panX * slide), Vector3.scale(up, -g.panY * slide)))
   }
+  // tilt the eye up out of the ground rather than move it, so the pivot stays centred
+  const pivot = Vector3.add(target, orbitOffset)
+  pitch = Math.max(pitch, minOrbitPitch(pivot.y, distance, PITCH_LIMIT))
+  const rotation = lookRotation()
+  const forward = Vector3.rotate(Vector3.Forward(), rotation)
   const t = Transform.getMutable(camEntity)
-  t.position = Vector3.subtract(Vector3.add(target, orbitOffset), Vector3.scale(forward, distance))
+  t.position = aboveFloor(Vector3.subtract(pivot, Vector3.scale(forward, distance)))
   t.rotation = rotation
 }
 
@@ -464,11 +477,13 @@ function axisUnit(axis: 'x' | 'y' | 'z', sign: number): Vector3 {
 }
 
 // Snap the camera onto a world axis looking at the active selection, framed to
-// fit the whole selection. No-op with no selection.
+// fit the whole selection. No-op with no selection, or from below one on the ground.
 export function orientToAxis(axis: 'x' | 'y' | 'z', sign: number): void {
   if (camEntity === null || state.camMode === 'none') return
   const target = activeTarget()
   if (target === null) return
+  // there is no view from below of something on the ground that stays above it
+  if (axis === 'y' && sign < 0 && target.y < CAMERA_FLOOR + MIN_DIST) return
 
   let radius = 0
   const world = computeWorldPositions(state.snapshot)
@@ -479,8 +494,7 @@ export function orientToAxis(axis: 'x' | 'y' | 'z', sign: number): void {
     }
   }
 
-  const d = fitDistance(radius)
-  if (state.camMode === 'target') distance = d
-  const camPos = Vector3.add(target, Vector3.scale(axisUnit(axis, sign), d))
+  const camPos = aboveFloor(Vector3.add(target, Vector3.scale(axisUnit(axis, sign), fitDistance(radius))))
+  if (state.camMode === 'target') distance = Math.max(MIN_DIST, Vector3.distance(camPos, target))
   startTween(camPos, Vector3.subtract(target, camPos))
 }

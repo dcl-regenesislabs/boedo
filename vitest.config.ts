@@ -25,7 +25,7 @@ export default defineConfig({
     environment: 'node',
     // scripts/ holds repo-level guard tests (file-size gate) next to the
     // config they check
-    include: ['packages/**/src/**/*.test.ts', 'scripts/*.test.mjs'],
+    include: ['packages/**/src/**/*.test.ts', 'packages/web/validate/*.test.ts', 'scripts/*.test.mjs'],
     // the scene build (sdk-commands) and engine assets are not test inputs.
     // staging/ and release/ are COPIES of packages/scene made while packaging —
     // without them excluded the same tests run three times, and a stale copy can

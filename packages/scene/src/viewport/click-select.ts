@@ -28,6 +28,7 @@ import {
 } from '@dcl/sdk/ecs'
 import { cmd } from '../cmd'
 import { log } from '../log'
+import { isReservedEntity } from '../bridge-protocol'
 import { state, selectionClick, selectEntityInTree, clearSelection, setActiveAction, parentOf } from '../state'
 import { hiddenInTree, syncHidden } from './hidden'
 import { NAME_COMPONENT } from '../custom-components'
@@ -195,7 +196,7 @@ function handlePickResult(): void {
   let pickedT = Infinity
   for (const h of ordered) {
     const hit = String(h.entityId)
-    if (!(hit in state.snapshot) || Number(hit) < 512) continue
+    if (!(hit in state.snapshot) || isReservedEntity(hit)) continue
     const id = resolvePick(hit)
     if (id !== null && !lockedInTree(id)) {
       picked = id

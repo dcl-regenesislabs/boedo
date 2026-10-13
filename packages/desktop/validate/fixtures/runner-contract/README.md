@@ -69,8 +69,9 @@ between priority `0` and priority `-100` that the runner actually produced on
 this pin; it never assumes one. Observations are also written to
 `packages/desktop/validate/artifacts/runner-contract-observed.json`.
 
-What the last verified run observed on pin `7.30.2-…commit-24c42ea`, both
-counter-intuitive:
+What the last verified run observed on pin `7.30.2-…commit-24c42ea`; the current
+pin `7.30.2-38470202470.commit-ee06955` ships the same `runtime-script.js` (same
+sha256 in `runner-fingerprint.json`). Both counter-intuitive:
 
 - `start()` — priority **0 ran before** priority −100. `runScripts` iterates
   `Object.entries(scriptsByPriority)`; `'0'` is an integer-index key and JS

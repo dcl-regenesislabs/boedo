@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { connectPreview } from './preview-cdp.mjs'
-import { movementKeys, playerPosition, steerJump } from '../src/ai/movement-keys.ts'
+import { movementKeys, playerPosition, steerJump } from './movement-keys.ts'
 
 const { values } = parseArgs({ options: {
   cdp: { type: 'string', default: 'http://127.0.0.1:9222' },

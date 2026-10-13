@@ -13,6 +13,34 @@ export function checkCanvasSize(width: number, height: number): void {
     '(1, 2, 4, 8, 16, 32, 64, 128, 256 or 512); pick those sizes and draw to fit them.')
 }
 
+const attributeList = (geometry: THREE.BufferGeometry): string => Object.keys(geometry.attributes).sort().join(', ')
+const layout = (a: THREE.BufferAttribute | THREE.InterleavedBufferAttribute): string =>
+  `${a.itemSize}:${String(a.normalized)}:${a.array.constructor.name}`
+
+function mergeFailure(parts: THREE.BufferGeometry[]): string {
+  const first = parts[0]
+  for (let i = 1; i < parts.length; i++) {
+    if (attributeList(parts[i]) !== attributeList(first)) {
+      return `parts have different attributes (part 0: ${attributeList(first)}; part ${i}: ${attributeList(parts[i])}); ` +
+        'give every part the same attributes, or add the odd ones as separate meshes.'
+    }
+    const odd = Object.keys(first.attributes).find((name) => layout(parts[i].getAttribute(name)) !== layout(first.getAttribute(name)))
+    if (odd !== undefined) return `attribute "${odd}" has a different layout in part ${i}; add that part as a separate mesh.`
+  }
+  return 'parts have different morph targets; add them as separate meshes.'
+}
+
+// three's merge returns null when only some parts are indexed (RoundedBoxGeometry never is),
+// and a null geometry fails later with an error that names nothing the script wrote
+export function mergeParts(geometries: THREE.BufferGeometry[], useGroups = false): THREE.BufferGeometry {
+  if (!Array.isArray(geometries) || geometries.length === 0) throw new Error('addons.mergeGeometries: pass an array of at least one geometry.')
+  const mixed = geometries.some((g) => g.index !== null) && geometries.some((g) => g.index === null)
+  const parts = mixed ? geometries.map((g) => (g.index === null ? g : g.toNonIndexed())) : geometries
+  const merged = mergeGeometries(parts, useGroups)
+  if (merged === null) throw new Error(`addons.mergeGeometries: ${mergeFailure(parts)}`)
+  return merged
+}
+
 // Decentraland's client ignores vertex colours, so a model coloured that way would look different there
 export function stripVertexColors(root: THREE.Object3D): string[] {
   let parts = 0
@@ -44,6 +72,74 @@ export function flipped(geometry: THREE.BufferGeometry, turnNormals = true): THR
     for (let i = 0; i < normal.count; i++) normal.setXYZ(i, -normal.getX(i), -normal.getY(i), -normal.getZ(i))
   }
   return out
+}
+
+// Decentraland reads glTF with x negated (left-handed), so x is mirrored here to make the script's +x the
+// scene's east; u turns too, so text and images still read forward from the front
+export function toSceneAxes(root: THREE.Object3D, clips: readonly THREE.AnimationClip[]): void {
+  const mirror = new THREE.Matrix4().makeScale(-1, 1, 1)
+  const conjugate = (m: THREE.Matrix4): THREE.Matrix4 => m.premultiply(mirror).multiply(mirror)
+  const negate = (attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined, component: 'X' | 'Y' | 'Z'): void => {
+    if (attribute === undefined) return
+    for (let i = 0; i < attribute.count; i++) attribute[`set${component}`](i, -attribute[`get${component}`](i))
+  }
+  const done = new Map<string, THREE.BufferGeometry>()
+  const mirrored = (geometry: THREE.BufferGeometry, faces: boolean): THREE.BufferGeometry => {
+    const key = `${geometry.uuid}:${faces}`
+    let out = done.get(key)
+    if (out !== undefined) return out
+    const copy = geometry.clone()
+    for (const name of ['position', 'normal'] as const) {
+      negate(copy.getAttribute(name), 'X')
+      for (const target of copy.morphAttributes[name] ?? []) negate(target, 'X')
+    }
+    // tangent' = -mirror(tangent) once u is turned, which leaves its handedness w as it was
+    negate(copy.getAttribute('tangent'), 'Y')
+    negate(copy.getAttribute('tangent'), 'Z')
+    for (const [name, uv] of Object.entries(copy.attributes)) {
+      if (!/^uv\d*$/.test(name)) continue
+      for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i))
+    }
+    // lines and points have no faces to turn, and their vertex order is their shape
+    out = faces ? flipped(copy, false) : copy
+    done.set(key, out)
+    return out
+  }
+  const skeletons = new Set<THREE.Skeleton>()
+  root.traverse((node) => {
+    node.position.x = -node.position.x
+    node.quaternion.set(node.quaternion.x, -node.quaternion.y, -node.quaternion.z, node.quaternion.w)
+    if (!node.matrixAutoUpdate) conjugate(node.matrix)
+    if (node instanceof THREE.InstancedMesh) {
+      const matrix = new THREE.Matrix4()
+      for (let i = 0; i < node.count; i++) {
+        node.getMatrixAt(i, matrix)
+        node.setMatrixAt(i, conjugate(matrix))
+      }
+    }
+    if (node instanceof THREE.SkinnedMesh) {
+      conjugate(node.bindMatrix)
+      conjugate(node.bindMatrixInverse)
+      if (!skeletons.has(node.skeleton)) {
+        skeletons.add(node.skeleton)
+        for (const inverse of node.skeleton.boneInverses) conjugate(inverse)
+      }
+    }
+    if ('geometry' in node && node.geometry instanceof THREE.BufferGeometry) node.geometry = mirrored(node.geometry, node instanceof THREE.Mesh)
+  })
+  // a track keeps the values array it was given, so tracks can share one
+  const turnedValues = new Set<ArrayLike<number>>()
+  for (const track of new Set(clips.flatMap((clip) => clip.tracks))) {
+    if (turnedValues.has(track.values)) continue
+    turnedValues.add(track.values)
+    const { propertyName, propertyIndex } = THREE.PropertyBinding.parseTrackName(track.name)
+    const turned = propertyName === 'position' ? ['x'] : propertyName === 'quaternion' ? ['y', 'z'] : []
+    const stride = propertyName === 'position' ? 3 : 4
+    track.values.forEach((value, i) => {
+      if (propertyIndex === undefined ? turned.includes('xyzw'[i % stride]) : turned.includes(propertyIndex)) track.values[i] = -value
+    })
+  }
+  root.updateMatrixWorld(true)
 }
 
 const sides = (mesh: THREE.Mesh): THREE.Side[] => [mesh.material].flat().map((material) => material.side)

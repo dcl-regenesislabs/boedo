@@ -6,7 +6,7 @@ import { IconExpand } from '../../icons'
 import { registerCss } from '../../ds/styles/registry'
 import { cmd } from '../../engine/cmd'
 import { engineFrames, type EngineFrames } from '../../engine/engine-frames'
-import { unusedModelFiles, unusedModelsKey } from '../../project-file-use'
+import { useUnusedFiles } from '../../unused-files'
 import { sceneBudget, sceneModels, type ModelRow } from '../../scene-budget'
 import { uiFocusEntity, uiSelectEntity } from '../../actions/selection'
 import { useSceneFindings } from './scene-checks'
@@ -108,7 +108,10 @@ function Dock(): JSX.Element {
   const [budget, setBudget] = useState<Budget | null>(null)
   const [models, setModels] = useState<ModelRow[] | null>(null)
   const [stats, setStats] = useState<{ now: Stats; ticksPerSecond: number | null } | null>(null)
-  const [unused, setUnused] = useState<string[]>([])
+  // collapsed too: the warning count shows there
+  const files = useUnusedFiles()
+  const unused = files.unused ?? []
+  const older = files.older ?? []
 
   useEffect(() => {
     let alive = true
@@ -138,28 +141,6 @@ function Dock(): JSX.Element {
     }
   }, [])
 
-  // rechecked whenever files or placed models change, collapsed too: the warning count shows there
-  useEffect(() => {
-    let alive = true
-    let checkedFor = ''
-    let checking = false
-    const check = async (): Promise<void> => {
-      const key = unusedModelsKey()
-      if (checking || key === checkedFor) return
-      checking = true
-      checkedFor = key
-      const idle = await unusedModelFiles().catch(() => [])
-      checking = false
-      if (alive) setUnused(idle)
-    }
-    void check()
-    const timer = setInterval(() => void check(), REFRESH_MS)
-    return () => {
-      alive = false
-      clearInterval(timer)
-    }
-  }, [])
-
   const select = (id: string): void => {
     uiSelectEntity(id, false, false)
     uiFocusEntity(id)
@@ -173,6 +154,7 @@ function Dock(): JSX.Element {
     ...heavy.map((m) => `${m.src} draws ${Math.round(((m.triangles * m.entities.length) / triangleLimit) * 100)}% of the scene's triangle limit.`),
     ...(models ?? []).flatMap((m) => m.warnings.map((w) => `${m.src}: ${w}`)),
     ...unused.map((f) => `${f} is not used by any entity or script.`),
+    ...(older.length > 0 ? [`${older.length} older build${older.length === 1 ? '' : 's'} of models in the scene ${older.length === 1 ? 'is' : 'are'} kept for undo: delete them from Assets.`] : []),
     ...findings.map((f) => `${f.title}: ${f.detail}`)
   ]
 

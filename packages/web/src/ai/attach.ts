@@ -1,5 +1,6 @@
 import { entityName } from '@scene/custom-components'
 import { isUiEntity, state } from '@scene/state'
+import { isReservedEntity } from '@dcl-editor/contract'
 import { attachScript, refreshScriptEverywhere } from '@ui/script/attach'
 import { attachablePath } from '@ui/script/template'
 
@@ -19,7 +20,7 @@ export function scriptAttacher() {
         await refreshScriptEverywhere(path, content)
         return null
       }
-      if (target === null || Number(target) < 512 || state.snapshot[target] === undefined || isUiEntity(state.snapshot, target)) return null
+      if (target === null || isReservedEntity(target) || state.snapshot[target] === undefined || isUiEntity(state.snapshot, target)) return null
       if (!(await attachScript(target, path, content))) return null
       return { id: target, name: entityName(state.snapshot, target) ?? `#${target}` }
     } catch (error) {

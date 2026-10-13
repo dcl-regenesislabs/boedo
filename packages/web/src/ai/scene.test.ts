@@ -6,6 +6,8 @@ import { inspectModel } from '@ui/model-info'
 import { sceneTextures } from '@ui/scene-budget'
 import { buildCodeModel } from './code-model'
 import { materialFile } from '@ui/three/materials'
+import { dataLayerListFiles, dataLayerSaveFileBytes } from '@ui/engine/datalayer'
+import { soundBytes } from './library-files'
 
 const { setValue, deleteValue, status } = vi.hoisted(() => {
   const status = new Map<string, string>()
@@ -25,8 +27,9 @@ vi.mock('@ui/engine/cmd', () => ({ cmd: { componentSchema: () => Promise.reject(
 vi.mock('@scene/allowed-components', () => ({ isAllowedComponent: () => true }))
 vi.mock('@ui/actions/entities', () => ({ uiAddEntity: vi.fn() }))
 vi.mock('@ui/actions/components', () => ({ uiSetComponentValue: setValue, uiDeleteComponent: deleteValue }))
-vi.mock('@ui/assets', () => ({ importCatalogFile: vi.fn(), loadModelCatalog: vi.fn(async () => []), modelById: vi.fn(() => undefined) }))
-vi.mock('@ui/engine/datalayer', async (real) => ({ ...(await real<object>()), dataLayerReadFileBytes: vi.fn(async () => new Uint8Array(0)) }))
+vi.mock('@ui/assets', () => ({ importCatalogFile: vi.fn(), loadModelCatalog: vi.fn(async () => []), modelById: vi.fn(() => undefined), ensureContentMapped: vi.fn() }))
+vi.mock('@ui/engine/datalayer', async (real) => ({ ...(await real<object>()), dataLayerListFiles: vi.fn(), dataLayerReadFileBytes: vi.fn(async () => new Uint8Array(0)), dataLayerSaveFileBytes: vi.fn() }))
+vi.mock('./library-files', () => ({ materialBytes: vi.fn(), soundBytes: vi.fn() }))
 vi.mock('@ui/engine/bus', () => ({ sendToScene: vi.fn() }))
 vi.mock('./code-model', () => ({ buildCodeModel: vi.fn(async () => { throw new Error('built') }), overBudget: () => [], MODEL_BUDGET: {} }))
 vi.mock('@ui/ai/requests', () => ({ runRequestText: vi.fn() }))
@@ -130,6 +133,20 @@ describe('assistant scene requests', () => {
 
   it('builds into a stand-in without a name, the way the prompt shows it', async () => {
     await expect(browserSceneRequest({ type: 'buildModel', into: '512', code: 'root' }, new AbortController().signal)).rejects.toThrow('built')
+  })
+
+  it('adds a library sound to its own folder once, never over an unreadable project, and names the sounds when asked for one it lacks', async () => {
+    const mp3 = new Uint8Array([0xff, 0xfb])
+    vi.mocked(soundBytes).mockResolvedValue(mp3)
+    const path = 'assets/audio/library/fire-loop.mp3'
+    vi.mocked(dataLayerListFiles).mockResolvedValueOnce(['assets/audio/fire-loop.mp3']).mockResolvedValueOnce([path]).mockRejectedValueOnce(new Error('offline'))
+    const added = await browserSceneRequest({ type: 'addSound', name: 'fire-loop' }, new AbortController().signal)
+    expect(added).toMatchObject({ path, loop: true, durationSeconds: expect.any(Number) })
+    expect(await browserSceneRequest({ type: 'addSound', name: 'fire-loop' }, new AbortController().signal)).toEqual(added)
+    await expect(browserSceneRequest({ type: 'addSound', name: 'fire-loop' }, new AbortController().signal)).rejects.toThrow('offline')
+    expect(dataLayerSaveFileBytes).toHaveBeenCalledTimes(1)
+    expect(dataLayerSaveFileBytes).toHaveBeenCalledWith(path, mp3)
+    await expect(browserSceneRequest({ type: 'addSound', name: 'banjo' }, new AbortController().signal)).rejects.toThrow('one of: coin, gem,')
   })
 
   it('places a catalog model that takes the scene past its texture limit, and says so, counting a file the scene has once', async () => {

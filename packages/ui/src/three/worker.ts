@@ -3,13 +3,13 @@ import * as THREE from 'three'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
-import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { Brush, Evaluator, ADDITION, SUBTRACTION, INTERSECTION } from 'three-bvh-csg'
 import type { ThreeReply, ThreeRequest } from './protocol'
 import { lockDown, refusedSyntax } from './sandbox'
 import { isLibraryName, LIBRARY, libraryMaterialName, metresPerTile, surface, type LibraryName, type MaterialMap } from './materials'
 import { boxProjectUVs, externalizeLibraryImages } from './library-glb'
-import { checkCanvasSize, mergeStatic, partNamer, singleSided, stripVertexColors } from './build-passes'
+import { checkCanvasSize, mergeParts, mergeStatic, partNamer, singleSided, stripVertexColors, toSceneAxes } from './build-passes'
 
 type Axis = 'x' | 'y' | 'z'
 const STEPS = 24
@@ -79,7 +79,7 @@ const libraryOf = (node: THREE.Mesh): LibraryName | undefined =>
 const addons = {
   // a shared tiling material: its texture is one file for every model, laid at one tile per metre
   material: libraryMaterial,
-  RoundedBoxGeometry, mergeGeometries, mergeVertices,
+  RoundedBoxGeometry, mergeGeometries: mergeParts, mergeVertices,
   Brush, Evaluator, ADDITION, SUBTRACTION, INTERSECTION,
   canvas: (width: number, height: number) => {
     checkCanvasSize(width, height)
@@ -126,7 +126,9 @@ async function build(code: string, model: string): Promise<void> {
   const root = new THREE.Group()
   const clips: unknown[] = []
   new Function('THREE', 'addons', 'root', 'clips', code)(THREE, addons, root, clips)
+  const animations = clips.filter((clip): clip is THREE.AnimationClip => clip instanceof THREE.AnimationClip)
   root.updateMatrixWorld(true)
+  toSceneAxes(root, animations)
   const warnings = stripVertexColors(root)
   singleSided(root)
   // projected without translation, so copies of one geometry that only move still share one buffer
@@ -146,7 +148,6 @@ async function build(code: string, model: string): Promise<void> {
     }
     node.geometry = geometry
   })
-  const animations = clips.filter((clip): clip is THREE.AnimationClip => clip instanceof THREE.AnimationClip)
   mergeStatic(root, animations)
   namer.nameAll(root)
   const exported = await new GLTFExporter().parseAsync(root, { binary: true, animations })

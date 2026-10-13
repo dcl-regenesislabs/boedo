@@ -4,6 +4,7 @@
 // it needs no new plumbing — and it applies to authored-but-unnamed rows too, not
 // just code-spawned ones.
 import type { Snapshot } from './state'
+import { isReservedEntity } from './bridge-protocol'
 import { entityName } from './custom-components'
 import { SCRIPT_COMPONENT } from './allowed-components'
 
@@ -96,8 +97,7 @@ const RESERVED_NAMES: Record<string, string> = { '0': 'Scene root', '1': 'Player
 
 export function describeEntity(snapshot: Snapshot, id: string, hasChildren: boolean): EntityKind {
   const comps = snapshot[id] ?? {}
-  const reserved = Number(id)
-  if (Number.isFinite(reserved) && reserved < 512) {
+  if (isReservedEntity(id)) {
     return { primary: RESERVED_NAMES[id] ?? 'Engine', derived: true, detail: null }
   }
   const derive = (primary: string, detail: string | null = null): EntityKind => ({

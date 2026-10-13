@@ -105,8 +105,9 @@ describe('describeEntity', () => {
 
   it('strips the version from the last-resort id', () => {
     // ids are version-packed: (index & 0xffff) | (version << 16)
-    const s: Snapshot = { '65548': { 'x::Y': {} } }
-    expect(describeEntity(s, '65548', false).detail).toBe('#12')
+    const s: Snapshot = { '66136': { 'x::Y': {} }, '65548': { 'x::Y': {} } }
+    expect(describeEntity(s, '66136', false).detail).toBe('#600')
+    expect(describeEntity(s, '65548', false).primary).toBe('Engine')
   })
 
 })

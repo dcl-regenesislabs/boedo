@@ -13,11 +13,10 @@ vi.mock('./engine/datalayer', () => ({
   },
   dataLayerRealm: () => 'project',
   dataLayerPathTick: () => tick.n,
-  dataLayerWriteTick: () => 0,
   dataLayerRemoveFiles: async (paths: string[]) => { removed.push(paths); return [] }
 }))
 import { state } from '@scene/state'
-import { deleteProjectFile, olderBuilds, unusedModelFiles } from './project-file-use'
+import { deleteProjectFile, fileUsers, olderBuilds, unusedModelFiles } from './project-file-use'
 
 // a model pointing at image files beside it
 const pointingAt = (...uris: string[]): Uint8Array => new TextEncoder().encode(JSON.stringify({
@@ -34,6 +33,11 @@ describe('deleting a project file', () => {
     files.splice(0, 1)
     await deleteProjectFile('models/barrel-0011aabb.glb')
     expect(removed).toEqual([['models/barrel-da3fa86b.glb'], ['models/barrel-0011aabb.glb', 'models/src/barrel.js']])
+  })
+
+  it('names the entities that play a sound file as its users', async () => {
+    state.snapshot = { '512': { AudioSource: { audioClipUrl: 'assets/audio/coin.mp3' } }, '513': { AudioStream: { url: 'assets/audio/coin.mp3' } }, '514': { AudioSource: { audioClipUrl: 'assets/audio/jump.mp3' } } }
+    expect((await fileUsers('assets/audio/coin.mp3')).entities).toEqual(['#512', '#513'])
   })
 
   it('leaves scripts alone when the file is not a built model', async () => {

@@ -16,6 +16,7 @@ import { Vector3, Quaternion } from '@dcl/sdk/math'
 import { rotateVec3ByQuat } from '../camera/perspective-to-screen'
 import { TRIGGER_AREA } from '../allowed-components'
 import type { Snapshot } from '../state'
+import { isReservedEntity } from '../bridge-protocol'
 import { worldTransformOf } from '../world-pos'
 
 // TriggerAreaMeshType: 0 = TAMT_BOX (default), 1 = TAMT_SPHERE.
@@ -58,7 +59,7 @@ export function zoneVolumes(snapshot: Snapshot, accept?: (id: string) => boolean
   const found: ZoneVolume[] = []
   for (const [id, comps] of Object.entries(snapshot)) {
     const area = comps[TRIGGER_AREA] as { mesh?: number } | undefined
-    if (area === undefined || Number(id) < 512) continue
+    if (area === undefined || isReservedEntity(id)) continue
     if (accept !== undefined && !accept(id)) continue
     const world = worldTransformOf(snapshot, id)
     if (world === null) continue

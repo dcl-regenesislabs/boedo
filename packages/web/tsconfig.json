@@ -11,5 +11,5 @@
       "@ui/*": ["../ui/src/*"]
     }
   },
-  "include": ["src", "../ui/src/vite-env.d.ts", "../ui/src/ds/styles/css.d.ts"]
+  "include": ["src", "validate/*.ts", "../ui/src/vite-env.d.ts", "../ui/src/ds/styles/css.d.ts"]
 }

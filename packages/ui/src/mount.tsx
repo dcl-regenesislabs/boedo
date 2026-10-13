@@ -48,9 +48,16 @@ export function mountEditorUi(parent: HTMLElement, view: ReactNode, rootClass?: 
     to.focus()
   }
   window.addEventListener('keydown', onTab, true)
+  // The explorer page re-sends any wheel that bubbles to its window onto the engine canvas, where it
+  // zooms the player camera and reaches the editor's own gestures as a viewport scroll.
+  const keepWheel = (e: WheelEvent): void => {
+    if (e.composedPath()[0] !== host) e.stopPropagation()
+  }
+  host.addEventListener('wheel', keepWheel)
   return () => {
     mounted = false
     window.removeEventListener('keydown', onTab, true)
+    host.removeEventListener('wheel', keepWheel)
     root.unmount()
     host.remove()
   }

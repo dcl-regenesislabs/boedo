@@ -38,6 +38,9 @@ There is nothing to import. The contract is the state key:
   the `if (isServer())` branch. The panel itself reads and paints on every
   player's client — that half is this prefab's, and you write no client code.
 - The panel sorts the rows itself, so the writer's order does not matter.
+- Until the key holds a row, players see "No scores yet — be the first!" ("No
+  times yet" on an `asc` or Run best times board). A board that stays empty in
+  play means nothing writes its `boardKey` — check the server branch.
 - Late joiners get the board from the snapshot. Write rows with `game.setState`,
   never with a broadcast — a message is a moment and a board is a fact.
 

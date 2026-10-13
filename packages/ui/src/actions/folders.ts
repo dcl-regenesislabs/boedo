@@ -17,6 +17,7 @@
 // Ungroup (⇧⌘G) is delete-keep-children, which already preserves world
 // placement and undoes as one step.
 import { state, setSelected, topLevelSelected, provenanceBaseline, type Snapshot } from '@scene/state'
+import { isReservedEntity } from '@dcl-editor/contract'
 import { createEntities, reparentEntitiesTo } from '@scene/inspector'
 import { NAME_COMPONENT } from '@scene/custom-components'
 import { revealAndRename } from '../panels/reveal'
@@ -51,7 +52,7 @@ export function groupParent(snapshot: Snapshot, ids: string[], isCode: (id: stri
   const parents = new Set(ids.map((id) => localParent(snapshot, id)))
   if (parents.size !== 1) return '0'
   const parent = [...parents][0]
-  if (parent !== '0' && Number(parent) >= 512 && (isCode(parent) || !(parent in snapshot))) return '0'
+  if (parent !== '0' && !isReservedEntity(parent) && (isCode(parent) || !(parent in snapshot))) return '0'
   return parent
 }
 

@@ -57,7 +57,8 @@ For the same reason (unsigned builds), SmartScreen may warn on first run. Click
    gizmos, tweak them in the inspector. The **Assets** panel has a catalog of
    ready-made models, plus a tile to add your own `.glb` / `.gltf` files from
    your computer — if a model keeps its textures in separate files, select
-   them together with it and the editor brings them all in. Right-click one of
+   them together with it and the editor brings them all in. Your sounds show there
+   too, with a ▶ button to preview them. Right-click one of
    your files there to delete it; the dialog says what still uses it. The **Prefabs**
    tab next to it holds the prefabs you've saved for reuse — in this scene, in
    your own cross-scene library, or shipped with the editor.
@@ -222,9 +223,9 @@ don't install a coding tool on your computer: it reads and edits the project ope
 in your browser, including imported projects, and builds there. Sign in to
 Decentraland and use the assistant when the hosting service has enabled it.
 For a new game it proposes a short plan and asks what to change before building, then builds in
-stages you can react to. After a build it starts Play once to check the game runs and its HUD shows;
-playing it through is yours, and it can reproduce a problem you report with real movement, jumps and
-HUD clicks. Parcel changes load the new preview during the same turn, so it can keep building.
+stages you can react to. It checks its work with builds and scene checks; playing it through is
+yours. When you ask, it plays to reproduce a problem, walking on the ground and clicking the HUD;
+jumps are left for you to try. Parcel changes load the new preview during the same turn, so it can keep building.
 If another edit changes a file while it is working, it must read the new version
 before saving. Service setup: [Web assistant](./docs/WEB-ASSISTANT.md).
 Completed turns resume after reloads and service restarts using encrypted memory
@@ -240,10 +241,14 @@ run in a sandbox with no network) and saves the script next to it in `models/src
 edits and rebuilds it. Built models can move (a looping clip plays on its own) and share a library of 21
 photo-scanned materials (stone, brick, wood, metal, grass, snow and more, with relief; CC0 from ambientCG)
 stored once in `models/materials/` as `T_<Name>_D.jpg` / `T_<Name>_N.jpg`; each costs the scene two textures, so a build that would go over the
-parcels' texture limit is refused. When the choice is yours, the chat shows catalog cards you can
+parcels' texture limit is refused. For sound it has a library of 25 CC0 sounds from Kenney (coin, jump, win, door,
+explosion, a few loops and more; credits in `packages/ui/src/sounds/CREDITS.md`), each copied into
+`assets/audio/library/` the first time a game uses it and played with an AudioSource. When the choice is yours, the chat shows catalog cards you can
 turn around in 3D, beside a "Build it in code" card; a model it built shows in its reply with a 3D view and
 **Make changes**, and Assets has a **Create with AI** tile to start one. The toolbar's gauge button opens **Scene insights**: the
 engine's frame rate, the scene against its parcel limits, deploy size, each model's triangles, and warnings.
+Model files nothing uses, and older builds kept for undo, are counted in a dismissible notice over the viewport whose
+**Review** opens Assets.
 For self-hosting, use the [service Docker deployment](./packages/service/README.md#container-deployment).
 The web assistant includes [Decentraland SDK skills](./packages/service/skills/README.md)
 for scene scripting, interactions, UI, animation and other SDK features, loaded on demand.

@@ -13,8 +13,12 @@
     "board"
   ],
   "requiresSdk": "auth-server",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "changelog": [
+    {
+      "version": "1.5.0",
+      "notes": "Before the first score the board tells players \"No scores yet — be the first!\" (or \"No times yet\" for times) instead of setup instructions, and its text wraps to stay inside the panel. A board placed before this keeps its old text size, where the new line already fits."
+    },
     {
       "version": "1.4.0",
       "notes": "The 3D panel's text is readable from its front, and players can no longer walk through the board. A board placed before this keeps its old text position and no collider: delete it and place it again."

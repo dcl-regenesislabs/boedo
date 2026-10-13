@@ -5,6 +5,7 @@ import { consoleCommand } from '@ui/engine/console'
 import { uiFocusEntity } from '@ui/actions/selection'
 import { resolveEntityRef } from '@ui/ai/request-format'
 import { state, isUiEntity } from '@scene/state'
+import { isReservedEntity } from '@dcl-editor/contract'
 import { sendToScene } from '@ui/engine/bus'
 
 const MAX_SIDE = 1024
@@ -71,7 +72,7 @@ async function captureFrame({ entity, from, lookAt }: ViewRequest, signal: Abort
     signal.throwIfAborted()
   } else if (entity !== null) {
     const id = resolveEntityRef(state.snapshot, entity)
-    if (id === null || Number(id) < 512 || isUiEntity(state.snapshot, id)) throw new Error('No editable entity matches that reference.')
+    if (id === null || isReservedEntity(id) || isUiEntity(state.snapshot, id)) throw new Error('No editable entity matches that reference.')
     uiFocusEntity(id)
     framed = entity
     await new Promise((resolve) => setTimeout(resolve, FOCUS_SETTLE_MS))
