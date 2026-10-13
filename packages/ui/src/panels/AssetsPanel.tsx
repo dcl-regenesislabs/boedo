@@ -4,7 +4,8 @@ import { useStore } from '../core/store'
 import { uiCheckModelRefs, uiFetchCatalog, uiImportAsset, uiLoadLocalModels, uiPlaceLocalModel, uiImportFiles } from '../actions/assets'
 import { loadLocalSounds, opendclUrl, SOUND_EXT } from '../assets'
 import { Button, ContextMenu, IconButton, LinkButton, MenuItem, Modal, SearchField, Select, Shelf } from '../ds'
-import { deleteProjectFile, fileUsers, filesDeletedWith, olderBuilds, unusedModelFiles, unusedModelsKey } from '../project-file-use'
+import { deleteProjectFile, fileUsers, filesDeletedWith } from '../project-file-use'
+import { refreshUnusedFiles, useUnusedFiles } from '../unused-files'
 import { assetsReview, takeSweepRequest } from './assets-review'
 import { dataLayerReadFileBytes, onDataLayerWrite } from '../engine/datalayer'
 import { canAskAssistant, prefillAssistant } from './ai-store'
@@ -361,8 +362,9 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   const [category, setCategory] = useState('')
   const [models, setModels] = useState<string[] | null>(null)
   const [allFiles, setAllFiles] = useState(false)
-  const [older, setOlder] = useState<string[]>([])
-  const [unused, setUnused] = useState<string[]>([])
+  const files = useUnusedFiles()
+  const older = files.older ?? []
+  const unused = files.unused ?? []
   const catalog = useStore(() => state.assetCatalog)
   const busy = useStore(() => state.assetBusy)
   const catalogFailed = useStore(() => state.assetCatalogFailed)
@@ -371,16 +373,8 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
     setModels(null)
     // models first: the capped preview of My files should still show them
     void Promise.all([uiLoadLocalModels(), loadLocalSounds()]).then(([m, sounds]) => setModels([...m, ...sounds]))
-    void olderBuilds().then(setOlder, () => setOlder([]))
-    void unusedModelFiles().then(setUnused, () => setUnused([]))
   }
   useEffect(refresh, [])
-  // which builds are older moves with what the scene places, not only with file writes
-  const placedKey = useStore(unusedModelsKey)
-  useEffect(() => {
-    void olderBuilds().then(setOlder, () => setOlder([]))
-    void unusedModelFiles().then(setUnused, () => setUnused([]))
-  }, [placedKey])
   // a model built, imported or deleted from anywhere shows up here without a manual reload
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -426,7 +420,7 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
             options={[{ value: '', label: 'All' }, ...categories.map((c) => ({ value: c, label: c }))]}
           />
         )}
-        <IconButton tip="Reload your files" style={{ flex: 'none' }} onClick={refresh}>
+        <IconButton tip="Reload your files" style={{ flex: 'none' }} onClick={() => { refresh(); void refreshUnusedFiles(true) }}>
           <IconRefresh />
         </IconButton>
       </div>

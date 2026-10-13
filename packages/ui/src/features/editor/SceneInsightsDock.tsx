@@ -6,7 +6,7 @@ import { IconExpand } from '../../icons'
 import { registerCss } from '../../ds/styles/registry'
 import { cmd } from '../../engine/cmd'
 import { engineFrames, type EngineFrames } from '../../engine/engine-frames'
-import { olderBuilds, unusedModelFiles, unusedModelsKey } from '../../project-file-use'
+import { useUnusedFiles } from '../../unused-files'
 import { sceneBudget, sceneModels, type ModelRow } from '../../scene-budget'
 import { uiFocusEntity, uiSelectEntity } from '../../actions/selection'
 import { useSceneFindings } from './scene-checks'
@@ -108,8 +108,10 @@ function Dock(): JSX.Element {
   const [budget, setBudget] = useState<Budget | null>(null)
   const [models, setModels] = useState<ModelRow[] | null>(null)
   const [stats, setStats] = useState<{ now: Stats; ticksPerSecond: number | null } | null>(null)
-  const [unused, setUnused] = useState<string[]>([])
-  const [older, setOlder] = useState<string[]>([])
+  // collapsed too: the warning count shows there
+  const files = useUnusedFiles()
+  const unused = files.unused ?? []
+  const older = files.older ?? []
 
   useEffect(() => {
     let alive = true
@@ -133,30 +135,6 @@ function Dock(): JSX.Element {
     }
     void refresh()
     const timer = setInterval(() => void refresh(), REFRESH_MS)
-    return () => {
-      alive = false
-      clearInterval(timer)
-    }
-  }, [])
-
-  // rechecked whenever files or placed models change, collapsed too: the warning count shows there
-  useEffect(() => {
-    let alive = true
-    let checkedFor = ''
-    let checking = false
-    const check = async (): Promise<void> => {
-      const key = unusedModelsKey()
-      if (checking || key === checkedFor) return
-      checking = true
-      checkedFor = key
-      const [idle, earlier] = await Promise.all([unusedModelFiles().catch(() => []), olderBuilds().catch(() => [])])
-      checking = false
-      if (!alive) return
-      setUnused(idle)
-      setOlder(earlier)
-    }
-    void check()
-    const timer = setInterval(() => void check(), REFRESH_MS)
     return () => {
       alive = false
       clearInterval(timer)

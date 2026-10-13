@@ -2,7 +2,7 @@
 import { isReservedEntity, object } from '@dcl-editor/contract'
 import { state } from '@scene/state'
 import { entityName } from '@scene/custom-components'
-import { dataLayerListFiles, dataLayerReadFile, dataLayerRemoveFiles, dataLayerWriteTick } from './engine/datalayer'
+import { dataLayerListFiles, dataLayerReadFile, dataLayerRemoveFiles } from './engine/datalayer'
 import { IGNORED_DIRS } from './script/project-files'
 import { materialTextureFiles, modelImageFiles } from './scene-budget'
 
@@ -76,9 +76,15 @@ export async function olderBuilds(): Promise<string[]> {
   return files.filter((f) => !placed.has(f) && building.has(BUILT.exec(f)?.[1] ?? ''))
 }
 
-// what the dock's unused-files check depends on: any file change, or a different set of placed models or Material images
+// only writes the scan reads count, so an autosave of the scene does not rescan every model
+let filesTick = 0
+export function noteFileWrite(paths: string[]): void {
+  if (paths.some((p) => MODEL.test(p) || MATERIAL_IMAGE.test(p) || SCRIPT.test(p))) filesTick++
+}
+
+// what the unused-files scan depends on: a model, material image or script written, or a different set of placed models or Material images
 export function unusedModelsKey(): string {
-  return `${dataLayerWriteTick()}|${[...placedModels()].sort().join(',')}|${[...materialImagesInUse()].sort().join(',')}`
+  return `${filesTick}|${[...placedModels()].sort().join(',')}|${[...materialImagesInUse()].sort().join(',')}`
 }
 
 // A built model's script goes with its last build, and a model's shared material images with the last model using them.

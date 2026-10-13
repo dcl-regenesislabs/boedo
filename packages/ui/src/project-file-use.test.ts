@@ -13,7 +13,6 @@ vi.mock('./engine/datalayer', () => ({
   },
   dataLayerRealm: () => 'project',
   dataLayerPathTick: () => tick.n,
-  dataLayerWriteTick: () => 0,
   dataLayerRemoveFiles: async (paths: string[]) => { removed.push(paths); return [] }
 }))
 import { state } from '@scene/state'
