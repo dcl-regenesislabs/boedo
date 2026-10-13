@@ -65,7 +65,7 @@ export function projectInfo(dir: string, cfg: config.AppConfig): ProjectInfo {
 }
 
 const SCENE_TEMPLATES: SceneTemplate[] = [
-  { id: 'blank', name: 'Blank', description: 'An empty parcel — start from scratch' },
+  { id: 'blank', name: 'Blank', description: 'An empty 2×2 plot — start from scratch' },
   // named "Example", not "Starter": the field itself is now labelled Starter, and
   // the whole point of the rename was to stop one word meaning three things
   { id: 'starter', name: 'Example', description: 'A clickable cube with a bit of SDK7 code' }
