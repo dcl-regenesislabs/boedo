@@ -14,7 +14,7 @@ export async function profileAvatar(wallet: string, signal?: AbortSignal): Promi
     const avatars = object(profile) && Array.isArray(profile.avatars) ? profile.avatars : []
     const avatar = object(avatars[0]) && object(avatars[0].avatar) ? avatars[0].avatar : undefined
     const body = avatar !== undefined && object(avatar.snapshots) ? avatar.snapshots.body : undefined
-    if (typeof body !== 'string' || !body.startsWith('https://')) return null
+    if (typeof body !== 'string' || !body.startsWith('https://') || !new URL(body).hostname.endsWith('.decentraland.org')) return null
     const response = await fetch(body, { signal: combined })
     if (!response.ok || Number(response.headers.get('content-length') ?? 0) > MAX_BYTES) return null
     const bytes = Buffer.from(await response.arrayBuffer())
