@@ -171,7 +171,7 @@ components; see the [service README](../packages/service/README.md).
   diagnostics plus scene/client/server errors. This does not simulate a full playthrough.
 - `view`: capture the viewport, optionally framing an entity or setting the camera pose.
 - `make_thumbnail` (runs on the service): paints the scene's key art with an image model. It takes
-  1–2 `view` shots as references, sends them with the assistant's brief, title and style plus
+  2 `view` shots as references (the hero subject close, then the whole scene wide), sends them with the assistant's brief, title and style plus
   Decentraland's composition rules (16:9, title and key subject inside the central square, no small
   text, UI, borders or watermarks) to the ChatGPT responses backend's `image_generation` tool, and
   asks the browser to save the result. The browser crops it to 1920×1080, encodes a jpg under 1 MB,

@@ -13,14 +13,15 @@ afterEach(async () => { for (const directory of directories.splice(0)) await rm(
 
 const args = {
   brief: 'A frantic rooftop chase at dusk', title: 'Roof Runner', style: 'comic',
-  shots: [{ from: { x: 8, y: 20, z: -10 }, lookAt: { x: 8, y: 0, z: 8 } }], preview: true
+  shots: [{ from: { x: 8, y: 3, z: 2 }, lookAt: { x: 8, y: 1, z: 8 } }, { from: { x: 8, y: 20, z: -10 }, lookAt: { x: 8, y: 0, z: 8 } }],
+  preview: true
 }
 
 function browser(): { call: BrowserCall; calls: Array<[string, Record<string, unknown>]> } {
   const calls: Array<[string, Record<string, unknown>]> = []
   const call: BrowserCall = async (tool, input) => {
     calls.push([tool, input])
-    if (tool === 'view') return JSON.stringify({ mimeType: 'image/jpeg', image: 'VIEW', width: 1024, height: 576 })
+    if (tool === 'view') return JSON.stringify({ mimeType: 'image/jpeg', image: `VIEW${calls.length}`, width: 1024, height: 576 })
     return JSON.stringify({ path: 'assets/images/thumbnail.jpg', width: 1920, height: 1080, bytes: 1234, preview: { mimeType: 'image/jpeg', image: 'SMALL' } })
   }
   return { call, calls }
@@ -43,17 +44,17 @@ describe('make_thumbnail', () => {
 
     const made = await makeThumbnail(args, call, images)
     const [request] = generate.mock.calls[0]
-    expect(request.references).toEqual([{ mimeType: 'image/jpeg', data: 'VIEW' }])
+    expect(request.references).toEqual([{ mimeType: 'image/jpeg', data: 'VIEW1' }, { mimeType: 'image/jpeg', data: 'VIEW2' }])
     expect(request.prompt).toContain('"Roof Runner"')
     expect(request.prompt).toContain('central square')
-    expect(calls.map(([tool]) => tool)).toEqual(['view', 'scene_request'])
-    expect(calls[1][1].request).toMatchObject({ type: 'saveThumbnail', image: '/9j/IMAGE', mimeType: 'image/jpeg', preview: true })
+    expect(calls.map(([tool]) => tool)).toEqual(['view', 'view', 'scene_request'])
+    expect(calls[2][1].request).toMatchObject({ type: 'saveThumbnail', image: '/9j/IMAGE', mimeType: 'image/jpeg', preview: true })
     expect(made.content[0]).toEqual({ type: 'image', mimeType: 'image/jpeg', data: 'SMALL' })
     expect(JSON.stringify(made.content)).not.toContain('/9j/IMAGE')
 
     const capped = await makeThumbnail(args, call, images)
     expect(capped.content).toEqual([{ type: 'text', text: expect.stringContaining("today's 1 thumbnail") }])
     expect(generate).toHaveBeenCalledTimes(1)
-    expect(calls).toHaveLength(2)
+    expect(calls).toHaveLength(3)
   })
 })

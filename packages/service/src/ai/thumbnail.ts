@@ -39,7 +39,8 @@ export function thumbnailPrompt({ brief, title, style }: { brief: string; title:
     `Style: ${style}.`,
     `Title text, spelled exactly: "${title}".`,
     `Art direction: ${brief}`,
-    'The attached pictures are views of the game\'s 3D scene. Keep its setting, hero subject, shapes and palette recognisable, ' +
+    'The attached pictures are views of the game\'s 3D scene: the first is a close view of the hero subject, the second a wide view ' +
+      'of the whole scene. Keep its setting, hero subject, shapes and palette recognisable, ' +
       'but redraw it as polished key art with a dynamic composition.',
     'Composition rules:',
     '- Landscape, filled edge to edge. It is cropped to 16:9, and parts of Decentraland show only the central square, ' +
@@ -72,9 +73,9 @@ export async function makeThumbnail(args: unknown, call: BrowserCall, images: Wa
   const title = text(args.title, 60)
   const style = text(args.style, 80)
   const shots = Array.isArray(args.shots) ? args.shots : []
-  if (brief === null || title === null || style === null || shots.length < 1 || shots.length > 2 ||
+  if (brief === null || title === null || style === null || shots.length !== 2 ||
     !shots.every((shot) => object(shot) && isPoint(shot.from) && isPoint(shot.lookAt))) {
-    throw new Error('make_thumbnail needs brief, title, style and 1–2 shots of {from, lookAt}.')
+    throw new Error('make_thumbnail needs brief, title, style and 2 shots of {from, lookAt}: the hero subject close, then the whole scene wide.')
   }
   const refused = await images.refusal()
   if (refused !== null) return { content: [{ type: 'text', text: refused }], details: {} }
@@ -99,13 +100,13 @@ export async function makeThumbnail(args: unknown, call: BrowserCall, images: Wa
 export function thumbnailTool(call: BrowserCall, images: WalletImages): ToolDefinition {
   return {
     name: 'make_thumbnail', label: 'Make thumbnail',
-    description: 'Make the scene\'s thumbnail: 16:9 key art painted by an image model from your brief and 1–2 views of the scene ' +
-      '(from, lookAt in world metres), saved as assets/images/thumbnail.jpg and set in scene.json. preview returns a small copy to check it.',
+    description: 'Make the scene\'s thumbnail: 16:9 key art painted by an image model from your brief and 2 views of the scene ' +
+      '(from, lookAt in world metres): the hero subject close, then the whole scene wide;, saved as assets/images/thumbnail.jpg and set in scene.json. preview returns a small copy to check it.',
     parameters: Type.Object({
       brief: Type.String({ maxLength: 2000, description: 'Art direction: the game hook, hero subject, mood and palette' }),
       title: Type.String({ maxLength: 60, description: 'The title text, exactly as it should read' }),
       style: Type.String({ maxLength: 80 }),
-      shots: Type.Array(Type.Object({ from: point, lookAt: point }), { minItems: 1, maxItems: 2 }),
+      shots: Type.Array(Type.Object({ from: point, lookAt: point }), { minItems: 2, maxItems: 2 }),
       preview: Type.Optional(Type.Boolean()),
       label: Type.Optional(Type.String({ description: 'What you are doing now, for the creator, at most six words' }))
     }),

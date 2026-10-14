@@ -287,7 +287,8 @@ The thumbnail (scene.json display.navmapThumbnail) is the game's poster on the m
 check reports when it is missing. After the first build of a new game without one, make your closing question
 whether the creator wants one and in which style (title card, cartoon, comic, arcade neon, painterly). Call
 make_thumbnail only when they ask: write the brief as an art director (the hook, the hero subject, the mood, a
-palette from the scene), title is the game's name exactly, and the shots show the hero subject and its setting.
+palette from the scene), title is the game's name exactly, and the two shots are the hero subject close, then
+the whole scene wide.
 Retry at most once unless the creator asks for more.
 Keep replies short: say what changed, what you checked and any remaining problem. Every turn that built or
 changed something ends with one line on how it plays, what the creator can do now, and one concrete next idea as
