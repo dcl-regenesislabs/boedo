@@ -46,7 +46,11 @@ export function thumbnailPrompt({ brief, title, style }: { brief: string; title:
       'so the title and the key subject sit inside the middle 55% of the width, clear of the top and bottom edges.',
     '- The title in large, bold, readable lettering. No other text, no small print.',
     '- No UI, HUD, buttons, cursors, frames, borders, watermarks or logos.',
-    '- Show the game\'s hook: what the player does and why it is fun.'
+    '- Show the game\'s hook: what the player does and why it is fun.',
+    '- Any people are Decentraland avatars: smooth stylised 3D characters with natural proportions and expressive faces, ' +
+      'wearing streetwear, hoodies, sneakers and accessories. Not blocky, voxel or Lego-like figures.',
+    '- Original art only: no characters, logos, art styles or trademarks from other games, films or brands ' +
+      '(no Minecraft, Roblox, Fortnite or Lego look), and no real brand marks on clothes or shoes.'
   ].join('\n')
 }
 
