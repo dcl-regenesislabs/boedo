@@ -226,6 +226,7 @@ For a new game it proposes a short plan and asks what to change before building,
 stages you can react to. It checks its work with builds and scene checks; playing it through is
 yours. When you ask, it plays to reproduce a problem, walking on the ground and clicking the HUD;
 jumps are left for you to try. Parcel changes load the new preview during the same turn, so it can keep building.
+Ask it for a thumbnail and it paints the scene's 16:9 key art in the style you name and sets it as the scene's map image.
 If another edit changes a file while it is working, it must read the new version
 before saving. Service setup: [Web assistant](./docs/WEB-ASSISTANT.md).
 Completed turns resume after reloads and service restarts using encrypted memory
