@@ -22,6 +22,7 @@ import { resolveEntityRef } from '@ui/ai/request-format'
 import { sceneOutline } from '@ui/ai/roster'
 import { refreshSceneChecks } from '@ui/features/editor/scene-check-context'
 import type { AssistantSceneSettings } from '../shell/scene-json'
+import { saveThumbnail } from './thumbnail'
 
 function entity(ref: unknown): string {
   if (typeof ref !== 'string') throw new Error('An entity id or unique name is required.')
@@ -120,6 +121,10 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
   if (request.type === 'sceneSettings') {
     if (settings === undefined) throw new Error('Scene settings cannot be changed here.')
     return settings({ permissions: request.permissions, spawnPoints: request.spawnPoints, parcels: request.parcels, base: request.base })
+  }
+  if (request.type === 'saveThumbnail') {
+    if (settings === undefined) throw new Error('The thumbnail cannot be saved here.')
+    return saveThumbnail(request, { save: dataLayerSaveFileBytes, setThumbnail: (path) => settings({ thumbnailPath: path }) }, signal)
   }
   if (request.type === 'outline') {
     return sceneOutline(state.snapshot, {

@@ -53,6 +53,7 @@ export function createBrowserAssistant(options: {
       case 'scene_request':
         if (request.type === 'batch' && Array.isArray(request.requests)) return { tool: 'Scene', detail: `${request.requests.length} changes` }
         if (request.type === 'sceneSettings') return { tool: 'Scene', detail: 'Settings' }
+        if (request.type === 'saveThumbnail') return { tool: 'Thumbnail', detail: 'assets/images/thumbnail.jpg' }
         if (request.type === 'attachScript') return null
     }
     return { tool: 'Inspect', detail: 'Project' }
