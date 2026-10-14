@@ -6,6 +6,7 @@ import { createWalletImages, makeThumbnail } from './thumbnail.ts'
 import { createUsageMeter } from './usage.ts'
 import type { ImageProvider } from './images.ts'
 import type { BrowserCall } from './types.ts'
+import { object } from '../../../contract/src/assistant.ts'
 
 const wallet = '0x0000000000000000000000000000000000000001'
 const directories: string[] = []
@@ -22,6 +23,7 @@ function browser(): { call: BrowserCall; calls: Array<[string, Record<string, un
   const call: BrowserCall = async (tool, input) => {
     calls.push([tool, input])
     if (tool === 'view') return JSON.stringify({ mimeType: 'image/jpeg', image: `VIEW${calls.length}`, width: 1024, height: 576 })
+    if (object(input.request) && input.request.type === 'readThumbnail') return JSON.stringify({ path: 'assets/images/thumbnail-1.jpg', mimeType: 'image/jpeg', image: 'CURRENT' })
     return JSON.stringify({ path: 'assets/images/thumbnail.jpg', width: 1920, height: 1080, bytes: 1234, preview: { mimeType: 'image/jpeg', image: 'SMALL' } })
   }
   return { call, calls }
@@ -56,5 +58,20 @@ describe('make_thumbnail', () => {
     expect(capped.content).toEqual([{ type: 'text', text: expect.stringContaining("today's 1 thumbnail") }])
     expect(generate).toHaveBeenCalledTimes(1)
     expect(calls).toHaveLength(3)
+  })
+
+  it('revises the current thumbnail by sending it after the scene views with only the change', async () => {
+    const generate = vi.fn<ImageProvider['generate']>(async () => ({ mimeType: 'image/jpeg', data: '/9j/IMAGE' }))
+    const dir = await mkdtemp(join(tmpdir(), 'dcl-images-'))
+    directories.push(dir)
+    const { call, calls } = browser()
+
+    await makeThumbnail({ ...args, revise: 'make the title bigger' }, call,
+      createWalletImages({ generate }, createUsageMeter(dir, { daily: 5, weekly: 7 }).forWallet(wallet), 5))
+
+    const [request] = generate.mock.calls[0]
+    expect(request.references.map((r) => r.data)).toEqual(['VIEW1', 'VIEW2', 'CURRENT'])
+    expect(request.prompt).toContain('change only this: make the title bigger')
+    expect(calls.map(([, input]) => (object(input.request) ? input.request.type : undefined))).toEqual([undefined, undefined, 'readThumbnail', 'saveThumbnail'])
   })
 })

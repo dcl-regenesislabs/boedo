@@ -33,7 +33,7 @@ export function createWalletImages(provider: ImageProvider | undefined, usage: W
   }
 }
 
-export function thumbnailPrompt({ brief, title, style }: { brief: string; title: string; style: string }): string {
+export function thumbnailPrompt({ brief, title, style, revise }: { brief: string; title: string; style: string; revise?: string }): string {
   return [
     'Key art for a Decentraland game: a poster that sells the game, not a screenshot.',
     `Style: ${style}.`,
@@ -51,7 +51,11 @@ export function thumbnailPrompt({ brief, title, style }: { brief: string; title:
     '- Any people are Decentraland avatars: smooth stylised 3D characters with natural proportions and expressive faces, ' +
       'wearing streetwear, hoodies, sneakers and accessories. Not blocky, voxel or Lego-like figures.',
     '- Original art only: no characters, logos, art styles or trademarks from other games, films or brands ' +
-      '(no Minecraft, Roblox, Fortnite or Lego look), and no real brand marks on clothes or shoes.'
+      '(no Minecraft, Roblox, Fortnite or Lego look), and no real brand marks on clothes or shoes.',
+    ...(revise === undefined ? [] : [
+      'The third picture is the current poster. Edit it rather than painting a new one: keep its composition, characters, ' +
+        `title lettering and palette, and change only this: ${revise}`
+    ])
   ].join('\n')
 }
 
@@ -72,8 +76,9 @@ export async function makeThumbnail(args: unknown, call: BrowserCall, images: Wa
   const brief = text(args.brief, 2000)
   const title = text(args.title, 60)
   const style = text(args.style, 80)
+  const revise = args.revise === undefined ? undefined : text(args.revise, 500)
   const shots = Array.isArray(args.shots) ? args.shots : []
-  if (brief === null || title === null || style === null || shots.length !== 2 ||
+  if (brief === null || title === null || style === null || revise === null || shots.length !== 2 ||
     !shots.every((shot) => object(shot) && isPoint(shot.from) && isPoint(shot.lookAt))) {
     throw new Error('make_thumbnail needs brief, title, style and 2 shots of {from, lookAt}: the hero subject close, then the whole scene wide.')
   }
@@ -85,7 +90,14 @@ export async function makeThumbnail(args: unknown, call: BrowserCall, images: Wa
     if (!object(view) || typeof view.image !== 'string' || view.mimeType !== 'image/jpeg') throw new Error('The browser sent no picture.')
     references.push({ mimeType: 'image/jpeg', data: view.image })
   }
-  const image = await images.generate({ prompt: thumbnailPrompt({ brief, title, style }), references }, signal)
+  if (revise !== undefined) {
+    const current: unknown = JSON.parse(await call('scene_request', { request: { type: 'readThumbnail' }, label: 'Reading the thumbnail' }, signal))
+    if (!object(current) || typeof current.image !== 'string' || (current.mimeType !== 'image/jpeg' && current.mimeType !== 'image/png')) {
+      throw new Error('The browser sent no thumbnail to revise.')
+    }
+    references.push({ mimeType: current.mimeType, data: current.image })
+  }
+  const image = await images.generate({ prompt: thumbnailPrompt({ brief, title, style, revise }), references }, signal)
   const saved: unknown = JSON.parse(await call('scene_request', {
     request: { type: 'saveThumbnail', image: image.data, mimeType: image.mimeType, preview: args.preview === true },
     label: 'Saving the thumbnail'
@@ -101,11 +113,14 @@ export function thumbnailTool(call: BrowserCall, images: WalletImages): ToolDefi
   return {
     name: 'make_thumbnail', label: 'Make thumbnail',
     description: 'Make the scene\'s thumbnail: 16:9 key art painted by an image model from your brief and 2 views of the scene ' +
-      '(from, lookAt in world metres): the hero subject close, then the whole scene wide;, saved as assets/images/thumbnail.jpg and set in scene.json. preview returns a small copy to check it.',
+      '(from, lookAt in world metres): the hero subject close, then the whole scene wide. Each one is saved as a new version, ' +
+      'assets/images/thumbnail-N.jpg, and set in scene.json; earlier versions stay. revise edits the current thumbnail instead ' +
+      'of painting a new one: say only what to change. preview returns a small copy to check it.',
     parameters: Type.Object({
       brief: Type.String({ maxLength: 2000, description: 'Art direction: the game hook, hero subject, mood and palette' }),
       title: Type.String({ maxLength: 60, description: 'The title text, exactly as it should read' }),
       style: Type.String({ maxLength: 80 }),
+      revise: Type.Optional(Type.String({ maxLength: 500, description: 'Only what to change in the current thumbnail' })),
       shots: Type.Array(Type.Object({ from: point, lookAt: point }), { minItems: 2, maxItems: 2 }),
       preview: Type.Optional(Type.Boolean()),
       label: Type.Optional(Type.String({ description: 'What you are doing now, for the creator, at most six words' }))
