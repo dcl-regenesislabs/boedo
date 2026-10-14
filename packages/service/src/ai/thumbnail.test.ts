@@ -45,7 +45,8 @@ describe('make_thumbnail', () => {
 
     const made = await makeThumbnail(args, call, images)
     const [request] = generate.mock.calls[0]
-    expect(request.references).toEqual([{ mimeType: 'image/jpeg', data: 'VIEW1' }, { mimeType: 'image/jpeg', data: 'VIEW2' }])
+    expect(request.references.map((r) => r.data)).toEqual(['VIEW1', 'VIEW2'])
+    expect(request.prompt).toContain('No people or characters.')
     expect(request.prompt).toContain('"Roof Runner"')
     expect(request.prompt).toContain('central square')
     expect(calls.map(([tool]) => tool)).toEqual(['view', 'view', 'scene_request'])
@@ -59,17 +60,20 @@ describe('make_thumbnail', () => {
     expect(calls).toHaveLength(3)
   })
 
-  it('revises the current thumbnail by sending it after the scene views with only the change', async () => {
+  it('leads with the creator\'s avatar and revises the current thumbnail, sent last, with only the change', async () => {
     const generate = vi.fn<ImageProvider['generate']>(async () => ({ mimeType: 'image/jpeg', data: '/9j/IMAGE' }))
     const dir = await mkdtemp(join(tmpdir(), 'dcl-images-'))
     directories.push(dir)
     const { call, calls } = browser()
 
-    await makeThumbnail({ ...args, revise: 'make the title bigger' }, call,
-      createWalletImages({ generate }, createUsageMeter(dir, { daily: 5, weekly: 7 }).forWallet(wallet), 5))
+    await makeThumbnail({ ...args, avatars: true, revise: 'make the title bigger' }, call,
+      createWalletImages({ generate }, createUsageMeter(dir, { daily: 5, weekly: 7 }).forWallet(wallet), 5,
+        async () => ({ mimeType: 'image/png', data: 'MINE' })))
 
     const [request] = generate.mock.calls[0]
-    expect(request.references.map((r) => r.data)).toEqual(['VIEW1', 'VIEW2', 'CURRENT'])
+    expect(request.references.map((r) => r.data)).toEqual(['VIEW1', 'VIEW2', expect.stringMatching(/^\/9j\//), 'MINE', 'CURRENT'])
+    expect(request.prompt).toContain('4. the creator\'s own Decentraland avatar\n5. the current poster')
+    expect(request.prompt).toContain('lead character')
     expect(request.prompt).toContain('change only this: make the title bigger')
     expect(calls.map(([, input]) => (object(input.request) ? input.request.type : undefined))).toEqual([undefined, undefined, 'readThumbnail', 'saveThumbnail'])
   })

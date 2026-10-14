@@ -71,7 +71,7 @@ export function codexImageRequest(token: string, request: ImageRequest): { url: 
 }
 
 // the base64 says what it is, whatever output_format the backend honoured
-function sniff(data: string): ImageMimeType | null {
+export function sniff(data: string): ImageMimeType | null {
   if (data.startsWith('/9j/')) return 'image/jpeg'
   if (data.startsWith('iVBORw0KGgo')) return 'image/png'
   if (data.startsWith('UklGR')) return 'image/webp'
