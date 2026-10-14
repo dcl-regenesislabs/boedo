@@ -175,7 +175,11 @@ components; see the [service README](../packages/service/README.md).
   Decentraland's composition rules (16:9, title and key subject inside the central square, no small
   text, UI, borders or watermarks) to the ChatGPT responses backend's `image_generation` tool, and
   asks the browser to save the result. The browser crops it to 1920×1080, encodes a jpg under 1 MB,
-  overwrites `assets/images/thumbnail.jpg` and sets `display.navmapThumbnail`. The reference shots
+  saves it as a new version, `assets/images/thumbnail-N.jpg`, and sets `display.navmapThumbnail`.
+  Each version shows as a card in the chat, with "Use this" to switch back to it. With `revise`, the
+  current thumbnail goes along as a third reference and the model edits only what was asked;
+  `scene_request {type:"useThumbnail",version}` switches versions without painting. Old versions
+  stay in the project (and are published) until the creator deletes them. The reference shots
   and the image never enter the chat model's context; only an optional 384×216 preview does. It
   needs `AI_IMAGE_AUTH_PATH` (a separate ChatGPT session from `npm run -w @dcl-editor/service
   image-login -- --out <file>`), counts against `ASSISTANT_IMAGES_PER_DAY` (default 10 per wallet),
