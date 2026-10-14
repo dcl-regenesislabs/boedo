@@ -64,5 +64,8 @@ describe('the Codex image provider', () => {
 
     const limited = provider(() => new Response('{"error":{"code":"usage_limit_reached"}}', { status: 429 })).provider
     await expect(limited.generate({ prompt: 'x', references: [] })).rejects.toThrow('usage limit')
+
+    const retired = provider(() => new Response('{"detail":"The \'gpt-5.5\' model is not supported"}', { status: 400 })).provider
+    await expect(retired.generate({ prompt: 'x', references: [] })).rejects.toThrow('(HTTP 400): The \'gpt-5.5\' model is not supported')
   })
 })
