@@ -1,5 +1,5 @@
 // The shared material images and sounds, served next to editor.js and held to the hashes written into it.
-import { fetchVerified } from '@dcl-editor/web-build'
+import { fetchVerified } from '@dcl-editor/scene-compiler'
 import { materialFile, type LibraryName, type MaterialMap } from '@ui/three/materials'
 import { soundFile, type SoundName } from '@ui/sounds'
 import { fileIntegrity } from '../workers'

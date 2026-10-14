@@ -19,7 +19,7 @@ import { mountEditorUi } from '@ui/mount'
 import { Root } from './Root'
 import type { WebShell } from './seam'
 import { createWebShell } from './shell'
-import { fileIntegrity, webBuildFiles } from './workers'
+import { fileIntegrity, sceneCompilerFiles } from './workers'
 
 declare const __EDITOR_UI_BUILD__: string
 
@@ -60,7 +60,7 @@ function start(): Session | null {
   setHostIdentity(() => host.identity())
   welcomeGate.needed = false
 
-  const web = createWebShell({ host, webBuild: webBuildFiles(host.editorBase) })
+  const web = createWebShell({ host, sceneCompiler: sceneCompilerFiles(host.editorBase) })
   window.editorShell = routed(web.shell, host)
   setDataLayerClient(web.dataLayer ?? null)
   // before the first project opens: its first build report must not be missed

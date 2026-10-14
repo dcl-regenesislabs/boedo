@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
-import { LOCK_FILE } from '@dcl-editor/web-build'
+import { LOCK_FILE } from '@dcl-editor/scene-compiler'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { memoryProfile } from '../store/memory-backend'
 import { ProjectStore } from '../store/project-store'

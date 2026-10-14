@@ -67,7 +67,7 @@ const withPackages = {
 
 // sdk-commands' bundler, run on a real folder holding the same files
 async function nativeBuild(files, production, installed = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'web-build-native-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'scene-compiler-native-'))
   try {
     for (const [file, bytes] of Object.entries({ ...files, ...installed })) {
       fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true })
@@ -145,8 +145,8 @@ async function runBundle(code, logged = []) {
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.wasm': 'application/wasm' }
 const PAGE = `<!doctype html><meta charset="utf-8"><script type="module">
-import * as webBuild from './index.js'
-window.webBuild = webBuild
+import * as sceneCompiler from './index.js'
+window.sceneCompiler = sceneCompiler
 </script>`
 
 const server = http.createServer((request, response) => {
@@ -180,7 +180,7 @@ async function livePackages() {
   context.on('requestfailed', (request) => request.url().startsWith(REGISTRY) && refused.push(request.url()))
   page.on('pageerror', (err) => console.log(`[page error] ${err.message}`))
   await page.goto(origin)
-  await page.waitForFunction(() => window.webBuild !== undefined)
+  await page.waitForFunction(() => window.sceneCompiler !== undefined)
 
   const helpers = () => {
     const decode = (base64) => Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
@@ -195,7 +195,7 @@ async function livePackages() {
       return out
     }
     const newBuilder = () =>
-      window.webBuild.createSceneBuilder({ workerUrl: './worker.js', wasmUrl: './esbuild.wasm', snapshotUrl: './sdk-snapshot.json' })
+      window.sceneCompiler.createSceneBuilder({ workerUrl: './worker.js', wasmUrl: './esbuild.wasm', snapshotUrl: './sdk-snapshot.json' })
     // a cold worker each time: first build, then a rebuild after an edit, for both kinds of bundle
     const timings = async (files, lock, store) => {
       const out = {}
@@ -217,7 +217,7 @@ async function livePackages() {
 
   const online = await page.evaluate(
     async ({ scenes, dependencies }) => {
-      const { resolveDependencies, MemoryPackageStore, PACKAGE_RECEIPT, layoutPackages, parseLock, serializeLock } = window.webBuild
+      const { resolveDependencies, MemoryPackageStore, PACKAGE_RECEIPT, layoutPackages, parseLock, serializeLock } = window.sceneCompiler
       const { decode, encode, newBuilder, timings } = window.liveHelpers
       const project = (files) => new Map(Object.entries(files).map(([file, base64]) => [file, decode(base64)]))
       const files = project(scenes.withPackages)
@@ -300,7 +300,7 @@ async function livePackages() {
   const requestsOnline = registryRequests.length
   await context.setOffline(true)
   const offline = await page.evaluate(async () => {
-    const { resolveDependencies, parseLock } = window.webBuild
+    const { resolveDependencies, parseLock } = window.sceneCompiler
     const { encode, edited } = window.liveHelpers
     const { builder, store, files, snapshot, dependencies, devDependencies, lockText } = window.live
     const networkDown = await fetch('https://registry.npmjs.org/color', { cache: 'no-store' }).then(
@@ -343,12 +343,12 @@ try {
   page.on('console', (message) => console.log(`[page] ${message.text()}`))
   page.on('pageerror', (err) => console.log(`[page error] ${err.message}`))
   await page.goto(origin)
-  await page.waitForFunction(() => window.webBuild !== undefined)
+  await page.waitForFunction(() => window.sceneCompiler !== undefined)
 
   const result = await page.evaluate(
     async ({ scenes, projectId }) => {
       const { createSceneBuilder, publishPreview, previewRealmUrl, PREVIEW_CACHE_NAME, previewManifestUrl, previewContentUrl } =
-        window.webBuild
+        window.sceneCompiler
       const decode = (base64) => Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
       const encode = (bytes) => {
         let binary = ''

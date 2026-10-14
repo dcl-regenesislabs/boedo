@@ -19,11 +19,11 @@ import {
   previewRealmUrl,
   publishPreview,
   serializeLock
-} from '@dcl-editor/web-build'
+} from '@dcl-editor/scene-compiler'
 import { freezePackages } from './packages'
 import { readKey, writeKey } from '@ui/core/persist'
 import { parseSceneJson } from './scene-json'
-import type { WebBuildFiles } from '../workers'
+import type { SceneCompilerFiles } from '../workers'
 
 const REBUILD_DEBOUNCE_MS = 150
 const MACHINE_ID_KEY = 'dcl-editor.machineId'
@@ -93,7 +93,7 @@ export interface Previews {
 
 export function createPreviews(options: {
   pageDir: string
-  urls: WebBuildFiles
+  urls: SceneCompilerFiles
   machineId: (projectId: string) => Promise<string>
   emit: (event: SceneBuildEvent) => void
   log: (line: string) => void

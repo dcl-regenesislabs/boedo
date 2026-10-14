@@ -5,7 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist')
-for (const file of ['editor.js', 'web-build/index.js', 'scene/about']) {
+for (const file of ['editor.js', 'scene-compiler/index.js', 'scene/about']) {
   if (!fs.existsSync(path.join(dist, file))) {
     console.error(`dist/${file} is missing: run the scene export and the web build first`)
     process.exit(1)

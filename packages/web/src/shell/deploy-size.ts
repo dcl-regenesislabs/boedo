@@ -1,4 +1,4 @@
-import { LOCK_FILE, publishableFiles } from '@dcl-editor/web-build'
+import { LOCK_FILE, publishableFiles } from '@dcl-editor/scene-compiler'
 
 // a file's content id, worked out once per version of the file
 const contentKeys = new WeakMap<Uint8Array, Promise<string>>()

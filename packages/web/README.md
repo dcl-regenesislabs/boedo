@@ -5,7 +5,7 @@ editor UI in the outer document and the engine in an iframe; here the engine's p
 the outer document and loads the editor as one ES module.
 
 ```bash
-npm run build -w @dcl-editor/web      # writes dist/ (gitignored); also builds @dcl-editor/web-build
+npm run build -w @dcl-editor/web      # writes dist/ (gitignored); also builds @dcl-editor/scene-compiler
 npm run validate:assistant -w @dcl-editor/web # Chromium: browser tools, memory restoration and New chat
 npm run validate -w @dcl-editor/web   # build + headless Chromium smoke against a fake host:
                                       # the Create page's scene list (mountHome); a starter scene is
@@ -27,7 +27,7 @@ node packages/web/validate/fake-worlds-server.mjs --port 8799 --world my.dcl.eth
 |---|---|
 | `editor.js` | The editor UI (ESM, React 18 inside). Every URL it uses is relative to itself. |
 | `editor.css` | The UI font's `@font-face` rules, with the font files inlined. `editor.js` links it itself, with its hash. |
-| `web-build/` | `index.js`, `worker.js`, `esbuild.wasm`, `sdk-snapshot.json` from `@dcl-editor/web-build`. |
+| `scene-compiler/` | `index.js`, `worker.js`, `esbuild.wasm`, `sdk-snapshot.json` from `@dcl-editor/scene-compiler`. |
 | `prefabs/` | The desktop app's built-in prefabs (`packages/desktop/prefabs/`) and `catalog.json`: each folder's `data.json` and every file's sha384. `editor.js` holds the catalog's hash, the catalog every file's. |
 | `scene/` | The editor scene's static export. Not written by this build, and kept across builds. |
 
@@ -124,7 +124,7 @@ and its `dataLayer` is the open project's files.
   files at the same bytes. An import past the service's limits (2000 files, 50 MB a file,
   500 MB in all) is refused before anything is inflated.
 - **Build and preview** (`src/shell/preview.ts`): opening a project, and every file written
-  after that, runs `@dcl-editor/web-build` and `publishPreview` with this browser's machine id
+  after that, runs `@dcl-editor/scene-compiler` and `publishPreview` with this browser's machine id
   (`localStorage` `dcl-editor.machineId`). The shell never reloads the scene: the editor does,
   always by the scene's id, on Play, on Stop and on a save in the code editor.
 - **Build reports** go to the editor as typed `SceneBuildEvent`s (`onBuildEvent`), which drive
@@ -201,7 +201,7 @@ smoke use it. The real one is `packages/service`.
 
 ## Packages
 
-What a project's `package.json` asks of npm is resolved by `@dcl-editor/web-build`
+What a project's `package.json` asks of npm is resolved by `@dcl-editor/scene-compiler`
 (`resolveDependencies`) when the project is opened, when it is imported, and when `package.json`
 is saved. Each tarball is checked against its sha512, unpacked, and never run.
 
@@ -284,15 +284,15 @@ or built from `host.editorBase`. What the CDN has to provide: CORS headers for e
 
 **Integrity.** The host's integrity hash covers `editor.js` only; `editor.js` covers the rest.
 `scripts/build.mjs` writes a sha384 of every other file the package fetches into `editor.js`
-(`web-build/worker.js`, `web-build/esbuild.wasm`, `web-build/sdk-snapshot.json`,
+(`scene-compiler/worker.js`, `scene-compiler/esbuild.wasm`, `scene-compiler/sdk-snapshot.json`,
 `editor.css`) and checks the written `dist/` against it. At run time (`src/workers.ts`,
-`web-build/src/verified-fetch.ts`) each is fetched with that `integrity`: the build worker
+`scene-compiler/src/verified-fetch.ts`) each is fetched with that `integrity`: the build worker
 starts from a same-origin blob of the checked text, the wasm is compiled from the checked
 bytes, and the stylesheet link carries `integrity` and `crossorigin`. A file that does not
 match is refused with an error that names it (the smoke flips one byte of `worker.js` to see
 it). The fonts are inlined into `editor.css`, since a CSS `url()` cannot carry a hash, and the
 build refuses a separate chunk or asset, since a lazy `import()` could not either.
-Not covered here: `web-build/index.js` (shipped, never fetched by the editor) and `scene/`,
+Not covered here: `scene-compiler/index.js` (shipped, never fetched by the editor) and `scene/`,
 the editor scene the engine loads. Pinning that one is the host's side (bevy-web's
 `PINNED_EDITOR`).
 
