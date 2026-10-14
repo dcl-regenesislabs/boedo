@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { Type } from '@earendil-works/pi-ai'
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
 import { object } from '../../../contract/src/assistant.ts'
@@ -13,12 +14,18 @@ export interface WalletImages {
   refusal(): Promise<string | null>
   /** Counts one image against the wallet's day, whether or not the model delivers it. */
   generate(request: ImageRequest, signal?: AbortSignal): Promise<PictureData>
+  /** The creator's own avatar, or null without one */
+  avatar(signal?: AbortSignal): Promise<PictureData | null>
 }
+
+// a line-up of Decentraland avatars, so people on the poster look like avatars rather than film characters
+const AVATAR_LINEUP: PictureData = { mimeType: 'image/jpeg', data: readFileSync(new URL('./avatar-lineup.jpg', import.meta.url)).toString('base64') }
 
 export const IMAGES_UNAVAILABLE = 'Making thumbnails is not set up on this assistant service (no image model is signed in). ' +
   'The creator can choose an image as the thumbnail in Scene settings.'
 
-export function createWalletImages(provider: ImageProvider | undefined, usage: WalletUsage | undefined, perDay: number): WalletImages {
+export function createWalletImages(provider: ImageProvider | undefined, usage: WalletUsage | undefined, perDay: number,
+  avatar: (signal?: AbortSignal) => Promise<PictureData | null> = async () => null): WalletImages {
   return {
     async refusal() {
       if (provider === undefined || usage === undefined) return IMAGES_UNAVAILABLE
@@ -29,31 +36,45 @@ export function createWalletImages(provider: ImageProvider | undefined, usage: W
       if (provider === undefined || usage === undefined) throw new Error(IMAGES_UNAVAILABLE)
       await usage.record(1)
       return provider.generate(request, signal)
-    }
+    },
+    avatar
   }
 }
 
-export function thumbnailPrompt({ brief, title, style, revise }: { brief: string; title: string; style: string; revise?: string }): string {
+export type PictureRole = 'hero' | 'wide' | 'avatars' | 'creator' | 'current'
+
+const ROLES: Record<PictureRole, string> = {
+  hero: 'a close view of the hero subject in the game\'s 3D scene',
+  wide: 'a wide view of the whole scene',
+  avatars: 'a line-up of Decentraland avatars, only to show how people look; not part of the scene',
+  creator: 'the creator\'s own Decentraland avatar',
+  current: 'the current poster'
+}
+
+export function thumbnailPrompt({ brief, title, style, revise, pictures }:
+  { brief: string; title: string; style: string; revise?: string; pictures: PictureRole[] }): string {
   return [
     'Key art for a Decentraland game: a poster that sells the game, not a screenshot.',
     `Style: ${style}.`,
     `Title text, spelled exactly: "${title}".`,
     `Art direction: ${brief}`,
-    'The attached pictures are views of the game\'s 3D scene: the first is a close view of the hero subject, the second a wide view ' +
-      'of the whole scene. Keep its setting, hero subject, shapes and palette recognisable, ' +
-      'but redraw it as polished key art with a dynamic composition.',
+    'The attached pictures, in order:',
+    ...pictures.map((role, at) => `${at + 1}. ${ROLES[role]}`),
+    'Keep the scene\'s setting, hero subject, shapes and palette recognisable, but redraw it as polished key art with a dynamic composition.',
     'Composition rules:',
     '- Landscape, filled edge to edge. It is cropped to 16:9, and parts of Decentraland show only the central square, ' +
       'so the title and the key subject sit inside the middle 55% of the width, clear of the top and bottom edges.',
     '- The title in large, bold, readable lettering. No other text, no small print.',
     '- No UI, HUD, buttons, cursors, frames, borders, watermarks or logos.',
     '- Show the game\'s hook: what the player does and why it is fun.',
-    '- Any people are Decentraland avatars: smooth stylised 3D characters with natural proportions and expressive faces, ' +
-      'wearing streetwear, hoodies, sneakers and accessories. Not blocky, voxel or Lego-like figures.',
+    ...(pictures.includes('avatars') ? ['- Any people are Decentraland avatars drawn in the look of the line-up: 3D game characters with stylised, slightly anime faces, ' +
+      'slim proportions, a clean game-model finish and bold, colourful streetwear and sneakers. At most three other people, each a new ' +
+      'character: never redraw anyone from the line-up or their hair, goggles, ears or outfits. Not realistic people, not Pixar or Disney-style film characters, not blocky, voxel or Lego-like figures.'] : revise === undefined ? ['- No people or characters.'] : []),
+    ...(pictures.includes('creator') ? ['- The creator\'s own avatar is the lead character: keep its hair, skin, face and outfit recognisable.'] : []),
     '- Original art only: no characters, logos, art styles or trademarks from other games, films or brands ' +
       '(no Minecraft, Roblox, Fortnite or Lego look), and no real brand marks on clothes or shoes.',
     ...(revise === undefined ? [] : [
-      'The third picture is the current poster. Edit it rather than painting a new one: keep its composition, characters, ' +
+      'Edit the current poster rather than painting a new one: keep its composition, characters, ' +
         `title lettering and palette, and change only this: ${revise}`
     ])
   ].join('\n')
@@ -77,6 +98,7 @@ export async function makeThumbnail(args: unknown, call: BrowserCall, images: Wa
   const title = text(args.title, 60)
   const style = text(args.style, 80)
   const revise = args.revise === undefined ? undefined : text(args.revise, 500)
+  const avatars = args.avatars === true
   const shots = Array.isArray(args.shots) ? args.shots : []
   if (brief === null || title === null || style === null || revise === null || shots.length !== 2 ||
     !shots.every((shot) => object(shot) && isPoint(shot.from) && isPoint(shot.lookAt))) {
@@ -84,20 +106,26 @@ export async function makeThumbnail(args: unknown, call: BrowserCall, images: Wa
   }
   const refused = await images.refusal()
   if (refused !== null) return { content: [{ type: 'text', text: refused }], details: {} }
-  const references: PictureData[] = []
-  for (const shot of shots as Array<Record<string, unknown>>) {
+  const pictures: Array<{ role: PictureRole; picture: PictureData }> = []
+  for (const [at, shot] of (shots as Array<Record<string, unknown>>).entries()) {
     const view: unknown = JSON.parse(await call('view', { from: shot.from, lookAt: shot.lookAt, label: 'Framing the thumbnail' }, signal))
     if (!object(view) || typeof view.image !== 'string' || view.mimeType !== 'image/jpeg') throw new Error('The browser sent no picture.')
-    references.push({ mimeType: 'image/jpeg', data: view.image })
+    pictures.push({ role: at === 0 ? 'hero' : 'wide', picture: { mimeType: 'image/jpeg', data: view.image } })
+  }
+  if (avatars) {
+    pictures.push({ role: 'avatars', picture: AVATAR_LINEUP })
+    const creator = await images.avatar(signal)
+    if (creator !== null) pictures.push({ role: 'creator', picture: creator })
   }
   if (revise !== undefined) {
     const current: unknown = JSON.parse(await call('scene_request', { request: { type: 'readThumbnail' }, label: 'Reading the thumbnail' }, signal))
     if (!object(current) || typeof current.image !== 'string' || (current.mimeType !== 'image/jpeg' && current.mimeType !== 'image/png')) {
       throw new Error('The browser sent no thumbnail to revise.')
     }
-    references.push({ mimeType: current.mimeType, data: current.image })
+    pictures.push({ role: 'current', picture: { mimeType: current.mimeType, data: current.image } })
   }
-  const image = await images.generate({ prompt: thumbnailPrompt({ brief, title, style, revise }), references }, signal)
+  const prompt = thumbnailPrompt({ brief, title, style, revise, pictures: pictures.map(({ role }) => role) })
+  const image = await images.generate({ prompt, references: pictures.map(({ picture }) => picture) }, signal)
   const saved: unknown = JSON.parse(await call('scene_request', {
     request: { type: 'saveThumbnail', image: image.data, mimeType: image.mimeType, preview: true },
     label: 'Saving the thumbnail'
@@ -122,6 +150,7 @@ export function thumbnailTool(call: BrowserCall, images: WalletImages): ToolDefi
       title: Type.String({ maxLength: 60, description: 'The title text, exactly as it should read' }),
       style: Type.String({ maxLength: 80 }),
       revise: Type.Optional(Type.String({ maxLength: 500, description: 'Only what to change in the current thumbnail' })),
+      avatars: Type.Optional(Type.Boolean({ description: 'Show Decentraland avatars, led by the creator\'s own, when players are the game\'s hook; without it the poster has no people' })),
       shots: Type.Array(Type.Object({ from: point, lookAt: point }), { minItems: 2, maxItems: 2 }),
       label: Type.Optional(Type.String({ description: 'What you are doing now, for the creator, at most six words' }))
     }),

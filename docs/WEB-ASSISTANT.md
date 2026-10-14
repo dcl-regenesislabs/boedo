@@ -171,13 +171,16 @@ components; see the [service README](../packages/service/README.md).
   diagnostics plus scene/client/server errors. This does not simulate a full playthrough.
 - `view`: capture the viewport, optionally framing an entity or setting the camera pose.
 - `make_thumbnail` (runs on the service): paints the scene's key art with an image model. It takes
-  2 `view` shots as references (the hero subject close, then the whole scene wide), sends them with the assistant's brief, title and style plus
+  2 `view` shots as references (the hero subject close, then the whole scene wide), with `avatars` adds a bundled
+  line-up of Decentraland avatars (`src/ai/avatar-lineup.jpg`, so people look like avatars) and the
+  creator's own avatar (the wallet's body snapshot from `peer.decentraland.org`, skipped when it
+  can't be fetched, drawn as the lead character; without `avatars` the poster has no people), sends them with the assistant's brief, title and style plus
   Decentraland's composition rules (16:9, title and key subject inside the central square, no small
   text, UI, borders or watermarks) to the ChatGPT responses backend's `image_generation` tool, and
   asks the browser to save the result. The browser crops it to 1920×1080, encodes a jpg under 1 MB,
   saves it as a new version, `assets/images/thumbnail-N.jpg`, and sets `display.navmapThumbnail`.
   Each version shows as a card in the chat, with "Use this" to switch back to it. With `revise`, the
-  current thumbnail goes along as a third reference and the model edits only what was asked;
+  current thumbnail goes along as the last reference and the model edits only what was asked;
   `scene_request {type:"useThumbnail",version}` switches versions without painting. Old versions
   stay in the project (and are published) until the creator deletes them. The reference shots
   and the image never enter the chat model's context; only an optional 384×216 preview does. It

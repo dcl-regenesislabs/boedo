@@ -10,6 +10,7 @@ import type { AssistantMemory } from './memory.ts'
 import type { UsageMeter } from './usage.ts'
 import type { ImageProvider } from './images.ts'
 import { createWalletImages, DEFAULT_IMAGES_PER_DAY } from './thumbnail.ts'
+import { profileAvatar } from './profile.ts'
 import type { AgentFactory, AssistantService } from './types.ts'
 import type { BaseComponents } from '../types.ts'
 
@@ -132,7 +133,8 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
       if (socket.readyState !== WebSocket.OPEN) return
       clearTimeout(deadline)
       const usage = options.usage?.forWallet(wallet)
-      const images = createWalletImages(options.images?.provider, options.images?.usage.forWallet(wallet), limits.imagesPerDay)
+      const images = createWalletImages(options.images?.provider, options.images?.usage.forWallet(wallet), limits.imagesPerDay,
+        (signal) => profileAvatar(wallet, signal))
       connection = createConnection({ factory, logger, send, allowTurn: () => allowTurn(wallet), memory: memory?.forWallet(wallet), usage, images })
       connections.set(socket, connection)
       send({ kind: 'ready', providers })
