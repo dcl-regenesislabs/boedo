@@ -121,10 +121,10 @@ export const createWebShell: CreateWebShell = ({ host, sceneCompiler }) => {
     if (logs.length > MAX_LOG_LINES) logs.splice(0, logs.length - MAX_LOG_LINES)
     for (const listener of logListeners) listener(line)
   }
-  const phone = createPhonePreview(host.pageDir)
+  const phone = createPhonePreview(host.pageDir, previewIdOf, async (realmId) => previewMachineId(await secret, wallet() ?? 'guest', realmId))
   const emit = (event: SceneBuildEvent): void => {
     for (const listener of buildListeners) listener(event)
-    if (event.type === 'bundleSaved') phone.reload()
+    if (event.type === 'bundleSaved' && current !== null) void phone.built(current.id)
   }
   // where each project's npm packages stand, for as long as the page lives
   const packages = new Map<string, ProjectPackages>()
