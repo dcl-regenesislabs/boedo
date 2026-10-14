@@ -236,9 +236,10 @@ export type MobilePreview =
 // Result of launching an external preview client (web explorer tab or the
 // Decentraland desktop app). `no-client` = no app registered for the
 // decentraland:// protocol — the UI points at the download page.
+// `unavailable` = this page doesn't serve the mobile explorer's web build.
 export type OpenPreview =
   | { ok: true }
-  | { ok: false; reason: 'no-scene' | 'no-client' }
+  | { ok: false; reason: 'no-scene' | 'no-client' | 'unavailable' }
 
 // ---- App auto-update ----
 // Main checks GitHub Releases in the background and downloads + stages the new
@@ -460,6 +461,8 @@ export interface EditorShell {
   webPreview?: () => Promise<OpenPreview>
   // open the scene in the Decentraland desktop client via its deep link
   unityPreview?: () => Promise<OpenPreview>
+  // open the scene in the mobile explorer's web build, in a phone-sized window, reloaded on each build
+  phonePreview?: () => Promise<OpenPreview>
   // ---- App auto-update ----
   // installed app version ("0.2.0") for the Account section
   appVersion?: () => Promise<string>

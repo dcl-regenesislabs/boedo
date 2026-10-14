@@ -109,6 +109,12 @@ You need Node 24, git, and both repos side by side:
    under `packages/scene` (the in-engine editor scene) also needs
    `npm run export-static -w @dcl-editor/scene`; the web build leaves `dist/scene` alone.
 
+5. **Preview ▸ As a phone** opens the scene in the Decentraland mobile explorer's web build, in a
+   1600×720 window that reloads after each build. The explorer serves that build at `/godot/` only
+   when `GODOT_WEB_DIR` names its export (`GODOT_WEB_DIR=/path/to/build/web npm run dev:web …`);
+   without it the menu says the phone preview couldn't open. It needs the explorer to answer `HEAD`
+   on the preview realm, or the mobile explorer reports "Connection lost".
+
 So one local page runs your editor, your explorer and your engine together: change any of the
 three, rebuild that one (editor: `npm run build -w @dcl-editor/web`; engine: step 1b; explorer:
 nothing) and reload.
