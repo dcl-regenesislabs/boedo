@@ -20,7 +20,7 @@ import { sendToScene } from '@ui/engine/bus'
 import { runRequestText } from '@ui/ai/requests'
 import { resolveEntityRef } from '@ui/ai/request-format'
 import { sceneOutline } from '@ui/ai/roster'
-import { refreshSceneChecks } from '@ui/features/editor/scene-check-context'
+import { invalidateSceneCheckCache, refreshSceneChecks } from '@ui/features/editor/scene-check-context'
 import type { AssistantSceneSettings } from '../shell/scene-json'
 import { saveThumbnail } from './thumbnail'
 
@@ -124,7 +124,9 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
   }
   if (request.type === 'saveThumbnail') {
     if (settings === undefined) throw new Error('The thumbnail cannot be saved here.')
-    return saveThumbnail(request, { save: dataLayerSaveFileBytes, setThumbnail: (path) => settings({ thumbnailPath: path }) }, signal)
+    const saved = await saveThumbnail(request, { save: dataLayerSaveFileBytes, setThumbnail: (path) => settings({ thumbnailPath: path }) }, signal)
+    invalidateSceneCheckCache()
+    return saved
   }
   if (request.type === 'outline') {
     return sceneOutline(state.snapshot, {

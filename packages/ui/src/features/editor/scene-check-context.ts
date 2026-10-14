@@ -46,6 +46,19 @@ interface ProjectRead {
   key: string
   prefabs: SceneCheckPrefab[]
   scripts: Record<string, string>
+  thumbnailPath: string | null | undefined
+}
+
+async function readThumbnailPath(files: string[]): Promise<string | null | undefined> {
+  try {
+    const scene: unknown = JSON.parse(await dataLayerReadFile('scene.json'))
+    const display = typeof scene === 'object' && scene !== null ? (scene as { display?: unknown }).display : undefined
+    const path = typeof display === 'object' && display !== null ? (display as { navmapThumbnail?: unknown }).navmapThumbnail : undefined
+    return typeof path === 'string' && files.includes(path) ? path : null
+  } catch (e) {
+    log.debug('scene checks: scene.json unreadable', e)
+    return undefined
+  }
 }
 
 let cached: ProjectRead | null = null
@@ -76,7 +89,7 @@ async function readProject(): Promise<ProjectRead> {
       log.debug('scene checks: script unreadable', path, e)
     }
   }
-  cached = { key, prefabs, scripts }
+  cached = { key, prefabs, scripts, thumbnailPath: await readThumbnailPath(files) }
   cachedAt = Date.now()
   return cached
 }
@@ -87,14 +100,15 @@ export function invalidateSceneCheckCache(): void {
 
 export async function collectSceneCheckContext(): Promise<SceneCheckContext | null> {
   if (dataLayerAvailable() !== true) return null
-  const { prefabs, scripts } = await readProject()
+  const { prefabs, scripts, thumbnailPath } = await readProject()
   const baseline = provenanceBaseline()
   return {
     snapshot: authoredOnly(state.snapshot, (id) => !isReservedEntity(id) && isRuntimeEntity(id, baseline)),
     prefabs,
     scripts,
     gameConfig: findGameConfig(state.snapshot)?.value ?? null,
-    parcels: state.scene?.parcels
+    parcels: state.scene?.parcels,
+    thumbnailPath
   }
 }
 

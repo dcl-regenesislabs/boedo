@@ -37,6 +37,8 @@ export interface SceneCheckContext {
   scripts: Record<string, string>
   gameConfig: GameConfigValue | null
   parcels?: ParcelCoord[]
+  /** scene.json's navmap thumbnail when that file exists, null when there is none, undefined when unread */
+  thumbnailPath?: string | null
 }
 
 export interface SceneFinding {

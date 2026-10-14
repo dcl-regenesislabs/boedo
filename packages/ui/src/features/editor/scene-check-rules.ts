@@ -34,6 +34,7 @@ import {
 } from './scene-check-model'
 import type { SceneCheck, SceneCheckContext, SceneCheckPrefab, SceneFinding } from './scene-checks'
 import { sceneBoundsCheck } from './scene-check-bounds'
+import { sceneThumbnailCheck, THUMBNAIL_CHECK_ID } from './scene-check-thumbnail'
 
 export const CHECK_IDS = {
   shadowing: 'config-shadowing',
@@ -377,5 +378,6 @@ export const BUILTIN_SCENE_CHECKS: ReadonlyArray<readonly [string, SceneCheck]> 
   [CHECK_IDS.prefabRuntimeImport, prefabRuntimeImport],
   ...SPAWNER_SCENE_CHECKS,
   ...GAME_SCENE_CHECKS,
-  ...SIDES_SCENE_CHECKS
+  ...SIDES_SCENE_CHECKS,
+  [THUMBNAIL_CHECK_ID, sceneThumbnailCheck]
 ]
