@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createCodexImageProvider } from './images.ts'
 
 const claims = Buffer.from(JSON.stringify({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-synthetic' } })).toString('base64url')
@@ -19,14 +19,21 @@ function sse(events: unknown[]): Response {
   return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })
 }
 
+afterEach(() => { vi.unstubAllGlobals() })
+
+function provider(answer: () => Response) {
+  const fetch = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => answer())
+  vi.stubGlobal('fetch', fetch)
+  return { fetch, provider: createCodexImageProvider({ token: async () => token }) }
+}
+
 describe('the Codex image provider', () => {
   it('asks the ChatGPT responses backend for one landscape image from the brief and reference shots', async () => {
-    const fetch = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => sse([
+    const { fetch, provider: codex } = provider(() => sse([
       { type: 'response.output_item.done', item: { type: 'image_generation_call', id: 'ig_1', status: 'completed', result: jpeg } },
       { type: 'response.completed', response: { status: 'completed', output: [] } }
     ]))
-    const provider = createCodexImageProvider({ token: async () => token, fetch })
-    const image = await provider.generate({ prompt: 'Key art', references: [{ mimeType: 'image/jpeg', data: 'AAAA' }] })
+    const image = await codex.generate({ prompt: 'Key art', references: [{ mimeType: 'image/jpeg', data: 'AAAA' }] })
 
     expect(image).toEqual({ mimeType: 'image/jpeg', data: jpeg })
     const [url, init] = fetch.mock.calls[0]
@@ -42,20 +49,20 @@ describe('the Codex image provider', () => {
   })
 
   it('takes the image from the completed response and reports a failed one', async () => {
-    const done = createCodexImageProvider({ token: async () => token, fetch: async () => sse([
+    const done = provider(() => sse([
       { type: 'response.completed', response: { output: [{ type: 'message' }, { type: 'image_generation_call', result: jpeg }] } }
-    ]) })
+    ])).provider
     await expect(done.generate({ prompt: 'x', references: [] })).resolves.toEqual({ mimeType: 'image/jpeg', data: jpeg })
 
-    const failed = createCodexImageProvider({ token: async () => token, fetch: async () => sse([
+    const failed = provider(() => sse([
       { type: 'response.failed', response: { error: { message: 'moderation_blocked' } } }
-    ]) })
+    ])).provider
     await expect(failed.generate({ prompt: 'x', references: [] })).rejects.toThrow('moderation_blocked')
 
-    const empty = createCodexImageProvider({ token: async () => token, fetch: async () => sse([{ type: 'response.completed', response: { output: [] } }]) })
+    const empty = provider(() => sse([{ type: 'response.completed', response: { output: [] } }])).provider
     await expect(empty.generate({ prompt: 'x', references: [] })).rejects.toThrow('without an image')
 
-    const limited = createCodexImageProvider({ token: async () => token, fetch: async () => new Response('{"error":{"code":"usage_limit_reached"}}', { status: 429 }) })
+    const limited = provider(() => new Response('{"error":{"code":"usage_limit_reached"}}', { status: 429 })).provider
     await expect(limited.generate({ prompt: 'x', references: [] })).rejects.toThrow('usage limit')
   })
 })

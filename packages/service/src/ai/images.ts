@@ -144,18 +144,13 @@ async function httpFailure(response: Response): Promise<string> {
   return `The image model failed (HTTP ${response.status})${message}`
 }
 
-export function createCodexImageProvider(options: {
-  token(signal?: AbortSignal): Promise<string>
-  fetch?: typeof fetch
-  timeoutMs?: number
-}): ImageProvider {
-  const send = options.fetch ?? globalThis.fetch
+export function createCodexImageProvider(options: { token(signal?: AbortSignal): Promise<string> }): ImageProvider {
   return {
     async generate(request, signal) {
-      const deadline = AbortSignal.timeout(options.timeoutMs ?? TIMEOUT_MS)
+      const deadline = AbortSignal.timeout(TIMEOUT_MS)
       const combined = signal === undefined ? deadline : AbortSignal.any([signal, deadline])
       const { url, init } = codexImageRequest(await options.token(combined), request)
-      const response = await send(url, { ...init, signal: combined })
+      const response = await fetch(url, { ...init, signal: combined })
       if (!response.ok) throw new Error(await httpFailure(response))
       if (response.body === null) throw new Error('The image model answered without an image.')
       return readCodexImage(response.body)

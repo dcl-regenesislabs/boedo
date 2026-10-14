@@ -11,7 +11,7 @@ const MAX_THUMBNAIL_BYTES = 1024 * 1024
 const QUALITIES = [0.88, 0.8, 0.7, 0.6]
 const TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
-export interface Crop {
+interface Crop {
   sx: number
   sy: number
   sw: number
@@ -19,7 +19,7 @@ export interface Crop {
 }
 
 // cover: the largest centred 16:9 part of the picture
-export function coverCrop(width: number, height: number): Crop {
+function coverCrop(width: number, height: number): Crop {
   const aspect = THUMBNAIL_WIDTH / THUMBNAIL_HEIGHT
   if (width / height > aspect) {
     const sw = Math.round(height * aspect)
@@ -29,16 +29,14 @@ export function coverCrop(width: number, height: number): Crop {
   return { sx: 0, sy: Math.round((height - sh) / 2), sw: width, sh }
 }
 
-export interface Picture {
+interface Picture {
   width: number
   height: number
   jpeg(crop: Crop, width: number, height: number, quality: number): Promise<Uint8Array>
   close(): void
 }
 
-export type OpenPicture = (bytes: Uint8Array<ArrayBuffer>, mimeType: string) => Promise<Picture>
-
-export const openCanvasPicture: OpenPicture = async (bytes, mimeType) => {
+async function openPicture(bytes: Uint8Array<ArrayBuffer>, mimeType: string): Promise<Picture> {
   const bitmap = await createImageBitmap(new Blob([bytes], { type: mimeType }))
   return {
     width: bitmap.width,
@@ -80,14 +78,13 @@ export async function saveThumbnail(request: Record<string, unknown>, project: {
   save(path: string, bytes: Uint8Array): Promise<void>
   // points scene.json's display.navmapThumbnail at the file
   setThumbnail(path: string): Promise<unknown>
-  open?: OpenPicture
 }, signal: AbortSignal): Promise<ThumbnailSaved> {
   const { image, mimeType } = request
   if (typeof mimeType !== 'string' || !TYPES.includes(mimeType) || typeof image !== 'string' ||
     image.length > Math.ceil(MAX_INPUT_BYTES / 3) * 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(image)) {
     throw new Error('saveThumbnail needs the image model\'s picture.')
   }
-  const picture = await (project.open ?? openCanvasPicture)(fromBase64(image), mimeType)
+  const picture = await openPicture(fromBase64(image), mimeType)
   try {
     const crop = coverCrop(picture.width, picture.height)
     let jpeg: Uint8Array = new Uint8Array(0)

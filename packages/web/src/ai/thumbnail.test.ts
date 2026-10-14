@@ -1,33 +1,38 @@
-import { describe, expect, it, vi } from 'vitest'
-import { saveThumbnail, type Crop, type OpenPicture } from './thumbnail'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { saveThumbnail } from './thumbnail'
 import { applyAssistantSettings, type RawSceneJson } from '../shell/scene-json'
 
+afterEach(() => { vi.unstubAllGlobals() })
+
+// the browser's canvas, as far as the thumbnail uses it: a 1536×1024 painting, and jpgs over Worlds' 1 MB at the first quality
+function stubCanvas() {
+  const draws: unknown[][] = []
+  const encodes: Array<{ width: number; height: number; quality: number }> = []
+  vi.stubGlobal('createImageBitmap', async () => ({ width: 1536, height: 1024, close: () => {} }))
+  vi.stubGlobal('OffscreenCanvas', class {
+    constructor(readonly width: number, readonly height: number) {}
+    getContext() { return { imageSmoothingQuality: 'low', drawImage: (...args: unknown[]) => { draws.push(args.slice(1)) } } }
+    async convertToBlob({ quality }: { quality: number }) {
+      encodes.push({ width: this.width, height: this.height, quality })
+      return new Blob([new Uint8Array(quality > 0.85 ? 1_200_000 : 700_000)])
+    }
+  })
+  return { draws, encodes }
+}
+
 describe('saveThumbnail', () => {
-  it('saves the painting as a 1920×1080 jpg under 1 MB and points scene.json at it', async () => {
-    const encodes: Array<[Crop, number, number, number]> = []
-    const open = vi.fn<OpenPicture>(async () => ({
-      width: 1536, height: 1024,
-      // the first quality is over Worlds' 1 MB thumbnail limit
-      jpeg: async (crop, width, height, quality) => {
-        encodes.push([crop, width, height, quality])
-        return new Uint8Array(quality > 0.85 ? 1_200_000 : 700_000)
-      },
-      close: () => {}
-    }))
+  it('saves the painting as a centred 1920×1080 jpg under 1 MB and points scene.json at it', async () => {
+    const { draws, encodes } = stubCanvas()
     const files = new Map<string, Uint8Array>()
     let scene: RawSceneJson = { display: { title: 'Roof Runner' }, scene: { parcels: ['0,0'], base: '0,0' } }
 
     const saved = await saveThumbnail({ image: btoa('painted'), mimeType: 'image/png' }, {
-      open,
       save: async (path, bytes) => { files.set(path, bytes) },
       setThumbnail: async (path) => { scene = applyAssistantSettings(scene, { thumbnailPath: path }) }
     }, new AbortController().signal)
 
-    expect(open.mock.calls[0][1]).toBe('image/png')
-    expect(encodes).toEqual([
-      [{ sx: 0, sy: 80, sw: 1536, sh: 864 }, 1920, 1080, 0.88],
-      [{ sx: 0, sy: 80, sw: 1536, sh: 864 }, 1920, 1080, 0.8]
-    ])
+    expect(draws[0]).toEqual([0, 80, 1536, 864, 0, 0, 1920, 1080])
+    expect(encodes).toEqual([{ width: 1920, height: 1080, quality: 0.88 }, { width: 1920, height: 1080, quality: 0.8 }])
     expect(saved).toEqual({ path: 'assets/images/thumbnail.jpg', width: 1920, height: 1080, bytes: 700_000 })
     expect(files.get('assets/images/thumbnail.jpg')?.length).toBe(700_000)
     expect(scene.display).toEqual({ title: 'Roof Runner', navmapThumbnail: 'assets/images/thumbnail.jpg' })
