@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { state } from '@scene/state'
 import { useStore } from './core/store'
 import { useEditorShortcuts } from './shortcuts'
@@ -15,6 +15,7 @@ import { PrefabDropLayer, PrefabsPanel } from './panels/PrefabsPanel'
 import { AiPanel } from './panels/AiPanel'
 import { aiStore, canAskAssistant } from './panels/ai-store'
 import { chrome, toggleRightPanel, trackRightDock } from './core/chrome'
+import { remeasureSceneInset, useSceneInsetRef } from './core/scene-inset'
 import { dragCapture } from './core/drag'
 import { isLeftView, type LeftView } from './panels/left-view'
 import { hasReadyMadePrefabs, sceneEmptiness } from './panels/empty-scene'
@@ -32,8 +33,11 @@ function LeftResize(props: { width: number; onResize: (w: number) => void }): JS
     const base = props.width
     dragCapture(e, (ev) => props.onResize(Math.max(248, Math.min(680, base + (ev.clientX - startX)))))
   }
+  // the handle sits on the left panel's right edge, whichever view the panel shows
+  const insetRef = useSceneInsetRef('left')
   return (
     <div
+      ref={insetRef}
       className="eui-left-resize"
       style={{ left: `calc(var(--edge-pad, 12px) + ${props.width - 5}px)` }}
       onPointerDown={onDown}
@@ -123,6 +127,13 @@ export function App(props: { playing?: boolean }): JSX.Element {
   // A stored height from a taller window (or a since-shrunk column) would push
   // the composer off the bottom — clamp on the way out, not just while dragging.
   const [colEl, setColEl] = useState<HTMLDivElement | null>(null)
+  const rightInsetRef = useSceneInsetRef('right')
+  const colRef = useCallback((el: HTMLDivElement | null) => {
+    setColEl(el)
+    rightInsetRef(el)
+  }, [rightInsetRef])
+  // panels that move without resizing
+  useEffect(() => remeasureSceneInset(), [leftOpen, leftWidth, rightOpen, rightWidth, playing])
   const dockMax = maxDockHeight(useElementHeight(colEl))
   // the Studio's own chat column is what the drawer must clear while it is open
   useEffect(() => {
@@ -138,7 +149,7 @@ export function App(props: { playing?: boolean }): JSX.Element {
   const rightCol = (
     <>
       <div
-        ref={setColEl}
+        ref={colRef}
         className="eui-right-col"
         style={{ width: rightWidth }}
         hidden={(!rightOpen && aiMode !== 'studio') || (!ready && !studioHere) || (playing && !dockInPlay)}

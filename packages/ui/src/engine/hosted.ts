@@ -69,6 +69,9 @@ export interface DclEditorHostV1 extends Omit<DclEditorHostV0, 'version'> {
   previewServerLogs?(after: number): ServerLogLine[]
   // contract v1.3: a build landed in the open preview, so the host restarts its scene server on it
   previewChanged?(): void
+  // contract v1.4: the screen the editor's panels leave to the scene, in CSS px from each window edge;
+  // the engine reports it to scenes as their interactable area
+  setSceneInset?(area: { left: number; top: number; right: number; bottom: number }): void
 }
 
 export interface ServerLogLine {

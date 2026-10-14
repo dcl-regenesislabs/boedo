@@ -32,6 +32,7 @@ import { UnusedFilesChip } from './UnusedFilesChip'
 import { openCodeAt } from '../../panels/ai-store'
 import { baseName } from '../../script/project-files'
 import { chrome, toggleUiHidden } from '../../core/chrome'
+import { remeasureSceneInset } from '../../core/scene-inset'
 import { uiSetPlayInspect } from '../../actions/viewport'
 import { MOD, isPrimaryMod, keyCombo } from '../../lib/keys'
 
@@ -254,6 +255,8 @@ export function Editor(props: { params: URLSearchParams; preview?: number }): JS
     if (settling) return
     setPlaying(ready && !frozen)
     host?.setMode(ready && !frozen ? 'play' : 'edit')
+    // the explorer reports its own HUD until the editor's mode is set
+    remeasureSceneInset()
   }, [host, ready, frozen, settling])
   playingRef.current = playing
   useEffect(() => {

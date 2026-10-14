@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { toggleInsights, useInsightsOpen } from '../features/editor/SceneInsightsDock'
 import { state } from '@scene/state'
 import { isLocalScene } from '@scene/inspector'
@@ -18,6 +18,7 @@ import { usePersistentFlag, usePersistentNum } from '../core/persist'
 import { MOD, SHIFT, keyCombo } from '../lib/keys'
 import { dragCapture } from '../core/drag'
 import { aiStore } from './ai-store'
+import { useSceneInsetRef } from '../core/scene-inset'
 import { Toggle, labelTip } from '../ds'
 import {
   IconSelect,
@@ -88,11 +89,17 @@ export function Toolbar(props: {
   // Where the toolbar sits. Until it's dragged it stays centred by CSS — the
   // stored x/y only mean anything once `moved` is set, which is also why they
   // clamp to a margin: usePersistentNum drops anything <= 0.
-  const barRef = useRef<HTMLDivElement>(null)
+  const barRef = useRef<HTMLDivElement | null>(null)
   const [moved, setMoved] = usePersistentFlag('toolbar-moved', false)
   const [barX, setBarX] = usePersistentNum('toolbar-x', 12)
   const [barY, setBarY] = usePersistentNum('toolbar-y', 12)
   const placement = moved ? { left: barX, top: barY } : undefined
+  // docked at the top it covers the scene's top edge; dragged elsewhere it floats over the game instead
+  const insetRef = useSceneInsetRef('top')
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    barRef.current = el
+    insetRef(moved ? null : el)
+  }, [insetRef, moved])
   // Only the window edges bound a drag — the bar outranks the topbar and the
   // docks (z-index in base.css), so anywhere on screen is somewhere it can be
   // seen and grabbed again.
@@ -143,7 +150,7 @@ export function Toolbar(props: {
   if (studio) return null
 
   return (
-    <div ref={barRef} className={`eui-panel eui-toolbar ${moved ? 'moved' : ''}`} style={placement}>
+    <div ref={ref} className={`eui-panel eui-toolbar ${moved ? 'moved' : ''}`} style={placement}>
       <span
         className="eui-toolbar-grip"
         data-tip="Drag to move · double-click to re-centre"
