@@ -21,7 +21,7 @@ export interface ImageProvider {
 
 export const CODEX_RESPONSES_URL = 'https://chatgpt.com/backend-api/codex/responses'
 // the Codex model that runs the image_generation tool; it must take image input for the reference shots
-export const CODEX_IMAGE_HOST_MODEL = 'gpt-5.5'
+export const CODEX_IMAGE_HOST_MODEL = 'gpt-5.6-terra'
 // the widest standard size of the GPT image models; the browser crops it to 16:9
 export const CODEX_IMAGE_SIZE = '1536x1024'
 const TIMEOUT_MS = 4 * 60_000
@@ -135,12 +135,15 @@ function finished(image: PictureData | null): PictureData {
 
 async function httpFailure(response: Response): Promise<string> {
   const text = await response.text().catch(() => '')
-  let error: unknown
-  try { error = (JSON.parse(text) as Record<string, unknown>).error } catch { error = undefined }
+  let parsed: unknown
+  try { parsed = JSON.parse(text) } catch { parsed = undefined }
+  const error = object(parsed) ? parsed.error : undefined
   const code = object(error) && typeof error.code === 'string' ? error.code : ''
   if (response.status === 429 || /usage_limit|rate_limit/i.test(code)) return 'The image model has reached its ChatGPT usage limit. Try again later.'
   if (response.status === 401 || response.status === 403) return 'The image model sign-in was refused. The service owner must sign in again with image-login.'
-  const message = object(error) && typeof error.message === 'string' ? `: ${error.message.slice(0, 300)}` : ''
+  // the ChatGPT backend reports some refusals (e.g. a retired model) as {detail} rather than {error}
+  const detail = object(error) && typeof error.message === 'string' ? error.message : object(parsed) && typeof parsed.detail === 'string' ? parsed.detail : ''
+  const message = detail === '' ? '' : `: ${detail.slice(0, 300)}`
   return `The image model failed (HTTP ${response.status})${message}`
 }
 
