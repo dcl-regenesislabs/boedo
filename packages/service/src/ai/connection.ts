@@ -6,6 +6,7 @@ import { MEMORY_ID, MEMORY_KEY } from './memory.ts'
 import type { MemoryRef, WalletMemory } from './memory.ts'
 import type { WalletUsage } from './usage.ts'
 import type { AgentFactory, AssistantAgent } from './types.ts'
+import type { WalletImages } from './thumbnail.ts'
 
 const MAX_TURN_RESULT_CHARS = 2_000_000
 const MAX_LABEL_CHARS = 80
@@ -49,6 +50,7 @@ export function createConnection(options: {
   allowTurn(): true | string
   usage?: WalletUsage
   memory?: WalletMemory
+  images?: WalletImages
   toolTimeoutMs?: number
   turnTimeoutMs?: number
 }) {
@@ -142,7 +144,7 @@ export function createConnection(options: {
         const restore = ref === null ? null : await options.memory?.load(ref) ?? null
         const created = await options.factory.create(params, call, ({ text }) => {
           if (active !== null && !active.controller.signal.aborted) send({ kind: 'event', event: { kind: 'text', turnId: active.id, text } })
-        }, restore ?? undefined)
+        }, restore ?? undefined, options.images)
         if (closed || turn.controller.signal.aborted) {
           created.dispose()
           return

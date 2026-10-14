@@ -10,7 +10,8 @@
 //
 // The assistant shows only with a model session for the service: sign in once with
 // `node packages/service/scripts/assistant-login.ts --provider claude --auth .data/assistant/.auth.json`,
-// then add `--ai-auth .data/assistant/.auth.json`.
+// then add `--ai-auth .data/assistant/.auth.json`. Thumbnails need a ChatGPT session too:
+// `npm run -w @dcl-editor/service image-login -- --out .data/assistant/image-auth.json`, then `--ai-image-auth` with it.
 //
 // Rebuild after editing the editor: `npm run build -w @dcl-editor/web`, then reload the page;
 // after editing packages/scene, `npm run export-static -w @dcl-editor/scene` first.
@@ -26,6 +27,7 @@ const { values } = parseArgs({
     bevy: { type: 'string', default: process.env.BEVY_DIR ?? path.resolve(root, '..', 'bevy-explorer') },
     world: { type: 'string' },
     'ai-auth': { type: 'string' },
+    'ai-image-auth': { type: 'string' },
     'no-build': { type: 'boolean', default: false }
   }
 })
@@ -96,7 +98,8 @@ start('service', process.execPath, [
   dataDir,
   '--origin',
   PAGE,
-  ...(values['ai-auth'] === undefined ? [] : ['--ai-auth', path.resolve(values['ai-auth'])])
+  ...(values['ai-auth'] === undefined ? [] : ['--ai-auth', path.resolve(values['ai-auth'])]),
+  ...(values['ai-image-auth'] === undefined ? [] : ['--ai-image-auth', path.resolve(values['ai-image-auth'])])
 ])
 let worldsQuery = ''
 if (values.world !== undefined) {

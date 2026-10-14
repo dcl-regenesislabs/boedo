@@ -12,6 +12,7 @@ const { values } = parseArgs({
     origin: { type: 'string' },
     'base-path': { type: 'string' },
     'ai-auth': { type: 'string' },
+    'ai-image-auth': { type: 'string' },
     'ai-model': { type: 'string' }
   }
 })
@@ -22,6 +23,7 @@ const config = await createServiceConfig({
   ALLOWED_ORIGINS: values.origin,
   BASE_PATH: values['base-path'],
   AI_AUTH_PATH: values['ai-auth'],
+  AI_IMAGE_AUTH_PATH: values['ai-image-auth'],
   AI_MODEL: values['ai-model']
 })
 
