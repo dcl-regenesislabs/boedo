@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Modal, Spinner } from '../../ds'
+import { Button, Modal, Spinner } from '../../ds'
 import { startThreeWorker, type ThreeWorker } from '../../three/client'
 import { catalogUrl } from '../../assets'
 import { dataLayerReadFileBytes } from '../../engine/datalayer'
@@ -34,7 +34,7 @@ function Details(props: { info: ModelInfo; playing: string | null; onPlay: (name
       <dt>Animations</dt>
       <dd>
         {info.animations.length === 0 ? '—' : info.animations.map((name) => (
-          <button key={name} type="button" className={`clip${props.playing === name ? ' on' : ''}`} aria-pressed={props.playing === name} onClick={() => props.onPlay(name)}>{name}</button>
+          <Button key={name} active={props.playing === name} aria-pressed={props.playing === name} onClick={() => props.onPlay(name)}>{name}</Button>
         ))}
       </dd>
     </dl>

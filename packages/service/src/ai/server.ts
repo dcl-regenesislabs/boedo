@@ -48,6 +48,8 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
   limits?: AssistantLimits
   usage?: UsageMeter
   memory?: AssistantMemory
+  /** How long a stop waits for running turns; compose's stop_grace_period must be longer. */
+  drainMs?: number
 }): AssistantComponent {
   const limits = options.limits ?? DEFAULT_ASSISTANT_LIMITS
   const days = new Map<string, { day: number; count: number }>()
@@ -77,6 +79,7 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
     return { all: tickets.size, held: (wallet) => [...tickets.values()].filter((ticket) => ticket.wallet === wallet).length }
   }
   function allowTurn(wallet: string): true | string {
+    if (stopped) return 'The assistant is restarting for an update. Send your message again in a minute.'
     const running = [...connections].filter(([socket, connection]) => sockets.get(socket) === wallet && connection.isRunning()).length
     if (running >= limits.turnsAtOnce) return `${limits.turnsAtOnce} turns are already running in your other tabs. Wait for one to finish.`
     const now = Date.now()
@@ -188,6 +191,10 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
     },
     async [STOP_COMPONENT]() {
       stopped = true
+      const deadline = Date.now() + (options.drainMs ?? 0)
+      while ([...connections.values()].some((connection) => connection.isRunning()) && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      }
       clearInterval(sweeper)
       tickets.clear()
       for (const reservation of pending.values()) clearTimeout(reservation.timer)

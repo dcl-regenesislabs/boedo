@@ -84,6 +84,7 @@ export async function initComponents(options: ComponentOptions = {}): Promise<Ap
   const assistant = createAssistantComponent({ logs }, {
     factory, allowedOrigins: env.allowedOrigins, basePath: env.basePath,
     limits,
+    drainMs: (await config.getNumber('ASSISTANT_DRAIN_SECONDS') ?? 600) * 1000,
     // beside the credential, outside STORAGE_DIR and its project backups
     memory: authPath === undefined ? undefined : createAssistantMemory(join(dirname(authPath), 'memory')),
     usage: authPath === undefined ? undefined : createUsageMeter(join(dirname(authPath), 'usage'), {
