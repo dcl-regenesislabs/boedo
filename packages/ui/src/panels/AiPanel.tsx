@@ -21,6 +21,7 @@ import { entityName } from '@scene/custom-components'
 import { type CodeEditorHandle } from '../script/code-editor'
 import { IconBot, IconChevron, IconNewChat } from '../icons'
 import { onBuiltModel } from '../features/ai/built-models'
+import { onThumbnail } from '../features/ai/built-thumbnails'
 import { aiStore, canAskAssistant, clearRevealLine, closeDoc, leaveStudio, openDoc, openStudio, refreshFileRail, setMode, setSelection, setStudioChordHandler, setStudioFile, toggleAssistantCollapsed, vendorRuntimeAfterTurn } from './ai-store'
 import { uiSelectEntity } from '../actions/selection'
 import { QuickOpen } from '../features/ai/QuickOpen'
@@ -315,6 +316,15 @@ export function AiPanel(props: { shown: boolean; fill: boolean; height: number }
     const msg = prev[i] as Extract<ChatMsg, { role: 'assistant' }>
     const next = [...prev]
     next[i] = { ...msg, models: [...(msg.models ?? []).filter((m) => m.name !== model.name), model] }
+    return next
+  })), [])
+  useEffect(() => onThumbnail((thumbnail) => setMessages((prev) => {
+    let i = prev.length - 1
+    while (i >= 0 && prev[i].role !== 'assistant') i--
+    if (i < 0) return prev
+    const msg = prev[i] as Extract<ChatMsg, { role: 'assistant' }>
+    const next = [...prev]
+    next[i] = { ...msg, thumbnails: [...(msg.thumbnails ?? []).filter((t) => t.path !== thumbnail.path), thumbnail] }
     return next
   })), [])
   const prefill = useStore(() => aiStore.prefill)

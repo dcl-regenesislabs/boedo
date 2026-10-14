@@ -5,12 +5,14 @@ import { ActivityGroup, groupTools, MUTATION_TOOLS, toolLabel, type ToolUse } fr
 import { MarkdownText } from './markdown'
 import { BuiltModelCard } from './BuiltModelCard'
 import type { BuiltModel } from './built-models'
+import { ThumbnailCard } from './ThumbnailCard'
+import type { BuiltThumbnail } from './built-thumbnails'
 import { CheckIcon } from './icons'
 import { EXAMPLES, friendlyError, SETUP } from './chat-helpers'
 
 export type ChatMsg =
   | { role: 'user'; text: string; images?: string[] }
-  | { role: 'assistant'; turnId?: string; text: string; tools: ToolUse[]; done: boolean; error?: string; paused?: string; models?: BuiltModel[] }
+  | { role: 'assistant'; turnId?: string; text: string; tools: ToolUse[]; done: boolean; error?: string; paused?: string; models?: BuiltModel[]; thumbnails?: BuiltThumbnail[] }
   | { role: 'note'; text: string }
 
 export function AiSetup(props: {
@@ -125,6 +127,7 @@ export function MessageList(props: {
               </div>
             )}
             {m.models?.map((model) => <BuiltModelCard key={model.path} model={model} />)}
+            {m.thumbnails?.map((thumbnail) => <ThumbnailCard key={thumbnail.path} thumbnail={thumbnail} />)}
             {m.text !== '' && (
               <div className="eui-ai-text">
                 <MarkdownText text={m.text} onChoose={m.done && i === props.messages.length - 1 ? props.onChoose : undefined} />
