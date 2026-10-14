@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process'
 import { createInterface } from 'node:readline/promises'
 import { ModelRuntime } from '@earendil-works/pi-coding-agent'
 
@@ -12,12 +13,18 @@ export async function oauthLogin(providerId: 'anthropic' | 'openai-codex', authP
       signal: controller.signal,
       prompt: async (prompt) => {
         if (prompt.type === 'secret') throw new Error('Only OAuth sign-in is supported.')
-        if (prompt.type === 'select') for (const option of prompt.options) console.log(`${option.id}: ${option.label}`)
+        // the first option is the browser sign-in, which finishes through the local callback
+        if (prompt.type === 'select') return prompt.options[0].id
         const signal = prompt.signal === undefined ? controller.signal : AbortSignal.any([controller.signal, prompt.signal])
+        // without a terminal (e.g. a `!` command) a closed stdin would cancel the browser callback, so only wait for it
+        if (!process.stdin.isTTY) return new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason)))
         return input.question(`${prompt.message}\n> `, { signal })
       },
       notify: (event) => {
-        if (event.type === 'auth_url') console.log(`${event.instructions ?? 'Open this URL to sign in:'}\n${event.url}`)
+        if (event.type === 'auth_url') {
+          console.log(`Open this URL to sign in if no browser window opens:\n${event.url}`)
+          if (process.platform === 'darwin') execFile('open', [event.url], () => {})
+        }
         else if (event.type === 'device_code') console.log(`Open ${event.verificationUri} and enter ${event.userCode}`)
         else console.log(event.message)
       }
