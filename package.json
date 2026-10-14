@@ -9,7 +9,7 @@
     "packages/scene",
     "packages/ui",
     "packages/desktop",
-    "packages/web-build",
+    "packages/scene-compiler",
     "packages/web",
     "packages/service"
   ],

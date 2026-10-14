@@ -1,5 +1,5 @@
 {
-  "name": "@dcl-editor/web-build",
+  "name": "@dcl-editor/scene-compiler",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "private": true,

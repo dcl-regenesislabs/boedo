@@ -1,10 +1,10 @@
-import { fetchVerified, type SceneBuilderOptions } from '@dcl-editor/web-build'
+import { fetchVerified, type SceneBuilderOptions } from '@dcl-editor/scene-compiler'
 
 // sha384 of every file the package fetches next to editor.js, written into this
 // bundle at build time (scripts/build.mjs): editor.js's own integrity covers them
 declare const __EDITOR_FILE_INTEGRITY__: Readonly<Record<string, string>>
 
-export type WebBuildFiles = Pick<SceneBuilderOptions, 'workerUrl' | 'wasmUrl' | 'snapshotUrl' | 'integrity'>
+export type SceneCompilerFiles = Pick<SceneBuilderOptions, 'workerUrl' | 'wasmUrl' | 'snapshotUrl' | 'integrity'>
 
 export function fileIntegrity(file: string): string {
   const integrity = __EDITOR_FILE_INTEGRITY__[file]
@@ -12,16 +12,16 @@ export function fileIntegrity(file: string): string {
   return integrity
 }
 
-export function webBuildFiles(editorBase: string): WebBuildFiles {
-  const at = (file: string): string => new URL(`web-build/${file}`, editorBase).href
+export function sceneCompilerFiles(editorBase: string): SceneCompilerFiles {
+  const at = (file: string): string => new URL(`scene-compiler/${file}`, editorBase).href
   return {
     workerUrl: at('worker.js'),
     wasmUrl: at('esbuild.wasm'),
     snapshotUrl: at('sdk-snapshot.json'),
     integrity: {
-      worker: fileIntegrity('web-build/worker.js'),
-      wasm: fileIntegrity('web-build/esbuild.wasm'),
-      snapshot: fileIntegrity('web-build/sdk-snapshot.json')
+      worker: fileIntegrity('scene-compiler/worker.js'),
+      wasm: fileIntegrity('scene-compiler/esbuild.wasm'),
+      snapshot: fileIntegrity('scene-compiler/sdk-snapshot.json')
     }
   }
 }

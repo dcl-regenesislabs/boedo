@@ -1,5 +1,5 @@
-// Builds dist/: editor.js (+ editor.css, chunks/, assets/), web-build/ copied
-// from @dcl-editor/web-build, and prefabs/ from the desktop app's built-ins.
+// Builds dist/: editor.js (+ editor.css, chunks/, assets/), scene-compiler/ copied
+// from @dcl-editor/scene-compiler, and prefabs/ from the desktop app's built-ins.
 // dist/scene/ belongs to the editor scene's static export and is left alone.
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -13,16 +13,16 @@ import { sri, writePrefabCatalog } from './prefab-catalog.mjs'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const repo = path.resolve(root, '../..')
 const dist = path.join(root, 'dist')
-const webBuildDist = path.join(repo, 'packages/web-build/dist')
-const WEB_BUILD_FILES = ['index.js', 'worker.js', 'esbuild.wasm', 'sdk-snapshot.json']
+const sceneCompilerDist = path.join(repo, 'packages/scene-compiler/dist')
+const SCENE_COMPILER_FILES = ['index.js', 'worker.js', 'esbuild.wasm', 'sdk-snapshot.json']
 
 // Windows: npm is npm.cmd, which Node only executes through a shell
-const webBuild = spawnSync('npm', ['run', 'build', '-w', '@dcl-editor/web-build'], {
+const sceneCompiler = spawnSync('npm', ['run', 'build', '-w', '@dcl-editor/scene-compiler'], {
   cwd: repo,
   stdio: 'inherit',
   shell: process.platform === 'win32'
 })
-if (webBuild.status !== 0) process.exit(webBuild.status ?? 1)
+if (sceneCompiler.status !== 0) process.exit(sceneCompiler.status ?? 1)
 
 fs.mkdirSync(dist, { recursive: true })
 for (const entry of fs.readdirSync(dist)) {
@@ -34,7 +34,7 @@ for (const entry of fs.readdirSync(dist)) {
 const SENTINEL = '"@@EDITOR_FILE_INTEGRITY@@"'
 const integrity = {}
 for (const file of ['worker.js', 'esbuild.wasm', 'sdk-snapshot.json']) {
-  integrity[`web-build/${file}`] = sri(fs.readFileSync(path.join(webBuildDist, file)))
+  integrity[`scene-compiler/${file}`] = sri(fs.readFileSync(path.join(sceneCompilerDist, file)))
 }
 
 // three.js lives only in this worker, fetched the first time a model is built or previewed
@@ -79,8 +79,8 @@ await build({
   define: { __EDITOR_FILE_INTEGRITY__: SENTINEL }
 })
 
-fs.mkdirSync(path.join(dist, 'web-build'), { recursive: true })
-for (const file of WEB_BUILD_FILES) fs.copyFileSync(path.join(webBuildDist, file), path.join(dist, 'web-build', file))
+fs.mkdirSync(path.join(dist, 'scene-compiler'), { recursive: true })
+for (const file of SCENE_COMPILER_FILES) fs.copyFileSync(path.join(sceneCompilerDist, file), path.join(dist, 'scene-compiler', file))
 for (const [file, expected] of Object.entries(integrity)) {
   if (sri(fs.readFileSync(path.join(dist, file))) !== expected) throw new Error(`dist/${file} does not match the hash written into editor.js`)
 }

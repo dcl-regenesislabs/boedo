@@ -21,7 +21,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    // dist/web-build and dist/scene are written by others (scripts/build.mjs)
+    // dist/scene-compiler and dist/scene are written by others (scripts/build.mjs)
     emptyOutDir: false,
     cssCodeSplit: false,
     // fonts inside editor.css, so its hash covers them: a CSS url() cannot carry one

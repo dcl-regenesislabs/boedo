@@ -24,7 +24,7 @@ import type {
 } from '@dcl-editor/contract'
 import { TRASH_DAYS, copySuffix, object } from '@dcl-editor/contract'
 import { contentCid } from '@dcl-editor/contract/cid'
-import { LOCK_FILE, PREVIEW_CACHE_NAME, PREVIEW_STORAGE_CACHE_NAME, assetPacksStubUpgrades, fetchVerified, lockedKey, parseLock } from '@dcl-editor/web-build'
+import { LOCK_FILE, PREVIEW_CACHE_NAME, PREVIEW_STORAGE_CACHE_NAME, assetPacksStubUpgrades, fetchVerified, lockedKey, parseLock } from '@dcl-editor/scene-compiler'
 import { notify } from '@scene/reactive'
 import { hostV1 } from '@ui/engine/hosted'
 import { persistReady } from '@ui/core/persist'
@@ -97,7 +97,7 @@ function previewReady(scene: RawSceneJson, realmUrl: string): ServersReady {
   }
 }
 
-export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
+export const createWebShell: CreateWebShell = ({ host, sceneCompiler }) => {
   const store = new ProjectStore(browserBackend())
   const services = hostV1(host)
   // a v0 host signs nothing, and a v1 host may have no project service
@@ -130,7 +130,7 @@ export const createWebShell: CreateWebShell = ({ host, webBuild }) => {
   const secret = persistReady.then(browserSecret)
   const previews = createPreviews({
     pageDir: host.pageDir,
-    urls: webBuild,
+    urls: sceneCompiler,
     machineId: async (id) => previewMachineId(await secret, wallet() ?? 'guest', id),
     emit,
     log,

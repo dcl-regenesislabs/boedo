@@ -9,7 +9,7 @@
 //
 // Deleting a project only marks its record; the files go when the trash is
 // purged. Writing needs the project's lock, which one tab at a time holds.
-import { PROJECT_ID_PATTERN } from '@dcl-editor/web-build'
+import { PROJECT_ID_PATTERN } from '@dcl-editor/scene-compiler'
 import { type DirEntry, type FileEntry, type StoreBackend, isNotFound } from './fs'
 import { OpfsPackageStore } from './package-store'
 

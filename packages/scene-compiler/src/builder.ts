@@ -61,7 +61,7 @@ async function startWorker(options: SceneBuilderOptions): Promise<Worker> {
   const { integrity } = options
   if (integrity === undefined) return new Worker(options.workerUrl)
   const url = new URL(options.workerUrl, location.href).href
-  const text = await (await fetchVerified(url, integrity.worker, 'web-build/worker.js')).text()
+  const text = await (await fetchVerified(url, integrity.worker, 'scene-compiler/worker.js')).text()
   // a blob is on the page's origin, so a worker served from a CDN can start from it
   const blob = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }))
   const worker = new Worker(blob)

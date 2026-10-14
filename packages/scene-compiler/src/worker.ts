@@ -42,8 +42,8 @@ interface Started {
 async function start(request: Extract<WorkerRequest, { type: 'init' }>): Promise<Started> {
   unclampZeroTimers()
   const [wasm, response] = await Promise.all([
-    fetchVerified(request.wasmUrl, request.integrity?.wasm, 'web-build/esbuild.wasm'),
-    fetchVerified(request.snapshotUrl, request.integrity?.snapshot, 'web-build/sdk-snapshot.json')
+    fetchVerified(request.wasmUrl, request.integrity?.wasm, 'scene-compiler/esbuild.wasm'),
+    fetchVerified(request.snapshotUrl, request.integrity?.snapshot, 'scene-compiler/sdk-snapshot.json')
   ])
   // compiled from the bytes just checked, never from a second request
   const wasmModule = await WebAssembly.compile(await wasm.arrayBuffer())

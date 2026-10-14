@@ -8,7 +8,7 @@
 // what is copied to the account and exported, and what any device needs to
 // download the same bytes again and check them. The files here are never part
 // of a project's own files, so they are not synced, exported or deployed.
-import type { PackageStore } from '@dcl-editor/web-build'
+import type { PackageStore } from '@dcl-editor/scene-compiler'
 import { type DirEntry, type FileEntry, isNotFound } from './fs'
 
 // "@scope/name@1.0.0" as one folder name

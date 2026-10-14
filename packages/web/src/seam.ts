@@ -25,10 +25,10 @@
 // - The host's identity and console stay with the host: no signing in or out,
 //   and console lines only through context.host.engineConsole.
 import type { EditorShell, ProjectImportReport } from '@dcl-editor/contract'
-import type { BuildOptions, BuildResult } from '@dcl-editor/web-build'
+import type { BuildOptions, BuildResult } from '@dcl-editor/scene-compiler'
 import type { DataLayerClient } from '@ui/engine/datalayer'
 import type { DclEditorHost } from '@ui/engine/hosted'
-import type { WebBuildFiles } from './workers'
+import type { SceneCompilerFiles } from './workers'
 
 export type { DataLayerClient, DclEditorHost, EditorShell }
 
@@ -55,7 +55,7 @@ export interface WebProjects {
 export interface WebShellContext {
   host: DclEditorHost
   // the in-browser build's files under editorBase, with the hashes they must match
-  webBuild: WebBuildFiles
+  sceneCompiler: SceneCompilerFiles
 }
 
 export interface WebShell {

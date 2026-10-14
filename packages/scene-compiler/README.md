@@ -1,4 +1,4 @@
-# @dcl-editor/web-build
+# @dcl-editor/scene-compiler
 
 Builds an SDK7 scene in the browser — no Node, no `npm install` — and writes the
 result where the page's service worker serves a preview realm from.
@@ -17,8 +17,8 @@ result where the page's service worker serves a preview realm from.
 ## Build it
 
 ```bash
-npm run build -w @dcl-editor/web-build      # writes dist/ (gitignored)
-npm run validate -w @dcl-editor/web-build   # builds the starter template in headless Chromium, compares with sdk-commands
+npm run build -w @dcl-editor/scene-compiler      # writes dist/ (gitignored)
+npm run validate -w @dcl-editor/scene-compiler   # builds the starter template in headless Chromium, compares with sdk-commands
 ```
 
 `validate` ends by installing two packages from registry.npmjs.org in the browser
@@ -32,17 +32,17 @@ and building again with the network off; `SKIP_LIVE_REGISTRY=1` leaves that out.
 | `sdk-snapshot.json` | The SDK packages. Serve compressed. |
 
 Serve the four files from the page's origin. A TypeScript consumer in this repo
-imports `@dcl-editor/web-build` (the sources); a plain page imports `dist/index.js`.
+imports `@dcl-editor/scene-compiler` (the sources); a plain page imports `dist/index.js`.
 
 ## Use it
 
 ```ts
-import { createSceneBuilder, previewRealmUrl, publishPreview, reloadCommand } from '@dcl-editor/web-build'
+import { createSceneBuilder, previewRealmUrl, publishPreview, reloadCommand } from '@dcl-editor/scene-compiler'
 
 const builder = createSceneBuilder({
-  workerUrl: new URL('web-build/worker.js', pageDir),
-  wasmUrl: new URL('web-build/esbuild.wasm', pageDir),
-  snapshotUrl: new URL('web-build/sdk-snapshot.json', pageDir),
+  workerUrl: new URL('scene-compiler/worker.js', pageDir),
+  wasmUrl: new URL('scene-compiler/esbuild.wasm', pageDir),
+  snapshotUrl: new URL('scene-compiler/sdk-snapshot.json', pageDir),
   onEvent: (event) => {} // buildStarted | diagnostics | bundleSaved | failed
 })
 
@@ -64,7 +64,7 @@ if (build.ok) {
 ## Packages
 
 ```ts
-import { LOCK_FILE, MemoryPackageStore, parseLock, resolveDependencies, serializeLock } from '@dcl-editor/web-build'
+import { LOCK_FILE, MemoryPackageStore, parseLock, resolveDependencies, serializeLock } from '@dcl-editor/scene-compiler'
 
 const { snapshot } = await builder.ready // what the SDK snapshot provides
 const { lock, warnings } = await resolveDependencies({

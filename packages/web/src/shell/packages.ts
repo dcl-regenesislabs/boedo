@@ -14,7 +14,7 @@ import {
   parseLock,
   resolveDependencies,
   serializeLock
-} from '@dcl-editor/web-build'
+} from '@dcl-editor/scene-compiler'
 import { parseSceneJson } from './scene-json'
 
 export interface FrozenPackages {

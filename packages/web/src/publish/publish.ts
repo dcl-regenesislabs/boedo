@@ -3,7 +3,7 @@
 // (upload.ts). The editor holds no key: it hands the entity id to
 // host.signDeployment and sends the auth chain that comes back.
 import type { PublishProgress, PublishedScene, ScenePublishResult } from '@dcl-editor/contract'
-import type { BuildResult } from '@dcl-editor/web-build'
+import type { BuildResult } from '@dcl-editor/scene-compiler'
 import type { DclEditorHostV1 } from '@ui/engine/hosted'
 import { buildDeployment, type Deployment } from './entity'
 import { PublishError } from './errors'

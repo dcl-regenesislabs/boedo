@@ -2,7 +2,7 @@
 // yet: everything the SDK snapshot does not carry.
 import { parseSceneJson } from '../shell/scene-json'
 
-// the packages inside web-build's sdk-snapshot.json (scripts/make-sdk-snapshot.mjs)
+// the packages inside scene-compiler's sdk-snapshot.json (scripts/make-sdk-snapshot.mjs)
 const BUNDLED = new Set([
   '@dcl/sdk',
   '@dcl/ecs',

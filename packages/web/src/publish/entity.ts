@@ -2,7 +2,7 @@
 // builds it (dcl-catalyst-client's DeploymentBuilder): the files the ignore rules
 // leave, each named by its content hash, listed in an entity file whose own hash
 // is the entity id the wallet signs.
-import { LOCK_FILE, publishableFiles } from '@dcl-editor/web-build'
+import { LOCK_FILE, publishableFiles } from '@dcl-editor/scene-compiler'
 import { contentCid } from '@dcl-editor/contract/cid'
 import { type RawSceneJson, parseSceneJson } from '../shell/scene-json'
 import { PublishError } from './errors'
