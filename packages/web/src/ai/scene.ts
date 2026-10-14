@@ -10,6 +10,7 @@ import { ensureContentMapped, importCatalogFile, loadModelCatalog, modelById, ty
 import { dataLayerListFiles, dataLayerReadFile, dataLayerReadFileBytes, dataLayerSaveFile, dataLayerSaveFileBytes } from '@ui/engine/datalayer'
 import { inspectModel } from '@ui/model-info'
 import { announceBuiltModel } from '@ui/features/ai/built-models'
+import { announceThumbnail, announceThumbnailUsed } from '@ui/features/ai/built-thumbnails'
 import { buildCodeModel, overBudget, MODEL_BUDGET } from './code-model'
 import { MATERIAL_MAPS, materialFile } from '@ui/three/materials'
 import { materialBytes, soundBytes } from './library-files'
@@ -20,8 +21,9 @@ import { sendToScene } from '@ui/engine/bus'
 import { runRequestText } from '@ui/ai/requests'
 import { resolveEntityRef } from '@ui/ai/request-format'
 import { sceneOutline } from '@ui/ai/roster'
-import { refreshSceneChecks } from '@ui/features/editor/scene-check-context'
+import { invalidateSceneCheckCache, refreshSceneChecks } from '@ui/features/editor/scene-check-context'
 import type { AssistantSceneSettings } from '../shell/scene-json'
+import { readThumbnail, saveThumbnail, THUMBNAIL_VERSION, thumbnailPath } from './thumbnail'
 
 function entity(ref: unknown): string {
   if (typeof ref !== 'string') throw new Error('An entity id or unique name is required.')
@@ -120,6 +122,30 @@ export async function browserSceneRequest(request: unknown, signal: AbortSignal,
   if (request.type === 'sceneSettings') {
     if (settings === undefined) throw new Error('Scene settings cannot be changed here.')
     return settings({ permissions: request.permissions, spawnPoints: request.spawnPoints, parcels: request.parcels, base: request.base })
+  }
+  if (request.type === 'saveThumbnail') {
+    if (settings === undefined) throw new Error('The thumbnail cannot be saved here.')
+    const saved = await saveThumbnail(request, {
+      files: () => dataLayerListFiles(),
+      save: dataLayerSaveFileBytes,
+      setThumbnail: (path) => settings({ thumbnailPath: path })
+    }, signal)
+    invalidateSceneCheckCache()
+    announceThumbnail({ path: saved.path, version: saved.version })
+    return saved
+  }
+  if (request.type === 'readThumbnail') return readThumbnail(await dataLayerReadFile('scene.json'), dataLayerReadFileBytes)
+  if (request.type === 'useThumbnail') {
+    if (settings === undefined) throw new Error('The thumbnail cannot be changed here.')
+    if (typeof request.version !== 'number' || !Number.isInteger(request.version)) throw new Error('useThumbnail needs the version number.')
+    const path = thumbnailPath(request.version)
+    if (!THUMBNAIL_VERSION.test(path) || !(await dataLayerReadFileBytes(path).then(() => true, () => false))) {
+      throw new Error(`There is no thumbnail version ${request.version}.`)
+    }
+    await settings({ thumbnailPath: path })
+    invalidateSceneCheckCache()
+    announceThumbnailUsed(path)
+    return { path, version: request.version }
   }
   if (request.type === 'outline') {
     return sceneOutline(state.snapshot, {

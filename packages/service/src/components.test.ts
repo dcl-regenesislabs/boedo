@@ -86,7 +86,8 @@ describe('component service', () => {
     [{ PUBLIC_URL: 'http://service.example' }, 'HTTPS'],
     [{ PUBLIC_URL: 'https://service.example/incorrect' }, 'BASE_PATH'],
     [{ ALLOWED_ORIGINS: 'http://editor.example' }, 'HTTPS'],
-    [{ AI_AUTH_PATH: '/synthetic-storage/.assistant/.auth.json' }, 'outside STORAGE_DIR']
+    [{ AI_AUTH_PATH: '/synthetic-storage/.assistant/.auth.json' }, 'outside STORAGE_DIR'],
+    [{ AI_IMAGE_AUTH_PATH: '/synthetic-storage/.assistant/image-auth.json' }, 'AI_IMAGE_AUTH_PATH must be outside']
   ] as const)('rejects unsafe production configuration %j', async (vars, message) => {
     vi.stubEnv('NODE_ENV', 'production')
     try {

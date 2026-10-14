@@ -59,6 +59,13 @@ secret mount, or the service warns at startup. In production (`NODE_ENV=producti
 refuses to start the assistant without `ASSISTANT_WALLETS` (a wallet list, or `*`), and caps turns
 with `ASSISTANT_TURNS_PER_MINUTE` (all wallets) and `ASSISTANT_TURNS_PER_DAY` (per wallet).
 
+Thumbnails use a second OAuth file, a ChatGPT (Codex) session: run
+`npm run -w @dcl-editor/service image-login -- --out /absolute/path/image-auth.json` where a browser
+can complete the sign-in (or choose the device-code login on a headless machine), copy the file to a
+secret mount outside `STORAGE_DIR` with mode 0600, and set `AI_IMAGE_AUTH_PATH` (`--ai-image-auth`
+for `dev-server.ts`). The service refreshes the token in that file. Production refuses a path inside
+`STORAGE_DIR`.
+
 ## Run locally with browser sign-in
 
 From the repository root, with Node 24 and dependencies installed:
@@ -163,6 +170,21 @@ components; see the [service README](../packages/service/README.md).
 - `build`: compile the current browser project, run the bundle once and return compiler
   diagnostics plus scene/client/server errors. This does not simulate a full playthrough.
 - `view`: capture the viewport, optionally framing an entity or setting the camera pose.
+- `make_thumbnail` (runs on the service): paints the scene's key art with an image model. It takes
+  2 `view` shots as references (the hero subject close, then the whole scene wide), sends them with the assistant's brief, title and style plus
+  Decentraland's composition rules (16:9, title and key subject inside the central square, no small
+  text, UI, borders or watermarks) to the ChatGPT responses backend's `image_generation` tool, and
+  asks the browser to save the result. The browser crops it to 1920×1080, encodes a jpg under 1 MB,
+  saves it as a new version, `assets/images/thumbnail-N.jpg`, and sets `display.navmapThumbnail`.
+  Each version shows as a card in the chat, with "Use this" to switch back to it. With `revise`, the
+  current thumbnail goes along as a third reference and the model edits only what was asked;
+  `scene_request {type:"useThumbnail",version}` switches versions without painting. Old versions
+  stay in the project (and are published) until the creator deletes them. The reference shots
+  and the image never enter the chat model's context; only an optional 384×216 preview does. It
+  needs `AI_IMAGE_AUTH_PATH` (a separate ChatGPT session from `npm run -w @dcl-editor/service
+  image-login -- --out <file>`), counts against `ASSISTANT_IMAGES_PER_DAY` (default 10 per wallet),
+  and without the session tells the creator it is unavailable. The assistant offers one after the
+  first build of a new game, and Scene checks warns about a built scene without one.
   There is no shell, package installation, deletion or publishing tool.
 - `playtest`: start or stop Play, read the player's position, HUD and runtime errors,
   walk on the ground with the movement controller, press the E/F interaction keys,

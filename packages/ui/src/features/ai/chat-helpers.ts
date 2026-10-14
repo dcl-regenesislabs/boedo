@@ -78,7 +78,7 @@ export function keptTranscript(messages: ChatMsg[]): ChatMsg[] {
   for (const m of messages) {
     if (m.role === 'user') kept.push({ role: 'user', text: m.text })
     else if (m.role === 'assistant' && m.done) {
-      kept.push({ role: 'assistant', text: m.text, tools: m.tools, done: true, ...(m.error === undefined ? {} : { error: m.error }), ...(m.models === undefined ? {} : { models: m.models }) })
+      kept.push({ role: 'assistant', text: m.text, tools: m.tools, done: true, ...(m.error === undefined ? {} : { error: m.error }), ...(m.models === undefined ? {} : { models: m.models }), ...(m.thumbnails === undefined ? {} : { thumbnails: m.thumbnails }) })
     }
   }
   let out = kept.slice(-KEPT_MESSAGES)
@@ -88,6 +88,7 @@ export function keptTranscript(messages: ChatMsg[]): ChatMsg[] {
 
 // a restored card may only point at a built model file in the project
 const MODEL_FILE = /^models\/[a-z0-9-]+\.glb$/
+const THUMBNAIL_FILE = /^assets\/images\/thumbnail-(\d+)\.jpg$/
 
 function isText(value: unknown): value is string {
   return typeof value === 'string' && value.length <= KEPT_BYTES
@@ -108,7 +109,14 @@ export function restoredTranscript(value: unknown): ChatMsg[] {
         object(b) && isText(b.name) && isText(b.path) && MODEL_FILE.test(b.path) && typeof b.triangles === 'number' && Number.isFinite(b.triangles)
           ? [{ name: b.name, path: b.path, triangles: b.triangles }] : []
       ) : []
-      out.push({ role: 'assistant', text: row.text, tools, done: true, ...(isText(row.error) ? { error: row.error } : {}), ...(models.length > 0 ? { models } : {}) })
+      const thumbnails = Array.isArray(row.thumbnails) ? (row.thumbnails as unknown[]).flatMap((t) => {
+        const version = object(t) && isText(t.path) ? THUMBNAIL_FILE.exec(t.path)?.[1] : undefined
+        return version === undefined || !object(t) || t.version !== Number(version) ? [] : [{ path: t.path as string, version: t.version }]
+      }) : []
+      out.push({
+        role: 'assistant', text: row.text, tools, done: true, ...(isText(row.error) ? { error: row.error } : {}),
+        ...(models.length > 0 ? { models } : {}), ...(thumbnails.length > 0 ? { thumbnails } : {})
+      })
     }
   }
   return out

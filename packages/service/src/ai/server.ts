@@ -8,6 +8,8 @@ import { createRateLimiter } from '../config.ts'
 import { createConnection } from './connection.ts'
 import type { AssistantMemory } from './memory.ts'
 import type { UsageMeter } from './usage.ts'
+import type { ImageProvider } from './images.ts'
+import { createWalletImages, DEFAULT_IMAGES_PER_DAY } from './thumbnail.ts'
 import type { AgentFactory, AssistantService } from './types.ts'
 import type { BaseComponents } from '../types.ts'
 
@@ -31,9 +33,11 @@ export interface AssistantLimits {
   turnsPerDay: number
   /** Turns one wallet may have running at once, across its tabs. */
   turnsAtOnce: number
+  /** Images (thumbnails) one wallet may have made per UTC day. */
+  imagesPerDay: number
 }
 
-export const DEFAULT_ASSISTANT_LIMITS: AssistantLimits = { wallets: null, turnsPerMinute: 30, turnsPerDay: 50, turnsAtOnce: 2 }
+export const DEFAULT_ASSISTANT_LIMITS: AssistantLimits = { wallets: null, turnsPerMinute: 30, turnsPerDay: 50, turnsAtOnce: 2, imagesPerDay: DEFAULT_IMAGES_PER_DAY }
 
 const MAX_SOCKETS = 32
 const SOCKETS_PER_WALLET = 3
@@ -48,6 +52,8 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
   limits?: AssistantLimits
   usage?: UsageMeter
   memory?: AssistantMemory
+  /** The image model and its per-wallet day count; without it thumbnails report themselves unavailable. */
+  images?: { provider: ImageProvider; usage: UsageMeter }
 }): AssistantComponent {
   const limits = options.limits ?? DEFAULT_ASSISTANT_LIMITS
   const days = new Map<string, { day: number; count: number }>()
@@ -126,7 +132,8 @@ export function createAssistantComponent({ logs }: Pick<BaseComponents, 'logs'>,
       if (socket.readyState !== WebSocket.OPEN) return
       clearTimeout(deadline)
       const usage = options.usage?.forWallet(wallet)
-      connection = createConnection({ factory, logger, send, allowTurn: () => allowTurn(wallet), memory: memory?.forWallet(wallet), usage })
+      const images = createWalletImages(options.images?.provider, options.images?.usage.forWallet(wallet), limits.imagesPerDay)
+      connection = createConnection({ factory, logger, send, allowTurn: () => allowTurn(wallet), memory: memory?.forWallet(wallet), usage, images })
       connections.set(socket, connection)
       send({ kind: 'ready', providers })
     }).catch(() => socket.close(1011, 'Assistant unavailable'))

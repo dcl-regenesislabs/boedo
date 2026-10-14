@@ -9,6 +9,7 @@ import type { BrowserToolName } from '../../../contract/src/assistant.ts'
 import type { AgentFactory } from './types.ts'
 import { WEB_ASSISTANT_PROMPT } from './prompt.ts'
 import { seedSetupToken } from './setup-token.ts'
+import { createWalletImages, thumbnailTool } from './thumbnail.ts'
 import { createSkillsComponent } from '../adapters/skills.ts'
 import type { SkillsComponent } from '../adapters/skills.ts'
 
@@ -70,7 +71,7 @@ export async function createPiFactory(authPath: string, preferredModel?: string,
   }
   return {
     providers,
-    async create(params, call, emit, restore) {
+    async create(params, call, emit, restore, images) {
       const info = (await providers()).find((p) => p.id === params.provider)
       if (info === undefined || !info.available) throw new Error('Provider unavailable')
       const chosen = params.model ?? info.defaultModel
@@ -148,6 +149,7 @@ export async function createPiFactory(authPath: string, preferredModel?: string,
           return { content: [{ type: 'text', text: skillLibrary.read(args.path, args.offset, args.query) }], details: {} }
         }
       })
+      tools.push(thumbnailTool(call, images ?? createWalletImages(undefined, undefined, 0)))
       const sessionManager = SessionManager.inMemory(undefined, undefined, restore as FileEntry[] | undefined)
       const { session } = await createAgentSession({
         modelRuntime: runtime, model, resourceLoader: resources(skillLibrary),

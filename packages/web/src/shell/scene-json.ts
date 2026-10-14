@@ -173,6 +173,7 @@ export interface AssistantSceneSettings {
   spawnPoints?: unknown
   parcels?: unknown
   base?: unknown
+  thumbnailPath?: unknown
 }
 
 const MAX_ASSISTANT_PARCELS = 100
@@ -197,9 +198,13 @@ function point(v: unknown): { x: number; y: number; z: number } | null {
   return [x, y, z].every((n) => typeof n === 'number' && Number.isFinite(n)) ? { x: x as number, y: y as number, z: z as number } : null
 }
 
-// Adds permissions, replaces the spawn points and the parcels; throws on anything it would not write.
+// Adds permissions, replaces the spawn points, the parcels and the thumbnail; throws on anything it would not write.
 export function applyAssistantSettings(raw: RawSceneJson, s: AssistantSceneSettings): RawSceneJson {
   const next: RawSceneJson = { ...raw }
+  if (s.thumbnailPath !== undefined) {
+    if (typeof s.thumbnailPath !== 'string' || !/^assets\/images\/[\w-]+\.(jpg|png)$/.test(s.thumbnailPath)) throw new Error('thumbnailPath must be an image under assets/images/')
+    next.display = { ...(raw.display ?? {}), navmapThumbnail: s.thumbnailPath }
+  }
   if (s.permissions !== undefined) {
     if (!Array.isArray(s.permissions) || s.permissions.some((p) => typeof p !== 'string' || !ASSISTANT_PERMISSIONS.includes(p))) {
       throw new Error(`permissions must be some of: ${ASSISTANT_PERMISSIONS.join(', ')}`)

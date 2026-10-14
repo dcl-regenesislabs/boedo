@@ -39,6 +39,15 @@ entry point runs the agent loop and sends tool requests back to the browser; pro
 files stay in the browser's working copy. No shell or server workspace is exposed
 to the model. Setup and validation: [Web assistant](../../docs/WEB-ASSISTANT.md).
 
+Scene thumbnails come from an image model on a separate ChatGPT sign-in. Create its session file
+once on a machine with a browser, copy it to the server outside `STORAGE_DIR` with mode 0600,
+and set `AI_IMAGE_AUTH_PATH` to it; the service refreshes it in place:
+
+```sh
+npm run -w @dcl-editor/service image-login -- --out ~/image-auth.json
+scp ~/image-auth.json server:/secrets/image-auth.json && ssh server chmod 600 /secrets/image-auth.json
+```
+
 The assistant includes the pinned [Decentraland SDK skills library](skills/README.md)
 as a read-only component. It advertises the topic catalog and loads guidance on demand
 through `read_skill`. The same bundle ships in Docker; no runtime network fetch is
@@ -273,6 +282,8 @@ block and directory overhead when sizing the volume; logical byte limits are not
 | `ASSISTANT_TURNS_AT_ONCE` | 2 | assistant turns one wallet may have running at once, across its tabs |
 | `ASSISTANT_DAILY_LIMIT` | 50000 | internal allowance per wallet per UTC day, priced at the model's API rates; usage is not displayed in the editor |
 | `ASSISTANT_WEEKLY_LIMIT` | 200000 | the same per week, from Monday 00:00 UTC |
+| `AI_IMAGE_AUTH_PATH` | none | ChatGPT (Codex) OAuth session file for the image model behind `make_thumbnail` (`--ai-image-auth`); must be outside `STORAGE_DIR` in production. Unset, the assistant says thumbnails are unavailable |
+| `ASSISTANT_IMAGES_PER_DAY` | 10 | thumbnail images per wallet per UTC day, counted in `image-usage/` beside that file |
 
 Fixed in code: signed-fetch window 60 seconds, ticket lifetime 15 minutes, JSON body 2 MB, project
 name 100 characters, path 512 characters, 3 auth-chain links, 500 spent tickets per purge run.

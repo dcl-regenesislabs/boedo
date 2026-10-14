@@ -1,5 +1,6 @@
 import type { AiEvent, AiProviderInfo, AiSendParams } from '../../../contract/src/shell.ts'
 import type { BrowserToolName } from '../../../contract/src/assistant.ts'
+import type { WalletImages } from './thumbnail.ts'
 
 export interface AssistantAgent {
   prompt(params: AiSendParams): Promise<void>
@@ -16,13 +17,16 @@ export interface TurnUsage {
   cost: number
 }
 
+export type BrowserCall = (tool: BrowserToolName, args: Record<string, unknown>, signal?: AbortSignal) => Promise<string>
+
 export interface AgentFactory {
   providers(): Promise<AiProviderInfo[]>
   create(
     params: AiSendParams,
-    call: (tool: BrowserToolName, args: Record<string, unknown>, signal?: AbortSignal) => Promise<string>,
+    call: BrowserCall,
     emit: (event: Pick<Extract<AiEvent, { kind: 'text' }>, 'text'>) => void,
-    restore?: unknown[]
+    restore?: unknown[],
+    images?: WalletImages
   ): Promise<AssistantAgent>
 }
 

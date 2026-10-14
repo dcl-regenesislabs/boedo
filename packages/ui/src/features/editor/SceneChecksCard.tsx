@@ -3,6 +3,8 @@ import { state } from '@scene/state'
 import { Chip } from '../../ds'
 import { useStore } from '../../core/store'
 import { revealPrefab } from '../../panels/prefab-store'
+import { canAskAssistant, prefillAssistant } from '../../panels/ai-store'
+import { THUMBNAIL_FIX_ACTION } from './scene-check-thumbnail'
 import { uiFocusEntity, uiSelectEntity } from '../../actions/selection'
 import { uiPlay } from '../../actions/playback'
 import css from './scene-checks.css?inline'
@@ -88,6 +90,7 @@ export function SceneChecksCard(): JSX.Element | null {
   const runFix = (finding: SceneFinding): void => {
     const action = finding.fix?.action
     if (action === 'reveal-prefab' && finding.folder !== undefined) revealPrefab(finding.folder)
+    if (action === THUMBNAIL_FIX_ACTION) prefillAssistant('Make a thumbnail for this scene in a … style')
     if (action === 'select-entity' && finding.entityId !== undefined) {
       uiSelectEntity(finding.entityId, false, false)
       uiFocusEntity(finding.entityId)
@@ -138,7 +141,7 @@ export function SceneChecksCard(): JSX.Element | null {
                 <b>{finding.title}</b>
               </div>
               <p>{finding.detail}</p>
-              {finding.fix !== undefined && (
+              {finding.fix !== undefined && (finding.fix.action !== THUMBNAIL_FIX_ACTION || canAskAssistant()) && (
                 <div className="act">
                   <button className="eui-link" onClick={() => runFix(finding)}>
                     {finding.fix.label}

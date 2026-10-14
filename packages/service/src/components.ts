@@ -12,6 +12,7 @@ import type { AssistantLimits } from './ai/server.ts'
 import { createAssistantMemory } from './ai/memory.ts'
 import { createUsageMeter, DEFAULT_USAGE_LIMITS } from './ai/usage.ts'
 import { ASSISTANT_MODEL, createPiFactory } from './ai/pi.ts'
+import { codexTokenSource, createCodexImageProvider } from './ai/images.ts'
 import type { AgentFactory } from './ai/types.ts'
 import { createRateLimiter, createUploadGate, envFromConfig, DEFAULT_LIMITS, walletAllowlist } from './config.ts'
 import { createQuotaStore } from './quota-store.ts'
@@ -43,7 +44,8 @@ async function assistantLimits(config: IConfigComponent, enabled: boolean): Prom
     wallets: walletAllowlist(listed, 'ASSISTANT_WALLETS'),
     turnsPerMinute: await count('ASSISTANT_TURNS_PER_MINUTE', DEFAULT_ASSISTANT_LIMITS.turnsPerMinute),
     turnsPerDay: await count('ASSISTANT_TURNS_PER_DAY', DEFAULT_ASSISTANT_LIMITS.turnsPerDay),
-    turnsAtOnce: await count('ASSISTANT_TURNS_AT_ONCE', DEFAULT_ASSISTANT_LIMITS.turnsAtOnce)
+    turnsAtOnce: await count('ASSISTANT_TURNS_AT_ONCE', DEFAULT_ASSISTANT_LIMITS.turnsAtOnce),
+    imagesPerDay: await count('ASSISTANT_IMAGES_PER_DAY', DEFAULT_ASSISTANT_LIMITS.imagesPerDay)
   }
 }
 
@@ -61,9 +63,12 @@ export async function initComponents(options: ComponentOptions = {}): Promise<Ap
   const authPath = await config.getString('AI_AUTH_PATH') ??
     (setupToken === undefined ? undefined : join(await config.requireString('STORAGE_DIR'), '..', '.assistant', '.auth.json'))
   const limits = await assistantLimits(config, options.agentFactory !== undefined || authPath !== undefined)
+  const imageAuthPath = await config.getString('AI_IMAGE_AUTH_PATH')
   const storageDir = await config.getString('STORAGE_DIR')
-  const authInStorage = authPath !== undefined && storageDir !== undefined &&
-    (resolve(authPath) === resolve(storageDir) || resolve(authPath).startsWith(resolve(storageDir) + sep))
+  const inStorage = (path: string | undefined) => path !== undefined && storageDir !== undefined &&
+    (resolve(path) === resolve(storageDir) || resolve(path).startsWith(resolve(storageDir) + sep))
+  const authInStorage = inStorage(authPath)
+  const imageAuthInStorage = inStorage(imageAuthPath)
   if (process.env.NODE_ENV === 'production') {
     if (env.publicUrl === undefined) throw new Error('PUBLIC_URL must be set in production, or upload urls echo the request Host header')
     if (!(await config.getString('WKC_METRICS_BEARER_TOKEN'))) throw new Error('WKC_METRICS_BEARER_TOKEN must be set in production, or /metrics is public')
@@ -73,6 +78,7 @@ export async function initComponents(options: ComponentOptions = {}): Promise<Ap
       publicUrl.pathname.replace(/\/$/, '') !== (env.basePath ?? '')) throw new Error('PUBLIC_URL must be HTTPS and match BASE_PATH')
     if (env.allowedOrigins.some((origin) => !origin.startsWith('https://'))) throw new Error('ALLOWED_ORIGINS must use HTTPS in production')
     if (authInStorage) throw new Error('AI_AUTH_PATH must be outside STORAGE_DIR in production')
+    if (imageAuthInStorage) throw new Error('AI_IMAGE_AUTH_PATH must be outside STORAGE_DIR in production')
   }
   const factory = options.agentFactory ?? (authPath === undefined ? undefined :
     await createPiFactory(authPath, (await config.getString('AI_MODEL')) ?? ASSISTANT_MODEL, setupToken, skills))
@@ -80,6 +86,9 @@ export async function initComponents(options: ComponentOptions = {}): Promise<Ap
   const logs = await createLogComponent({ config, metrics })
   if (authInStorage) {
     logs.getLogger('assistant').warn('The assistant credential is inside STORAGE_DIR; set AI_AUTH_PATH to a secret mount outside it')
+  }
+  if (imageAuthInStorage) {
+    logs.getLogger('assistant').warn('The image model credential is inside STORAGE_DIR; set AI_IMAGE_AUTH_PATH to a secret mount outside it')
   }
   const assistant = createAssistantComponent({ logs }, {
     factory, allowedOrigins: env.allowedOrigins, basePath: env.basePath,
@@ -89,7 +98,12 @@ export async function initComponents(options: ComponentOptions = {}): Promise<Ap
     usage: authPath === undefined ? undefined : createUsageMeter(join(dirname(authPath), 'usage'), {
       daily: (await config.getNumber('ASSISTANT_DAILY_LIMIT')) ?? DEFAULT_USAGE_LIMITS.daily,
       weekly: (await config.getNumber('ASSISTANT_WEEKLY_LIMIT')) ?? DEFAULT_USAGE_LIMITS.weekly
-    })
+    }),
+    // one image counts 1, so the meter's daily limit is the image cap
+    images: imageAuthPath === undefined ? undefined : {
+      provider: createCodexImageProvider({ token: await codexTokenSource(imageAuthPath) }),
+      usage: createUsageMeter(join(dirname(imageAuthPath), 'image-usage'), { daily: limits.imagesPerDay, weekly: limits.imagesPerDay * 7 })
+    }
   })
   const server = await createServerComponent<GlobalContext>({ config, logs, ws: assistant.ws }, {})
   if (!metrics.registry) throw new Error('Metrics registry is not initialized')
