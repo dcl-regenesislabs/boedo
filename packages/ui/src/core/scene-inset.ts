@@ -1,7 +1,8 @@
-// The screen the editor's own panels leave to the scene, sent to the explorer (host setSceneInset), which
-// reports it to scenes as their interactable area: a game's HUD then lays out clear of the editor.
+// The screen the editor's own panels leave to the scene. The editor scene sets it as the engine's interactable
+// area (BevyApi.setInteractableArea), which scenes read from UiCanvasInformation: a game's HUD then lays out
+// clear of the editor.
 import { useCallback, useRef } from 'react'
-import { hostV1 } from '../engine/hosted'
+import { BevyApi } from '../engine/bevy-api-web'
 
 export type InsetSide = 'left' | 'right' | 'top'
 
@@ -12,8 +13,6 @@ let queued = false
 
 function measure(): void {
   queued = false
-  const host = hostV1()
-  if (host?.setSceneInset === undefined) return
   const area = { left: 0, top: 0, right: 0, bottom: 0 }
   for (const [el, side] of elements) {
     const r = el.getBoundingClientRect()
@@ -26,7 +25,7 @@ function measure(): void {
   const key = JSON.stringify(rounded)
   if (key === sent) return
   sent = key
-  host.setSceneInset(rounded)
+  BevyApi.setInteractableArea(rounded)
 }
 
 function schedule(): void {

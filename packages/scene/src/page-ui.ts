@@ -65,7 +65,9 @@ const RPC_METHODS = new Set([
   'loginGuest',
   'liveSceneInfo',
   // the toolbar mute drives the engine's "Master Volume" setting (engine/audio.ts)
-  'setSetting'
+  'setSetting',
+  // the space the editor's panels leave to scene UI (core/scene-inset.ts)
+  'setInteractableArea'
 ])
 
 // the session and the engine settings: the host's when hosted, so not the page's to call

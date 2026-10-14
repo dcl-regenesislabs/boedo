@@ -49,6 +49,8 @@ export type BevyApiInterface = {
   // column of these; we replicate that in graphics-preset.ts.
   getSettings: () => Promise<EngineSetting[]>
   setSetting: (name: string, value: number) => Promise<void>
+  // the screen scenes may draw UI in, as CSS px from each window edge (UiCanvasInformation.interactableArea)
+  setInteractableArea: (area: { left: number; top: number; right: number; bottom: number }) => void
 }
 
 export type EngineSetting = {

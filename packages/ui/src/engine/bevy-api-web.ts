@@ -17,6 +17,10 @@ export const BevyApi: BevyApiInterface = {
   liveSceneInfo: async () => await sceneRpc('liveSceneInfo'),
   getSettings: async () => await sceneRpc('getSettings'),
   setSetting: async (name, value) => await sceneRpc('setSetting', [name, value]),
+  setInteractableArea: (area) => {
+    // lost while the editor scene is starting; the editor sends it again once the scene is ready
+    sceneRpc('setInteractableArea', [area]).catch(() => {})
+  },
   getSystemActionStream: async () => {
     // system actions stay scene-side (gizmo/camera input); nothing to consume here
     return (async function* () {})()

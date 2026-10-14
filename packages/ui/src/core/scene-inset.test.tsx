@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import { mount } from '../test/render'
-import { setHost, type DclEditorHost } from '../engine/hosted'
+import { BevyApi } from '../engine/bevy-api-web'
 import { useSceneInsetRef, type InsetSide } from './scene-inset'
 
 // happy-dom lays nothing out, so each panel's rect comes from its props
@@ -12,10 +12,9 @@ function Panel(props: { side: InsetSide; rect: { left: number; right: number; bo
   }} />
 }
 
-it('tells the explorer the space the editor panels leave, following them as they open and close', async () => {
+it('tells the engine the space the editor panels leave, following them as they open and close', async () => {
   Object.assign(window, { innerWidth: 1920 })
-  const setSceneInset = vi.fn()
-  setHost({ version: 1, setSceneInset } as unknown as DclEditorHost)
+  const setSceneInset = vi.spyOn(BevyApi, 'setInteractableArea').mockImplementation(() => {})
   const view = mount(<>
     <Panel side="left" rect={{ left: 12, right: 312, bottom: 1000 }} />
     <Panel side="right" rect={{ left: 1580, right: 1920, bottom: 1080 }} />
@@ -28,5 +27,4 @@ it('tells the explorer the space the editor panels leave, following them as they
   await view.settle()
   expect(setSceneInset).toHaveBeenLastCalledWith({ left: 0, top: 106, right: 0, bottom: 0 })
   view.unmount()
-  setHost(null)
 })
