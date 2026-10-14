@@ -15,7 +15,7 @@ services:
     volumes:
       - editor-data:/data
     restart: unless-stopped
-    stop_grace_period: 30s
+    stop_grace_period: 11m
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
