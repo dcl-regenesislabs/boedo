@@ -99,7 +99,7 @@ export async function makeThumbnail(args: unknown, call: BrowserCall, images: Wa
   }
   const image = await images.generate({ prompt: thumbnailPrompt({ brief, title, style, revise }), references }, signal)
   const saved: unknown = JSON.parse(await call('scene_request', {
-    request: { type: 'saveThumbnail', image: image.data, mimeType: image.mimeType, preview: args.preview === true },
+    request: { type: 'saveThumbnail', image: image.data, mimeType: image.mimeType, preview: true },
     label: 'Saving the thumbnail'
   }, signal))
   if (!object(saved)) throw new Error('The browser did not save the thumbnail.')
@@ -115,14 +115,14 @@ export function thumbnailTool(call: BrowserCall, images: WalletImages): ToolDefi
     description: 'Make the scene\'s thumbnail: 16:9 key art painted by an image model from your brief and 2 views of the scene ' +
       '(from, lookAt in world metres): the hero subject close, then the whole scene wide. Each one is saved as a new version, ' +
       'assets/images/thumbnail-N.jpg, and set in scene.json; earlier versions stay. revise edits the current thumbnail instead ' +
-      'of painting a new one: say only what to change. preview returns a small copy to check it.',
+      'of painting a new one: say only what to change. Every call paints a new image and returns a small copy of it; ' +
+      'never call it just to look at a thumbnail.',
     parameters: Type.Object({
       brief: Type.String({ maxLength: 2000, description: 'Art direction: the game hook, hero subject, mood and palette' }),
       title: Type.String({ maxLength: 60, description: 'The title text, exactly as it should read' }),
       style: Type.String({ maxLength: 80 }),
       revise: Type.Optional(Type.String({ maxLength: 500, description: 'Only what to change in the current thumbnail' })),
       shots: Type.Array(Type.Object({ from: point, lookAt: point }), { minItems: 2, maxItems: 2 }),
-      preview: Type.Optional(Type.Boolean()),
       label: Type.Optional(Type.String({ description: 'What you are doing now, for the creator, at most six words' }))
     }),
     execute: (_id, args, signal) => makeThumbnail(args, call, images, signal)

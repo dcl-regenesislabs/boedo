@@ -14,8 +14,7 @@ afterEach(async () => { for (const directory of directories.splice(0)) await rm(
 
 const args = {
   brief: 'A frantic rooftop chase at dusk', title: 'Roof Runner', style: 'comic',
-  shots: [{ from: { x: 8, y: 3, z: 2 }, lookAt: { x: 8, y: 1, z: 8 } }, { from: { x: 8, y: 20, z: -10 }, lookAt: { x: 8, y: 0, z: 8 } }],
-  preview: true
+  shots: [{ from: { x: 8, y: 3, z: 2 }, lookAt: { x: 8, y: 1, z: 8 } }, { from: { x: 8, y: 20, z: -10 }, lookAt: { x: 8, y: 0, z: 8 } }]
 }
 
 function browser(): { call: BrowserCall; calls: Array<[string, Record<string, unknown>]> } {
