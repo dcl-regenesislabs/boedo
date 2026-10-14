@@ -1,6 +1,10 @@
+import { object } from '@dcl-editor/contract'
+
 // The scene thumbnail the assistant's image model painted: cropped to Decentraland's 16:9 at 1920×1080
 // and saved as the project's navmap thumbnail. Only a small preview, when asked, goes back to the model.
-export const THUMBNAIL_PATH = 'assets/images/thumbnail.jpg'
+// Each painting is a new version, so the creator can go back to an earlier one.
+export const THUMBNAIL_VERSION = /^assets\/images\/thumbnail-(\d+)\.jpg$/
+export const thumbnailPath = (version: number): string => `assets/images/thumbnail-${version}.jpg`
 export const THUMBNAIL_WIDTH = 1920
 export const THUMBNAIL_HEIGHT = 1080
 const PREVIEW_WIDTH = 384
@@ -66,8 +70,13 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(binary)
 }
 
+export function nextThumbnailVersion(files: string[]): number {
+  return Math.max(0, ...files.map((file) => Number(THUMBNAIL_VERSION.exec(file)?.[1] ?? 0))) + 1
+}
+
 export interface ThumbnailSaved {
   path: string
+  version: number
   width: number
   height: number
   bytes: number
@@ -75,6 +84,7 @@ export interface ThumbnailSaved {
 }
 
 export async function saveThumbnail(request: Record<string, unknown>, project: {
+  files(): Promise<string[]>
   save(path: string, bytes: Uint8Array): Promise<void>
   // points scene.json's display.navmapThumbnail at the file
   setThumbnail(path: string): Promise<unknown>
@@ -93,12 +103,26 @@ export async function saveThumbnail(request: Record<string, unknown>, project: {
       if (jpeg.length <= MAX_THUMBNAIL_BYTES) break
     }
     signal.throwIfAborted()
-    await project.save(THUMBNAIL_PATH, jpeg)
-    await project.setThumbnail(THUMBNAIL_PATH)
-    const saved: ThumbnailSaved = { path: THUMBNAIL_PATH, width: THUMBNAIL_WIDTH, height: THUMBNAIL_HEIGHT, bytes: jpeg.length }
+    const version = nextThumbnailVersion(await project.files())
+    const path = thumbnailPath(version)
+    await project.save(path, jpeg)
+    await project.setThumbnail(path)
+    const saved: ThumbnailSaved = { path, version, width: THUMBNAIL_WIDTH, height: THUMBNAIL_HEIGHT, bytes: jpeg.length }
     if (request.preview !== true) return saved
     return { ...saved, preview: { mimeType: 'image/jpeg', image: toBase64(await picture.jpeg(crop, PREVIEW_WIDTH, PREVIEW_HEIGHT, 0.7)) } }
   } finally {
     picture.close()
   }
+}
+
+// The thumbnail scene.json points at now, for the image model to revise
+export async function readThumbnail(sceneJson: string, read: (path: string) => Promise<Uint8Array>): Promise<{ path: string; mimeType: string; image: string }> {
+  const scene: unknown = JSON.parse(sceneJson)
+  const path = object(scene) && object(scene.display) ? scene.display.navmapThumbnail : undefined
+  if (typeof path !== 'string' || path === '') throw new Error('The scene has no thumbnail yet.')
+  const mimeType = /\.png$/i.test(path) ? 'image/png' : /\.jpe?g$/i.test(path) ? 'image/jpeg' : null
+  if (mimeType === null) throw new Error(`The thumbnail ${path} is not a jpg or png.`)
+  const bytes = await read(path)
+  if (bytes.length > MAX_INPUT_BYTES) throw new Error(`The thumbnail ${path} is too large to revise.`)
+  return { path, mimeType, image: toBase64(bytes) }
 }
