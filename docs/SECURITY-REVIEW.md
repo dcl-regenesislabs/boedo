@@ -101,10 +101,14 @@ A buffer-coherence fixture reproduced five stale-data failures on the old engine
 CPU updates, clears, copies, read-only shader use and a GPU write. The driver now submits
 queued changes before readback, updates CPU mirrors and invalidates them before writable
 shader use. Pending GPU reads return empty data instead of taking a synchronous fallback.
-The clean engine build and all three fixture exports pass. The native/browser library
-build is in progress; final graphics and editor lifecycle checks are still pending.
-Automatic approval review could not start the Linux browser check because account usage
-capacity was exhausted. This is not a passing browser result. Native phone tests have not run.
+The clean engine build, native importer build and all three fixture exports pass. The
+fresh browser library build cannot proceed until `nightly-2026-09-15` with `rust-src` is
+installed. The default native check stopped in LiveKit's WebRTC dependency build script
+when its HTTP client panicked in the sandbox; this is not a successful native check.
+Final graphics and editor lifecycle checks are still pending. Automatic approval review
+could not start the Linux browser check because account usage capacity was exhausted.
+The prepared npm runtime and service smoke result above still use the earlier migrated
+export, not the final engine fixes. Native phone tests have not run.
 
 Dependency review uses the downloaded public OSV npm database and an offline scanner;
 no private dependency list is uploaded. The service's 91 production packages have no
@@ -131,5 +135,8 @@ disabled in the source forks, and branch names in the inherited distribution wor
 are passed through environment variables rather than inserted into shell code.
 GitHub requires a read-only
 `GODOT_SOURCE_TOKEN` for the private source repositories; no credential was added and
-no remote workflow was dispatched. Submodule commits and the parent pin are prepared
-locally. Nothing has been pushed, published or deployed.
+the secret is currently absent from both the source parent and editor repositories.
+No remote workflow was dispatched. Submodule commits and the parent pin are prepared
+locally. Before merging, complete the fresh browser export, all three graphics assertions,
+runtime packaging and editor lifecycle checks, then pass CI with the source secret
+configured. Nothing has been pushed, published or deployed.
