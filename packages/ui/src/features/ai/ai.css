@@ -212,11 +212,6 @@
 }
 .eui-studio-brand { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13px; }
 .eui-studio-brand svg { color: var(--primary); }
-.eui-studio-hbtn {
-  width: 28px; height: 28px; border-radius: var(--r-control); border: 1px solid var(--divider); background: var(--paper);
-  color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px;
-}
-.eui-studio-hbtn:hover { color: var(--text); background: var(--paper-hi); }
 
 /* ---- studio columns: chrome on --paper, documents on --input ---- */
 .eui-studio-split { flex: 1; min-height: 0; display: flex; }
@@ -304,6 +299,8 @@
 
 /* ---- project file tree (Studio's left column) ---- */
 .eui-studio-rail-head { padding: 8px; border-bottom: 1px solid var(--divider-soft); }
+.eui-studio-rail.fill { width: auto; border-right: 0; background: transparent; }
+.eui-studio-rail.fill .eui-studio-rail-body { overflow: visible; }
 .eui-studio-rail-body { flex: 1; min-height: 0; overflow: auto; padding: 6px 6px 14px; }
 
 .eui-file-row {

@@ -1,0 +1,16 @@
+.eui-ds-winctls { display: flex; flex: none; align-items: center; }
+.eui-ds-winctl {
+  display: grid; place-items: center; width: 22px; height: 28px; padding: 0;
+  border: 0; border-radius: 6px; background: transparent; color: var(--mac-glyph); cursor: pointer;
+}
+.eui-ds-winctl span { display: grid; place-items: center; width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 12%); }
+.eui-ds-winctl.close span { background: var(--mac-close); }
+.eui-ds-winctl.minimize span { background: var(--mac-minimize); }
+.eui-ds-winctl.expand span { background: var(--mac-expand); }
+.eui-ds-winctl svg { width: 10px; height: 10px; stroke-width: 2; opacity: 0; }
+.eui-ds-winctls:is(:hover, :focus-within) .eui-ds-winctl:not(:disabled) svg { opacity: 1; }
+.eui-ds-winctl:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+.eui-ds-winctl:active:not(:disabled) span { filter: brightness(0.8); }
+.eui-ds-winctl:disabled { cursor: default; }
+.eui-ds-winctl:disabled span { background: var(--divider); }
+@media (hover: none) { .eui-ds-winctl:not(:disabled) svg { opacity: 1; } }

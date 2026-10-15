@@ -15,7 +15,7 @@ import {
   Button, IconButton, LinkButton, ControlButton, Segmented, Toggle, Checkbox, TextInput, NumberField,
   Select, MultiSelect, Popover, Slider, ColorSwatch, TextArea, IdBadge, Panel, GroupLabel, PropRow, MenuItem,
   FieldLabel, Notice, SearchField, Shelf, Splitter, Tooltip, Spinner, Toast, AutoSaveChip,
-  Pager, ConfirmButton, CopyField, PanelState, StateBlock, Modal, Chip, ContextMenu, TableEditor, ParcelMap, CardPicker,
+  Pager, ConfirmButton, CopyField, PanelState, StateBlock, Modal, Chip, ContextMenu, WindowControls, TableEditor, ParcelMap, CardPicker,
   type TableColumn, type TableRow
 } from './ds'
 
@@ -553,6 +553,9 @@ function Composites(): JSX.Element {
       <Story title="Modal"><ModalDemo /></Story>
       <Story title="Modal — size=&quot;xl&quot; (--modal-w-xl)"><ModalXlDemo /></Story>
       <Story title="ContextMenu"><ContextMenuDemo /></Story>
+      <Story title="WindowControls">
+        <WindowControls onClose={() => undefined} closeLabel="Close" onMinimize={() => undefined} minimizeLabel="Minimize" />
+      </Story>
       <Story title="ParcelMap"><ParcelMapDemo /></Story>
       <Story title="CardPicker"><CardPickerDemo /></Story>
       <Story title="StateBlock"><StateBlockDemo /></Story>

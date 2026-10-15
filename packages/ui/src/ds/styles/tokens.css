@@ -32,6 +32,11 @@
      --success/green says the server owns a value, this blue says the client
      decides it. Only guarantee chips speak it — it is not a status colour. */
   --client-blue: #4ea3ff;
+  /* the macOS window dots (WindowControls) */
+  --mac-close: #ff5f57;
+  --mac-minimize: #febc2e;
+  --mac-expand: #28c840;
+  --mac-glyph: #3c1e14;
   /* the three axis colours, matched to the in-scene gizmo handles
      (AXIS_COLORS in packages/scene/src/viewport/gizmo.ts). A creator reads the
      red bar in the inspector and the red arrow in the viewport as the same

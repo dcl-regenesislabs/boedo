@@ -3,7 +3,7 @@
 // which owns the dirty-buffer / pending-diff guard.
 import { useEffect, useState, type ReactNode, type RefObject } from 'react'
 import { trackRightDock } from '../../core/chrome'
-import { AutoSaveChip, labelTip } from '../../ds'
+import { AutoSaveChip, WindowControls } from '../../ds'
 import { IconCode } from '../../icons'
 import { CodeEditor, type CodeEditorHandle } from '../../script/code-editor'
 import { baseName, isEditable } from '../../script/project-files'
@@ -50,18 +50,15 @@ export function StudioShell(props: {
   return (
     <aside className="eui-ai-panel studio">
       <header className="eui-studio-head">
+        <WindowControls
+          onClose={() => props.onLeaveTab(leaveStudio)}
+          closeLabel={props.chat === null ? 'Back to the scene (Esc)' : 'Back to the chat dock (Esc)'}
+        />
         <span className="eui-studio-brand">
           <IconCode /> Script Studio
         </span>
         <span style={{ flex: 1 }} />
         {props.headActions}
-        <button
-          className="eui-studio-hbtn"
-          onClick={() => props.onLeaveTab(leaveStudio)}
-          {...labelTip(props.chat === null ? 'Back to the scene (Esc)' : 'Back to the chat dock (Esc)')}
-        >
-          ⤡
-        </button>
       </header>
       <div className="eui-studio-split">
         <FileRail active={file} reloadKey={props.railKey} onOpen={(p) => props.onLeaveTab(() => props.onOpenDoc(p))} />
