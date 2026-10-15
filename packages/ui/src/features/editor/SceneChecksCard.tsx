@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { state } from '@scene/state'
-import { Chip } from '../../ds'
+import { Button, Chip } from '../../ds'
+import { IconBot, IconFrame, IconPrefab } from '../../icons'
 import { useStore } from '../../core/store'
 import { revealPrefab } from '../../panels/prefab-store'
 import { canAskAssistant, prefillAssistant } from '../../panels/ai-store'
@@ -24,6 +25,12 @@ import {
 registerCss('features/editor/scene-checks', 'features', css)
 
 const IDLE_REFRESH_MS = 15_000
+
+const FIX_ICON: Record<string, JSX.Element> = {
+  [THUMBNAIL_FIX_ACTION]: <IconBot />,
+  'select-entity': <IconFrame />,
+  'reveal-prefab': <IconPrefab />
+}
 
 const LEVEL_LABEL: Record<SceneCheckLevel, string> = {
   blocker: 'Blocks Play',
@@ -135,7 +142,7 @@ export function SceneChecksCard(): JSX.Element | null {
           {findings.map((finding, index) => (
             <li key={findingKey(finding, index)} className={finding.level}>
               <div className="top">
-                <Chip size="xs" tone={finding.level === 'warning' ? 'default' : 'danger'}>
+                <Chip size="xs" tone={finding.level === 'warning' ? 'warning' : 'danger'}>
                   {LEVEL_LABEL[finding.level]}
                 </Chip>
                 <b>{finding.title}</b>
@@ -143,9 +150,10 @@ export function SceneChecksCard(): JSX.Element | null {
               <p>{finding.detail}</p>
               {finding.fix !== undefined && (finding.fix.action !== THUMBNAIL_FIX_ACTION || canAskAssistant()) && (
                 <div className="act">
-                  <button className="eui-link" onClick={() => runFix(finding)}>
+                  <Button variant="primary" size="sm" onClick={() => runFix(finding)}>
+                    {FIX_ICON[finding.fix.action]}
                     {finding.fix.label}
-                  </button>
+                  </Button>
                 </div>
               )}
             </li>
