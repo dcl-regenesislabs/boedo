@@ -3,7 +3,7 @@ import { state } from '@scene/state'
 import { useStore } from '../core/store'
 import { uiCheckModelRefs, uiFetchCatalog, uiImportAsset, uiLoadLocalModels, uiPlaceLocalModel, uiImportFiles } from '../actions/assets'
 import { loadLocalMedia, loadLocalSounds, opendclUrl, SOUND_EXT } from '../assets'
-import { Button, ContextMenu, IconButton, MenuItem, Modal, SearchField, Select, Shelf } from '../ds'
+import { Button, ContextMenu, IconButton, LinkButton, MenuItem, Modal, SearchField, Select, Shelf } from '../ds'
 import { deleteProjectFile, fileUsers, filesDeletedWith } from '../project-file-use'
 import { refreshUnusedFiles, useUnusedFiles } from '../unused-files'
 import { assetsReview, takeSweepRequest } from './assets-review'
@@ -470,10 +470,10 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
           {tree ? <AssetsFileTree query={filter} reloadKey={reloads} /> : <LocalGrid list={shownLocal} older={older} olderScanned={files.older !== null} unused={unused} onUploaded={refresh} />}
           {!tree && capped && (
             <div className="eui-asset-more">
-              <Button variant="secondary" size="sm" onClick={() => setAllFiles(true)}>
-                <IconChevron />
+              <LinkButton tone="inline" onClick={() => setAllFiles(true)}>
                 Show all {local.length} files
-              </Button>
+                <IconChevron />
+              </LinkButton>
             </div>
           )}
         </Shelf>
