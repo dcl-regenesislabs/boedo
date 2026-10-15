@@ -2,10 +2,12 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const source = process.argv[2] ?? process.env.MOBILE_PREVIEW_EXPORT
-if (!source) throw new Error('Pass the mobile web export directory, or set MOBILE_PREVIEW_EXPORT.')
+const override = process.argv[2] ?? process.env.MOBILE_PREVIEW_EXPORT
+const source = override ?? fileURLToPath(new URL('./', import.meta.resolve('@dcl-regenesislabs/mobile-preview-runtime/manifest.json')))
+if (!override) execFileSync(process.execPath, [fileURLToPath(import.meta.resolve('@dcl-regenesislabs/mobile-preview-runtime/check'))], { stdio: 'inherit' })
 const required = ['index.html', 'index.js', 'index.wasm', 'index.side.wasm', 'index.pck', 'dclgodot.wasm']
 const names = (await fs.readdir(source)).filter(name => /^(index\.(html|js|wasm|side\.wasm|pck|png|icon\.png|apple-touch-icon\.png|audio\.[a-z.]+\.js)|dclgodot\.wasm|libsentry\.[a-z0-9.]+\.wasm)$/.test(name))
 for (const name of required) if (!names.includes(name)) throw new Error(`Missing runtime artifact: ${name}`)
@@ -24,6 +26,10 @@ for (const name of names) await fs.copyFile(path.join(source, name), path.join(d
 await fs.writeFile(path.join(dist, 'index.html'), html)
 for (const name of ['bridge.js', 'realm-fetch.js', 'capture.js']) await fs.copyFile(path.join(root, 'src', name), path.join(dist, name))
 const manifest = { version: JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8')).version, files: {} }
+if (!override) {
+  const runtime = JSON.parse(await fs.readFile(path.join(source, 'manifest.json'), 'utf8'))
+  manifest.runtime = { version: runtime.version, source: runtime.source }
+}
 for (const name of await fs.readdir(dist)) {
   const bytes = await fs.readFile(path.join(dist, name))
   manifest.files[name] = { bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') }

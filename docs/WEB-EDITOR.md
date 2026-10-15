@@ -118,13 +118,15 @@ You need Node 24, git, and both repos side by side:
    bar while you edit. Restore keeps the same instance and player camera. Minimizing retains its
    memory; **Close preview** releases it. Captures require restoring a minimized preview first.
    Moving restarts the preview; closing it or leaving the project releases its engine.
-   Builds hot-reload the scene in either view. The runtime is a separate editor-owned npm package,
+   Builds hot-reload the scene in either view. The runtime is a separately published npm package,
    `@dcl-regenesislabs/mobile-preview-runtime`; bevy-explorer does not serve or depend on it.
-   For a local build, set `MOBILE_PREVIEW_EXPORT=/path/to/build/web` before `npm run dev:web`.
-   This prepares the package and starts its server on **127.0.0.1:8788**, separate from the editor's
+   `npm ci` installs the exact version pinned in `packages/mobile-preview/package.json`.
+   `npm run dev:web` prepares the editor adapter and starts its server on **127.0.0.1:8788**, separate from the editor's
    localhost origin so runtime startup cannot block the editor's JavaScript thread.
-   Production uses the editor service's `/mobile-preview/` endpoint. CI builds the pinned
-   source revision and includes the verified runtime in the service image.
+   Production uses the editor service's `/mobile-preview/` endpoint. The service image installs
+   the pinned npm package and verifies its artifacts; editor CI never clones or builds Godot.
+   For runtime development, `MOBILE_PREVIEW_EXPORT=/path/to/build/web` overrides the installed
+   runtime. Releases use npm OIDC in `test-godot-web`; the editor requires no source token.
    See [runtime packaging](../packages/mobile-preview/README.md). A fetch bridge relays the active
    scene's HTTP requests through the editor, including requests from scene workers; lifecycle, hot reload and captures use scoped postMessage.
    The local launch skips lobby/account background work and surrounding terrain.

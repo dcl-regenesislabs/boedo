@@ -6,7 +6,6 @@ on:
       - 'packages/service/**'
       - 'packages/contract/**'
       - 'packages/mobile-preview/**'
-      - '.github/workflows/mobile-preview.yml'
       - 'scripts/check-secrets*'
       - 'SECURITY.md'
       - 'package.json'
@@ -18,7 +17,6 @@ on:
       - 'packages/service/**'
       - 'packages/contract/**'
       - 'packages/mobile-preview/**'
-      - '.github/workflows/mobile-preview.yml'
       - 'scripts/check-secrets*'
       - 'SECURITY.md'
       - 'package.json'
@@ -32,12 +30,7 @@ permissions:
   contents: read
 
 jobs:
-  runtime:
-    uses: ./.github/workflows/mobile-preview.yml
-    secrets:
-      GODOT_SOURCE_TOKEN: ${{ secrets.GODOT_SOURCE_TOKEN }}
   verify:
-    needs: runtime
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -63,10 +56,5 @@ jobs:
           "$RUNNER_TEMP/osv-scanner" scan source --offline -L "$RUNNER_TEMP/service.cdx.json" --format gh-annotations
       - run: npm run typecheck --workspace @dcl-editor/service
       - run: npx vitest run packages/service/src
-      - uses: actions/download-artifact@v4
-        with:
-          name: mobile-preview-dist
-          path: packages/mobile-preview/dist
-      - run: node packages/mobile-preview/scripts/check-dist.mjs
       - run: docker build -f packages/service/Dockerfile -t dcl-editor-service:local .
       - run: node packages/service/scripts/docker-smoke.mjs

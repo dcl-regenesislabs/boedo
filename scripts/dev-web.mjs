@@ -67,7 +67,7 @@ if (!values['no-build']) {
   }
   run('npm', ['run', 'build', '-w', '@dcl-editor/web'])
 }
-if (process.env.MOBILE_PREVIEW_EXPORT) run('npm', ['run', 'build', '-w', '@dcl-regenesislabs/mobile-preview-runtime'])
+run('npm', ['run', 'build', '-w', '@dcl-editor/mobile-preview'])
 
 const children = []
 function start(name, command, args, options = {}) {

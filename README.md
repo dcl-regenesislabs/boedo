@@ -137,7 +137,7 @@ up as you make them:
   and camera. **Close preview** releases its memory. The covered editor viewport runs at up to 5 FPS,
   restoring its configured rate when you minimize, close or move the preview to a tab. With the preview
   in another tab, the editor's viewport and gizmos remain available. Edits hot-reload in either view. Requires the separate
-  [`@dcl-regenesislabs/mobile-preview-runtime`](packages/mobile-preview/README.md) npm package, served by
+  [`@dcl-regenesislabs/mobile-preview-runtime`](packages/mobile-preview/README.md) npm package, pinned to an exact release and served by
   the editor on its own origin (see [local setup](docs/WEB-EDITOR.md)). Startup stays separate from the editor UI.
   The mobile preview includes the default grass floor under the scene's parcels.
   Its web runtime still has gaps in system APIs; verify final gameplay in the native phone app.

@@ -134,17 +134,27 @@ vulnerability-free. Bevy's lockfile is unchanged, including findings in its brow
 (crossbeam-epoch, quick-xml, ringbuf, ruint and ruzstd) that require separate dependency
 upgrades. Browser isolation does not replace those upgrades.
 
-CI builds the pinned Godot source, packages the runtime and includes it in service
-images. The image build fails when artifacts are absent or changed. Production dependency
-checks in CI use the same offline OSV approach, including cached runtime exports. The
-scanner binary is version-pinned and checksum-verified. Inherited release workflows are
-disabled in the source forks, and branch names in the inherited distribution workflow
-are passed through environment variables rather than inserted into shell code.
-GitHub requires a read-only
-`GODOT_SOURCE_TOKEN` for the private source repositories; no credential was added and
-the secret is currently absent from both the source parent and editor repositories.
-No remote workflow was dispatched. Submodule commits and the parent pin are prepared
-locally, with the fresh browser export, graphics assertions, runtime packaging and editor
-lifecycle checks complete. Secret setup is deferred to the maintainer's handoff. Before
-merging, make the source commits available, configure the secret in both repositories
-and pass remote CI. Nothing has been pushed, published or deployed.
+Runtime releases now belong to `test-godot-web`: its CI builds and audits the pinned
+source, runs graphics assertions, verifies the npm artifact inventory and publishes stable
+tags through npm OIDC. The editor's private hosting adapter depends on an exact runtime
+npm version; its service image installs that package and verifies its manifest before
+adding the editor transport. The editor has no source checkout, Rust/Godot build, source
+credential or publishing workflow. Production dependency checks still use offline OSV;
+the scanner binary is version-pinned and checksum-verified. Source-fork release workflows
+remain disabled, and inherited distribution branch names are passed through environment
+variables rather than interpolated into shell code.
+
+The package name currently returns 404 from npm. Local integration uses a packed runtime;
+it does not establish that a registry install or OIDC publish succeeds. Before merging the
+editor, publish the first runtime, refresh its lockfile entry with the registry integrity,
+and pass remote CI. The current `0.1.0` lock entry intentionally has no invented integrity
+value. npm trusted-publisher setup and private source access belong only in the source
+repository. No package, branch, workflow or deployment was published or dispatched.
+
+The distribution change passed editor validation (2,642 tests in 265 files and all
+six gates), source packaging/release checks and workflow lint. A locally packed runtime
+installed into the editor rendered the scene, grass and touch controls in an inspected
+1024×461 capture. The service image built and passed its restricted-container smoke
+using that tarball in an isolated build context; only that temporary context replaced
+the registry URL with the local tarball and its measured integrity. Registry fetching
+and OIDC publishing remain untested until the maintainer performs the first release.

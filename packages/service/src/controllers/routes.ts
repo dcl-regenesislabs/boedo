@@ -1,5 +1,5 @@
 import { fromNativeResponse, Router } from '@dcl/http-server'
-import { createMobilePreviewHandler } from '@dcl-regenesislabs/mobile-preview-runtime/server'
+import { createMobilePreviewHandler } from '@dcl-editor/mobile-preview/server'
 import type { GlobalContext } from '../types.ts'
 
 export async function setupRouter({ components }: GlobalContext): Promise<Router<GlobalContext>> {
