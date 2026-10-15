@@ -16,7 +16,7 @@ export interface WindowControlsProps {
 
 // The three macOS window dots. A control without a handler shows as a grey, inert dot.
 export function WindowControls(props: WindowControlsProps): JSX.Element {
-  const dot = (kind: 'close' | 'minimize' | 'expand', onClick: (() => void) | undefined, label: string | undefined, icon: JSX.Element): JSX.Element => (
+  const dot = (kind: 'close' | 'minimize' | 'expand', onClick: (() => void) | undefined, label: string, icon: JSX.Element): JSX.Element => (
     <button type="button" className={`eui-ds-winctl ${kind}`} aria-label={label} data-tip={label} disabled={onClick === undefined} onClick={onClick}>
       <span>{icon}</span>
     </button>
@@ -24,8 +24,8 @@ export function WindowControls(props: WindowControlsProps): JSX.Element {
   return (
     <div className="eui-ds-winctls" role="group" aria-label="Window controls">
       {dot('close', props.onClose, props.closeLabel, <X aria-hidden="true" />)}
-      {dot('minimize', props.onMinimize, props.minimizeLabel, <Minus aria-hidden="true" />)}
-      {dot('expand', props.onExpand, props.expandLabel, props.expandIcon ?? <Maximize2 aria-hidden="true" />)}
+      {dot('minimize', props.onMinimize, props.minimizeLabel ?? 'Minimize', <Minus aria-hidden="true" />)}
+      {dot('expand', props.onExpand, props.expandLabel ?? 'Full screen', props.expandIcon ?? <Maximize2 aria-hidden="true" />)}
     </div>
   )
 }
