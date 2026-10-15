@@ -253,6 +253,15 @@ export async function loadLocalSounds(): Promise<string[]> {
   }
 }
 
+// imported images and videos; textures that ship with a model live under models/ and stay out
+export async function loadLocalMedia(): Promise<string[]> {
+  try {
+    return (await projectFiles()).filter((p) => p.startsWith('assets/') && (IMAGE_EXT.test(p) || VIDEO_EXT.test(p))).sort()
+  } catch {
+    return []
+  }
+}
+
 // Place a model that's already in the project content at `position`.
 export async function placeLocalModel(
   rel: string,

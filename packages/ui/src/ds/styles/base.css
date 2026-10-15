@@ -669,6 +669,7 @@
 .eui-asset .glyph { position: relative; }
 .eui-asset .glyph .eui-asset-preview { position: absolute; right: 4px; bottom: 4px; background: var(--input); }
 .eui-asset .glyph .eui-asset-preview svg { width: 15px; height: 15px; }
+.eui-asset .glyph .eui-asset-thumb { height: 100%; max-height: none; object-fit: cover; }
 .eui-asset-upload { border-style: dashed; cursor: pointer; }
 .eui-asset-upload .glyph { background: transparent; color: var(--primary); font-size: 32px; font-weight: 300; line-height: 1; }
 .eui-asset-upload:hover { border-color: var(--primary-border); }

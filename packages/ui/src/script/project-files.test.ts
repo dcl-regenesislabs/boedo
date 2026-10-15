@@ -47,7 +47,8 @@ describe('file kinds', () => {
     expect(fileKind('assets/Tree.PNG')).toBe('image')
     expect(fileKind('assets/Tree.glb')).toBe('model')
     expect(fileKind('game.wasm')).toBe('binary')
-    expect(fileKind('audio/theme.mp3')).toBe('binary')
+    expect(fileKind('audio/theme.MP3')).toBe('audio')
+    expect(fileKind('videos/intro.mp4')).toBe('video')
   })
 
   it('falls back to text for unknown and extensionless files', () => {
@@ -58,12 +59,14 @@ describe('file kinds', () => {
     expect(fileKind('LICENSE')).toBe('text')
   })
 
-  it('opens code and previews text/images, but not models or binaries', () => {
+  it('opens code and previews text, images, models, sounds and videos, but not binaries', () => {
     expect(isViewable('src/index.ts')).toBe(true)
     expect(isViewable('README.md')).toBe(true)
     expect(isViewable('logo.png')).toBe(true)
     expect(isViewable('app.config')).toBe(true)
-    expect(isViewable('Tree.glb')).toBe(false)
+    expect(isViewable('Tree.glb')).toBe(true)
+    expect(isViewable('theme.ogg')).toBe(true)
+    expect(isViewable('intro.webm')).toBe(true)
     expect(isViewable('game.wasm')).toBe(false)
   })
 
@@ -80,18 +83,21 @@ describe('file kinds', () => {
     expect(isEditable('scene.json')).toBe(false)
   })
 
-  it('maps image mime types, including the two irregular ones', () => {
+  it('maps media mime types, including the irregular ones', () => {
     expect(mimeFor('a.png')).toBe('image/png')
     expect(mimeFor('a.jpg')).toBe('image/jpeg')
     expect(mimeFor('a.jpeg')).toBe('image/jpeg')
     expect(mimeFor('a.svg')).toBe('image/svg+xml')
+    expect(mimeFor('a.mp3')).toBe('audio/mpeg')
+    expect(mimeFor('a.ogg')).toBe('audio/ogg')
+    expect(mimeFor('a.mp4')).toBe('video/mp4')
   })
 
   it('marks tree nodes with their kind', () => {
     const tree = buildTree(['docs/README.md', 'docs/logo.png', 'docs/Tree.glb'])
     const kinds = Object.fromEntries(tree[0].children.map((n) => [n.name, n.kind]))
     expect(kinds).toEqual({ 'README.md': 'text', 'logo.png': 'image', 'Tree.glb': 'model' })
-    expect(tree[0].children.filter((n) => n.viewable).map((n) => n.name).sort()).toEqual(['README.md', 'logo.png'])
+    expect(tree[0].children.filter((n) => n.viewable).map((n) => n.name).sort()).toEqual(['README.md', 'Tree.glb', 'logo.png'])
   })
 })
 

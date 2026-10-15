@@ -74,9 +74,8 @@ function Node(props: {
 
   if (!node.dir) {
     if (!node.viewable) {
-      const why = node.kind === 'model' ? 'No 3D preview yet — drop it in the scene to see it' : "Can't be previewed"
       return (
-        <div className="eui-file-row off" title={why}>
+        <div className="eui-file-row off" title="Can't be previewed">
           {guides}
           <span className="slot" />
           <KindGlyph kind={node.kind} />
@@ -150,6 +149,19 @@ const GLYPHS: Record<TreeNode['kind'], JSX.Element> = {
     <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path d="M8 1.6l5.5 3.2v6.4L8 14.4l-5.5-3.2V4.8L8 1.6Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
       <path d="M2.6 4.9L8 8l5.4-3.1M8 8v6.2" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  ),
+  audio: (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M6 11.5V3.2l7-1.4v8.3" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <circle cx="4.3" cy="11.6" r="1.8" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="11.3" cy="10.2" r="1.8" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  ),
+  video: (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect x="1.8" y="3.5" width="12.4" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M6.6 5.9v4.2L10.2 8 6.6 5.9Z" fill="currentColor" />
     </svg>
   ),
   binary: (

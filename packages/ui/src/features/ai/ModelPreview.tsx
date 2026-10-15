@@ -58,7 +58,7 @@ async function load(source: PreviewSource): Promise<{ bytes: ArrayBuffer; files:
   return { bytes: bytes.slice().buffer, files, info: describe(bytes) }
 }
 
-export function ModelPreview(props: { source: PreviewSource; name: string; onClose: () => void }): JSX.Element {
+export function ModelView(props: { source: PreviewSource }): JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading')
   const [info, setInfo] = useState<ModelInfo | null>(null)
@@ -103,19 +103,25 @@ export function ModelPreview(props: { source: PreviewSource; name: string; onClo
     }
   }, ['url' in props.source ? props.source.url : props.source.path])
   return (
-    <Modal title={props.name} size="lg" closeX onClose={props.onClose}>
-      <div className="eui-ai-model-body">
-        <div ref={host} className="eui-ai-model-view">
-          {status === 'loading' && <Spinner size="md" />}
-          {status === 'failed' && <p>The model could not be loaded.</p>}
-        </div>
-        {info !== null && (
-          <Details info={info} playing={playing} onPlay={(name) => {
-            setPlaying(name)
-            workerRef.current?.postMessage({ kind: 'clip', name })
-          }} />
-        )}
+    <div className="eui-ai-model-body">
+      <div ref={host} className="eui-ai-model-view">
+        {status === 'loading' && <Spinner size="md" />}
+        {status === 'failed' && <p>The model could not be loaded.</p>}
       </div>
+      {info !== null && (
+        <Details info={info} playing={playing} onPlay={(name) => {
+          setPlaying(name)
+          workerRef.current?.postMessage({ kind: 'clip', name })
+        }} />
+      )}
+    </div>
+  )
+}
+
+export function ModelPreview(props: { source: PreviewSource; name: string; onClose: () => void }): JSX.Element {
+  return (
+    <Modal title={props.name} size="lg" closeX onClose={props.onClose}>
+      <ModelView source={props.source} />
     </Modal>
   )
 }
