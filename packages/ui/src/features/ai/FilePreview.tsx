@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Modal, Spinner } from '../../ds'
+import { Button, Modal, Spinner } from '../../ds'
 import { dataLayerReadFileBytes } from '../../engine/datalayer'
 import { baseName, fileKind, mimeFor, looksBinary, MAX_PREVIEW_BYTES } from '../../script/project-files'
 import { threeAvailable } from '../../three/client'
@@ -104,9 +104,21 @@ export function FilePreview(props: { path: string }): JSX.Element {
   return fileKind(props.path) === 'model' ? <ModelFile path={props.path} /> : <BytesPreview path={props.path} />
 }
 
-export function FilePreviewModal(props: { path: string; onClose: () => void }): JSX.Element {
+export function FilePreviewModal(props: { path: string; onClose: () => void; action?: { label: string; run: () => void } }): JSX.Element {
+  const { action } = props
+  const footer = action === undefined ? undefined : (
+    <Button
+      variant="primary"
+      onClick={() => {
+        action.run()
+        props.onClose()
+      }}
+    >
+      {action.label}
+    </Button>
+  )
   return (
-    <Modal title={baseName(props.path)} size="lg" closeX onClose={props.onClose}>
+    <Modal title={baseName(props.path)} size="lg" closeX onClose={props.onClose} footer={footer}>
       <div className="eui-preview-modal">
         <FilePreview path={props.path} />
       </div>

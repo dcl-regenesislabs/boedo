@@ -14,7 +14,7 @@ import { LeftTabs, type LeftView } from './left-view'
 import { ensurePrefabsLoaded } from './prefab-store'
 import { SearchEmpty } from './SearchEmpty'
 import { catalogMatches, countPrefabMatches, matchHint } from './search-hints'
-import { IconCamera, IconChevron, IconEye, IconFileTree, IconPlay, IconRefresh, IconSound, IconStop, IconTiles } from '../icons'
+import { IconCamera, IconChevron, IconDots, IconFileTree, IconPlay, IconRefresh, IconSound, IconStop, IconTiles } from '../icons'
 import { AssetsFileTree } from './AssetsFileTree'
 import { UnusedReview } from './UnusedReview'
 import { FilePreviewModal } from '../features/ai/FilePreview'
@@ -213,8 +213,8 @@ function LocalGrid(props: { list: string[]; older: string[]; unused: string[]; o
             <div
               key={p}
               className="eui-asset"
-              data-tip={older ? `An earlier build of a model in the scene, kept for undo · right-click to delete` : unused ? `Not placed in the scene or named by a script · right-click to delete` : sound ? `${p} · right-click for more` : media ? `View ${p} · right-click for more` : `Place ${p} · right-click to preview`}
-              onClick={() => void (sound ? togglePreview(p) : media ? setViewing(p) : uiPlaceLocalModel(p))}
+              data-tip={older ? `An earlier build of a model in the scene, kept for undo · right-click to delete` : unused ? `Not placed in the scene or named by a script · right-click to delete` : sound ? `${p} · right-click for more` : media ? `View ${p} · right-click for more` : `Preview ${p} · ⋯ to add it to the scene`}
+              onClick={() => void (sound ? togglePreview(p) : canView(p) ? setViewing(p) : uiPlaceLocalModel(p))}
               onContextMenu={(e) => {
                 e.preventDefault()
                 setMenu({ x: e.clientX, y: e.clientY, path: p })
@@ -222,18 +222,17 @@ function LocalGrid(props: { list: string[]; older: string[]; unused: string[]; o
             >
               <div className="glyph">
                 {sound ? <IconSound /> : kind === 'image' ? <AssetThumb path={p} fallback={<ModelGlyph />} /> : kind === 'video' ? <IconCamera /> : <ModelGlyph />}
-                {kind === 'model' && threeAvailable() && (
-                  <IconButton
-                    className="eui-asset-preview"
-                    tip="Preview"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setViewing(p)
-                    }}
-                  >
-                    <IconEye />
-                  </IconButton>
-                )}
+                <IconButton
+                  className="eui-asset-menu"
+                  tip="More"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const r = e.currentTarget.getBoundingClientRect()
+                    setMenu({ x: r.left, y: r.bottom + 4, path: p })
+                  }}
+                >
+                  <IconDots />
+                </IconButton>
                 {sound && (
                   <IconButton
                     className="eui-asset-preview"
@@ -254,9 +253,16 @@ function LocalGrid(props: { list: string[]; older: string[]; unused: string[]; o
           )
         })}
       </div>
-      {viewing !== null && <FilePreviewModal path={viewing} onClose={() => setViewing(null)} />}
+      {viewing !== null && (
+        <FilePreviewModal
+          path={viewing}
+          onClose={() => setViewing(null)}
+          action={fileKind(viewing) === 'model' ? { label: 'Add to scene', run: () => void uiPlaceLocalModel(viewing) } : undefined}
+        />
+      )}
       {menu !== null && (
         <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
+          {fileKind(menu.path) === 'model' && <MenuItem onClick={() => { void uiPlaceLocalModel(menu.path); setMenu(null) }}>Add to scene</MenuItem>}
           {canView(menu.path) && <MenuItem onClick={() => { setViewing(menu.path); setMenu(null) }}>Preview</MenuItem>}
           <MenuItem danger onClick={() => askDelete(menu.path)}>Delete file…</MenuItem>
           {props.older.includes(menu.path) && props.older.length > 1 && (
