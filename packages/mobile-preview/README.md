@@ -26,10 +26,27 @@ The editor prepares the package and serves it at `http://127.0.0.1:8788/mobile-p
 Start only that server with `npm run serve -w @dcl-regenesislabs/mobile-preview-runtime`.
 The loopback IP deliberately differs from the editor's `localhost` site to isolate startup.
 
-For deployment, install a pinned runtime package on the editor service (or prepare this
-workspace's `dist` before building the service image). The service exposes `/mobile-preview/`;
-without artifacts the endpoint returns 503 and the editor remains usable. Runtime versions
-can be released independently of the editor UI. No package has been published by this change.
+The service image requires this workspace's prepared `dist`; its build verifies the
+manifest and refuses missing or modified artifacts. The service exposes `/mobile-preview/`.
+A source-only development server still returns 503 until the runtime is prepared.
+Runtime versions can be released independently of the editor UI.
+
+CI reads the exact Godot workspace commit from `source.json`, builds its pinned submodules,
+and uploads both the prepared runtime and npm tarball. Service-image checks and deployment
+consume that artifact, including in Docker's build context. The raw export is cached by
+source commit; changes to the editor's transport are always packaged again. The
+browser dependency advisory scan runs again even when the export is cached. The
+`mobile-preview.yml` workflow can also be run manually. Publishing is an explicit, default-off
+input and uses the production environment and npm trusted publishing. The first publish
+and npm trusted-publisher registration must be performed by a maintainer.
+
+GitHub setup: add `GODOT_SOURCE_TOKEN` to this repository, with read-only Contents access
+to `kuruk-mm/test-godot-web`, `kuruk-mm/godot-explorer-test` and `kuruk-mm/dclgodotengine`.
+The token is used only during checkout and is not persisted in the checkout. Never put
+it in this repository or an artifact. Prepare the `source.json` pin locally, then push
+the source submodule commits and parent commit before the editor branch. Their checks
+must pass before merging the editor. The npm tarball includes this source pin.
+No package has been published by this change.
 
 The runtime requires HTTPS or loopback, WebGPU and the isolation headers provided by its server.
 Its fetch bridge relays only the active scene's requests to the editor, where the browser-local

@@ -123,7 +123,8 @@ You need Node 24, git, and both repos side by side:
    For a local build, set `MOBILE_PREVIEW_EXPORT=/path/to/build/web` before `npm run dev:web`.
    This prepares the package and starts its server on **127.0.0.1:8788**, separate from the editor's
    localhost origin so runtime startup cannot block the editor's JavaScript thread.
-   Production uses the editor service's `/mobile-preview/` endpoint with a pinned runtime package.
+   Production uses the editor service's `/mobile-preview/` endpoint. CI builds the pinned
+   source revision and includes the verified runtime in the service image.
    See [runtime packaging](../packages/mobile-preview/README.md). A fetch bridge relays the active
    scene's HTTP requests through the editor, including requests from scene workers; lifecycle, hot reload and captures use scoped postMessage.
    The local launch skips lobby/account background work and surrounding terrain.
@@ -164,7 +165,8 @@ behind Cloudflare. It stores projects and runs the assistant on the team's Claud
   `TICKET_SECRET`, `WKC_METRICS_BEARER_TOKEN`, `STORAGE_WALLETS` and, with a model credential,
   `ASSISTANT_WALLETS` (both `*` here). The credential is `ANTHROPIC_OAUTH_SETUP_TOKEN` from
   `claude setup-token` (`sk-ant-oat…`); an empty `ANTHROPIC_OAUTH_SETUP_TOKEN=` line crashes startup.
-- **Redeploy:**
+- **Redeploy:** prepare `packages/mobile-preview/dist` first (or use the release
+  workflow, which builds it from the pinned source); the image rejects missing runtime artifacts.
 
   ```bash
   rsync -a --delete package.json package-lock.json root@162.243.43.60:/opt/dcl-editor/

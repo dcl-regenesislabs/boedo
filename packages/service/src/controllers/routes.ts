@@ -6,7 +6,11 @@ export async function setupRouter({ components }: GlobalContext): Promise<Router
   const base = (await components.config.getString('BASE_PATH') ?? '').replace(/\/$/, '')
   const router = new Router<GlobalContext>()
   const mobile = createMobilePreviewHandler(undefined, `${base}/mobile-preview/`)
-  router.all(`${base}/mobile-preview/:path(.*)`, async ({ request }) => fromNativeResponse(await mobile(request)))
+  router.all(`${base}/mobile-preview/:path(.*)`, async ({ request }) => {
+    const response = await mobile(request)
+    // Local artifact bytes are streamed unchanged; preserve their declared length.
+    return { ...fromNativeResponse(response), headers: response.headers }
+  })
   router.get(`${base}/assistant/socket`, async ({ request, components }) => components.assistant.upgrade(request))
   const paths = [
     '/health', '/projects', '/projects/:id', '/projects/:id/manifest',

@@ -65,7 +65,7 @@ assistant turn against the deployed HTTPS endpoint, and enable private vulnerabi
 reporting in the repository settings. See [SECURITY.md](../SECURITY.md) for release checks
 and the trust boundaries. This review is not an independent penetration test.
 
-## Mobile preview review — 2026-10-14
+## Mobile preview review — 2026-10-15
 
 The mobile runtime source and graphics fixtures now live in the `test-godot-web`
 parent workspace and its pinned engine/explorer submodules. The editor retains its
@@ -85,26 +85,48 @@ machine paths from the export. The migrated local static server now rejects path
 and symlink escapes and streams assets. Exports import resources first and fail
 on script/resource errors, including when Godot exits successfully.
 
-Validation: editor `npm run validate` passed all six checks and 2,642 tests.
-Explorer typechecking and 757 tests passed under UTC; its unchanged badge-date
-test fails in the local timezone. Eight migrated export, lifecycle and server tests
-passed. Both browser graphics fixtures passed. A fresh mobile export from the new
-workspace loaded one scene worker and produced an inspected 1024×461 screenshot.
-Minimized preview: zero mobile GPU submissions over three seconds, while the editor
-ran at 60 FPS. The mobile Wasm heap was 494.75 MiB; this is not total browser RSS.
+Validation: after rebasing onto current main, editor `npm run validate` passed all six
+checks and the explorer's 757 tests passed in the local timezone. The badge-date fixture
+now uses a mid-month timestamp. Nine export, lifecycle, shader-build and server tests pass.
+The service container builds with a verified mobile runtime and passes its restricted
+container, signed-storage, restart and shutdown smoke test. That test also verifies
+mobile Wasm delivery and denial of non-artifact files. Workflow syntax passes actionlint.
 
-Limits: the migrated export reused compiled engine/library artifacts after checking
-the changed runtime source matched; a clean toolchain rebuild and native phone tests
-were not run. Local credential-pattern scans found no matches in changed source.
-The public explorer production dependency audit reported zero vulnerabilities.
-The private editor dependency audit remains pending authorization to send dependency
-metadata to npm; automatic approval review rejected that network request. Rust
-advisory auditing was unavailable (`cargo audit` is not installed).
+The initial migrated browser export loaded one scene worker and produced an inspected
+1024×461 screenshot. Minimized preview: zero mobile GPU submissions over three seconds,
+while the editor ran at 60 FPS. The mobile Wasm heap was 494.75 MiB; this is not total
+browser RSS. Both original graphics fixtures passed with the migrated binaries.
 
-Before integration, update the editor/explorer branches to current main and review
-the engine buffer mirror's invalidation on GPU writes. The new CPU copy is updated
-by buffer copies/clears, but writable shader bindings and direct mapped writes do
-not invalidate/update it; GPU-modified vertex/index readback can return stale data.
-The graphics fixtures above cover uploaded texture/mesh serialization and frame
-pacing, not that write/readback case. Submodule changes must be committed separately
-before the parent can record their new revisions.
+A new buffer-coherence fixture reproduced stale data after CPU updates and GPU writes.
+The driver now updates mirrors for mapped/direct writes and invalidates them before
+writable shader use, including read-only uniform sets rebound to writable shaders.
+A clean engine/library rebuild and rerun of all graphics fixtures are in progress.
+Native phone tests have not run.
+
+Dependency review uses the downloaded public OSV npm database and an offline scanner;
+no private dependency list is uploaded. The service's 91 production packages have no
+reported vulnerabilities. The full editor lockfile has findings against 19 package
+versions, all already present on main: older SDK/test-tool transitive packages and the
+desktop Electron package. These are baseline maintenance findings, not introduced by
+the mobile runtime. The public explorer's production npm audit also reported zero.
+Local credential-pattern scans found no matches in changed source.
+
+The browser runtime's 283 registry crates pass the offline OSV check after updates to
+anyhow, bytes, keccak, protobuf, rand, Tokio and tracing-subscriber. Three maintenance-only
+notices for core2, instant and multipart have explicit exceptions until November 15, 2026;
+no vulnerability advisory is exempted. The full native Godot and Bevy lockfiles still
+contain pre-existing RustSec findings; this does not establish that those runtimes are
+vulnerability-free. Bevy's lockfile is unchanged, including findings in its browser graph
+(crossbeam-epoch, quick-xml, ringbuf, ruint and ruzstd) that require separate dependency
+upgrades. Browser isolation does not replace those upgrades.
+
+CI builds the pinned Godot source, packages the runtime and includes it in service
+images. The image build fails when artifacts are absent or changed. Production dependency
+checks in CI use the same offline OSV approach, including cached runtime exports. The
+scanner binary is version-pinned and checksum-verified. Inherited release workflows are
+disabled in the source forks, and branch names in the inherited distribution workflow
+are passed through environment variables rather than inserted into shell code.
+GitHub requires a read-only
+`GODOT_SOURCE_TOKEN` for the private source repositories; no credential was added and
+no remote workflow was dispatched. Submodule commits and the parent pin are prepared
+locally. Nothing has been pushed, published or deployed.

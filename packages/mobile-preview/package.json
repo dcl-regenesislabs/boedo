@@ -8,6 +8,7 @@
     "dist",
     "src/server.ts",
     "README.md",
+    "source.json",
     "LICENSE",
     "scripts/check-dist.mjs",
     "GODOT-LICENSE.txt",

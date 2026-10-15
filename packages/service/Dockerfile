@@ -5,7 +5,7 @@ COPY package.json package-lock.json ./
 COPY packages/service/package.json ./packages/service/
 COPY packages/contract/package.json ./packages/contract/
 COPY packages/mobile-preview/package.json ./packages/mobile-preview/
-RUN npm ci --workspace @dcl-editor/service --include-workspace-root=false --omit=dev --ignore-scripts \
+RUN npm ci --workspace @dcl-editor/service --include-workspace-root=false --omit=dev --ignore-scripts --no-audit \
     && mkdir -p packages/service/node_modules packages/contract/node_modules \
     && npm cache clean --force
 
@@ -34,6 +34,7 @@ COPY packages/service/scripts/healthcheck.mjs ./packages/service/scripts/healthc
 COPY packages/contract/package.json ./packages/contract/
 COPY packages/contract/src ./packages/contract/src
 COPY packages/mobile-preview ./packages/mobile-preview
+RUN node packages/mobile-preview/scripts/check-dist.mjs
 
 USER node
 EXPOSE 8787

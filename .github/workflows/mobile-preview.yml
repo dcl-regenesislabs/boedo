@@ -1,0 +1,88 @@
+name: Mobile preview package
+on:
+  workflow_call:
+    secrets:
+      GODOT_SOURCE_TOKEN:
+        required: true
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the checked package to npm (requires trusted publishing)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: macos-14
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Read pinned source revision
+        id: source
+        run: |
+          echo "revision=$(node -p 'require("./packages/mobile-preview/source.json").revision')" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          repository: kuruk-mm/test-godot-web
+          ref: ${{ steps.source.outputs.revision }}
+          path: .mobile-source
+          submodules: true
+          token: ${{ secrets.GODOT_SOURCE_TOKEN }}
+          persist-credentials: false
+      - uses: actions/cache@v4
+        id: export
+        with:
+          path: .mobile-source/godot-explorer/build/web
+          key: mobile-export-${{ steps.source.outputs.revision }}-v1
+      - uses: ./.mobile-source/.github/actions/build-preview
+        if: steps.export.outputs.cache-hit != 'true'
+        with:
+          directory: .mobile-source
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Audit browser dependencies offline
+        run: |
+          rustup toolchain install 1.90 --profile minimal
+          bash .mobile-source/scripts/audit-browser.sh
+      - run: npm ci --ignore-scripts --no-audit
+      - name: Prepare and verify npm package
+        run: |
+          npm run build -w @dcl-regenesislabs/mobile-preview-runtime -- "$GITHUB_WORKSPACE/.mobile-source/godot-explorer/build/web"
+          npx vitest run scripts/mobile-preview-pack.test.mjs
+          npm pack -w @dcl-regenesislabs/mobile-preview-runtime
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-preview-dist
+          path: packages/mobile-preview/dist/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-preview-npm
+          path: dcl-regenesislabs-mobile-preview-runtime-*.tgz
+          if-no-files-found: error
+          retention-days: 14
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    needs: package
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v4
+        with:
+          name: mobile-preview-npm
+      - run: npm publish ./dcl-regenesislabs-mobile-preview-runtime-*.tgz --access public --provenance=false
