@@ -8,8 +8,8 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 const override = process.argv[2] ?? process.env.MOBILE_PREVIEW_EXPORT
 const source = override ?? fileURLToPath(new URL('./', import.meta.resolve('@dcl-regenesislabs/mobile-preview-runtime/manifest.json')))
 if (!override) execFileSync(process.execPath, [fileURLToPath(import.meta.resolve('@dcl-regenesislabs/mobile-preview-runtime/check'))], { stdio: 'inherit' })
-const required = ['index.html', 'index.js', 'index.wasm', 'index.side.wasm', 'index.pck', 'dclgodot.wasm']
-const names = (await fs.readdir(source)).filter(name => /^(index\.(html|js|wasm|side\.wasm|pck|png|icon\.png|apple-touch-icon\.png|audio\.[a-z.]+\.js)|dclgodot\.wasm|libsentry\.[a-z0-9.]+\.wasm)$/.test(name))
+const required = ['index.html', 'index.js', 'index.wasm', 'index.side.wasm', 'index.pck', 'dclgodot.wasm', 'scene-comms.js', 'livekit-client.umd.js', 'livekit-LICENSE.txt']
+const names = (await fs.readdir(source)).filter(name => /^(index\.(html|js|wasm|side\.wasm|pck|png|icon\.png|apple-touch-icon\.png|audio\.[a-z.]+\.js)|dclgodot\.wasm|scene-comms\.js|livekit-client\.umd\.js|livekit-LICENSE\.txt|libsentry\.[a-z0-9.]+\.wasm)$/.test(name))
 for (const name of required) if (!names.includes(name)) throw new Error(`Missing runtime artifact: ${name}`)
 let html = (await fs.readFile(path.join(source, 'index.html'), 'utf8')).replace(/\r\n/g, '\n')
 if (!html.includes('await initWebGPU()') || !html.includes('localPreviewReady')) throw new Error('Export does not support the local preview protocol.')

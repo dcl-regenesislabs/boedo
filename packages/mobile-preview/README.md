@@ -39,7 +39,9 @@ The runtime requires HTTPS or loopback, WebGPU and the isolation headers provide
 by this server. Its fetch bridge relays only active-scene metadata, content and
 active-entity lookups; environment variables and server storage are inaccessible.
 Messages are scoped to the runtime origin, editor window, session and instance.
-No wallet credentials cross the relay. Requests expire after 30 seconds, with a
+The runtime bundles its browser networking assets and signs its own guest connection
+to the preview scene room. The editor keeps the authoritative server running while
+the mobile preview is focused. No wallet credentials cross the relay. Requests expire after 30 seconds, with a
 1 MiB request limit, 4 MiB JSON limit and 64 MiB total buffered response budget.
 
 Screenshots copy the canvas after GPU submission. Scene reload, capture and
