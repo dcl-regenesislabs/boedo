@@ -9,6 +9,7 @@ import {
   dropPosition,
   loadLocalModels,
   placeLocalModel,
+  placeLocalSound,
   importFiles,
   missingModelRefs
 } from '../assets'
@@ -63,11 +64,11 @@ export const uiLoadLocalModels = async (): Promise<string[]> => {
 }
 
 // Place a model that's already in the project content into the scene.
-export const uiPlaceLocalModel = async (rel: string): Promise<void> => {
+const placeFile = async (rel: string, place: typeof placeLocalModel): Promise<void> => {
   state.assetBusy = true
   try {
-    const name = rel.split('/').pop()?.replace(/\.(glb|gltf)$/i, '') ?? rel
-    await placeLocalModel(rel, name, await dropPosition())
+    const name = rel.split('/').pop()?.replace(/\.[^.]+$/, '') ?? rel
+    await place(rel, name, await dropPosition())
     focusPlaced()
     state.saveStatus = `Placed ${name}`
   } catch (e) {
@@ -79,6 +80,8 @@ export const uiPlaceLocalModel = async (rel: string): Promise<void> => {
     ensureTransformTool()
   }
 }
+export const uiPlaceLocalModel = (rel: string): Promise<void> => placeFile(rel, placeLocalModel)
+export const uiPlaceLocalSound = (rel: string): Promise<void> => placeFile(rel, placeLocalSound)
 
 // Referenced files the picked set doesn't satisfy — checked before importing so
 // the panel can warn first. Fail-open: the post-upload status warning backstops.

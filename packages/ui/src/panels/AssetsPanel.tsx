@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { state } from '@scene/state'
 import { useStore } from '../core/store'
-import { uiCheckModelRefs, uiFetchCatalog, uiImportAsset, uiLoadLocalModels, uiPlaceLocalModel, uiImportFiles } from '../actions/assets'
+import { uiCheckModelRefs, uiFetchCatalog, uiImportAsset, uiLoadLocalModels, uiPlaceLocalModel, uiPlaceLocalSound, uiImportFiles } from '../actions/assets'
 import { loadLocalMedia, loadLocalSounds, opendclUrl, SOUND_EXT } from '../assets'
 import { Button, ContextMenu, IconButton, LinkButton, MenuItem, Modal, SearchField, Select, Shelf } from '../ds'
 import { deleteProjectFile, fileUsers, filesDeletedWith } from '../project-file-use'
@@ -23,6 +23,8 @@ import { AssetThumb, ModelGlyph } from './AssetThumb'
 
 const PAGE_SIZE = 60
 const LISTED = ['model', 'audio', 'image', 'video']
+const placer = (p: string): ((rel: string) => Promise<void>) | undefined =>
+  fileKind(p) === 'model' ? uiPlaceLocalModel : SOUND_EXT.test(p) ? uiPlaceLocalSound : undefined
 
 // Enough of your own files to recognise the section, few enough that the Catalog
 // header below it stays on the first screen. A search is the one time the long
@@ -213,7 +215,7 @@ function LocalGrid(props: { list: string[]; older: string[]; unused: string[]; o
             <div
               key={p}
               className="eui-asset"
-              data-tip={older ? `An earlier build of a model in the scene, kept for undo · right-click to delete` : unused ? `Not placed in the scene or named by a script · right-click to delete` : sound ? `${p} · right-click for more` : media ? `View ${p} · right-click for more` : `Preview ${p} · ⋯ to add it to the scene`}
+              data-tip={older ? `An earlier build of a model in the scene, kept for undo · right-click to delete` : unused ? `Not placed in the scene or named by a script · right-click to delete` : sound ? `Play ${p} · ⋯ to add it to the scene` : media ? `View ${p} · right-click for more` : `Preview ${p} · ⋯ to add it to the scene`}
               onClick={() => void (sound ? togglePreview(p) : canView(p) ? setViewing(p) : uiPlaceLocalModel(p))}
               onContextMenu={(e) => {
                 e.preventDefault()
@@ -257,12 +259,12 @@ function LocalGrid(props: { list: string[]; older: string[]; unused: string[]; o
         <FilePreviewModal
           path={viewing}
           onClose={() => setViewing(null)}
-          action={fileKind(viewing) === 'model' ? { label: 'Add to scene', run: () => void uiPlaceLocalModel(viewing) } : undefined}
+          action={placer(viewing) === undefined ? undefined : { label: 'Add to scene', run: () => void placer(viewing)?.(viewing) }}
         />
       )}
       {menu !== null && (
         <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
-          {fileKind(menu.path) === 'model' && <MenuItem onClick={() => { void uiPlaceLocalModel(menu.path); setMenu(null) }}>Add to scene</MenuItem>}
+          {placer(menu.path) !== undefined && <MenuItem onClick={() => { void placer(menu.path)?.(menu.path); setMenu(null) }}>Add to scene</MenuItem>}
           {canView(menu.path) && <MenuItem onClick={() => { setViewing(menu.path); setMenu(null) }}>Preview</MenuItem>}
           <MenuItem danger onClick={() => askDelete(menu.path)}>Delete file…</MenuItem>
           {props.older.includes(menu.path) && props.older.length > 1 && (
