@@ -116,7 +116,8 @@ You need Node 24, git, and both repos side by side:
    frame rate; only the embedded preview caps the covered viewport at 5 FPS.
    **Minimize** pauses mobile rendering and scene processing, leaving a compact **Restore preview**
    bar while you edit. Restore keeps the same instance and player camera. Minimizing retains its
-   memory; **Close preview** releases it. Captures require restoring a minimized preview first.
+   memory; **Close preview** releases it. A screenshot briefly resumes a minimized preview and
+   pauses it again afterward, keeping the same instance and camera.
    Moving restarts the preview; closing it or leaving the project releases its engine.
    Builds hot-reload the scene in either view. The runtime is a separately published npm package,
    `@dcl-regenesislabs/mobile-preview-runtime`; bevy-explorer does not serve or depend on it.
@@ -131,6 +132,7 @@ You need Node 24, git, and both repos side by side:
    scene's HTTP requests through the editor, including requests from scene workers; lifecycle, hot reload and captures use scoped postMessage.
    The local launch skips lobby/account background work and surrounding terrain.
    The assistant's `view` tool accepts `target: 'mobile'` to photograph this preview.
+   When the creator asks to see mobile UI, it can also open a closed preview with `openIfClosed: true`.
    Scene JavaScript runs in a web worker. Its system API bridge is still incomplete, including
    renderer RPC calls, so verify final gameplay in the native mobile app.
 

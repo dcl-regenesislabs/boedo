@@ -66,13 +66,82 @@ describe('mobile preview lifecycle', () => {
     expect(channel.send).toHaveBeenLastCalledWith({ type: 'visibility', ...first, visible: false })
     channel.receive({ type: 'ready', ...first })
     expect(channel.send).toHaveBeenLastCalledWith({ type: 'visibility', ...first, visible: false })
-    await expect(preview.capture(new AbortController().signal)).rejects.toThrow('Restore')
     await open()
     expect(preview.state()).toEqual({ mode: 'embedded', url, ready: true })
     expect(channel.send).toHaveBeenLastCalledWith({ type: 'visibility', ...first, visible: true })
     expect(channel.send).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'stop' }))
     expect(fetch).toHaveBeenCalledOnce()
     expect(window.open).not.toHaveBeenCalled()
+    preview.dispose()
+  })
+
+  it('captures a minimized preview without restarting it and pauses after all pictures finish', async () => {
+    const { preview, channel, open, identity } = setup()
+    await open()
+    channel.receive({ type: 'ready', ...identity() })
+    await open('minimized')
+    const before = preview.state()
+    const first = preview.capture(new AbortController().signal)
+    const request: unknown = channel.send.mock.lastCall?.[0]
+    expect(preview.state()).toEqual({ ...before, mode: 'embedded' })
+    const second = preview.capture(new AbortController().signal)
+    const next: unknown = channel.send.mock.lastCall?.[0]
+    channel.receive({ ...request as object, image: 'JPEG', width: 1024, height: 461 })
+    expect(await first).toMatchObject({ image: 'JPEG' })
+    expect(preview.state().mode).toBe('embedded')
+    channel.receive({ ...next as object, image: 'JPEG', width: 1024, height: 461 })
+    await second
+    expect(preview.state()).toEqual(before)
+    expect(channel.send).toHaveBeenLastCalledWith({ type: 'visibility', ...identity(), visible: false })
+    expect(channel.send).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'stop' }))
+    expect(fetch).toHaveBeenCalledOnce()
+    preview.dispose()
+  })
+
+  it.each(['abort', 'timeout', 'error'] as const)('pauses again after a minimized capture fails: %s', async (failure) => {
+    const { preview, channel, open, identity } = setup()
+    await open()
+    channel.receive({ type: 'ready', ...identity() })
+    await open('minimized')
+    const controller = new AbortController()
+    const pending = preview.capture(controller.signal)
+    expect(preview.state().mode).toBe('embedded')
+    const rejected = expect(pending).rejects.toThrow()
+    if (failure === 'abort') controller.abort()
+    else if (failure === 'timeout') await vi.advanceTimersByTimeAsync(10_000)
+    else {
+      const request: unknown = channel.send.mock.lastCall?.[0]
+      channel.receive({ ...request as object, error: 'No frame' })
+    }
+    await rejected
+    expect(preview.state().mode).toBe('minimized')
+    expect(vi.getTimerCount()).toBe(0)
+    preview.dispose()
+  })
+
+  it('keeps a preview open if the creator restores it during a temporary capture', async () => {
+    const { preview, channel, open, identity } = setup()
+    await open()
+    channel.receive({ type: 'ready', ...identity() })
+    await open('minimized')
+    const pending = preview.capture(new AbortController().signal)
+    expect(preview.state().mode).toBe('embedded')
+    const request: unknown = channel.send.mock.lastCall?.[0]
+    await open()
+    channel.receive({ ...request as object, image: 'JPEG', width: 1024, height: 461 })
+    await pending
+    expect(preview.state().mode).toBe('embedded')
+    preview.dispose()
+  })
+
+  it('does not launch or resume an unavailable preview for a picture', async () => {
+    const { preview, open } = setup()
+    await expect(preview.capture(new AbortController().signal)).rejects.toThrow('Open')
+    expect(fetch).not.toHaveBeenCalled()
+    await open()
+    await open('minimized')
+    await expect(preview.capture(new AbortController().signal)).rejects.toThrow('wait for it to load')
+    expect(preview.state().mode).toBe('minimized')
     preview.dispose()
   })
 

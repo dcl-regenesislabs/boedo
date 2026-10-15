@@ -21,6 +21,7 @@ export function createPhonePreview(
   let relayRealm = ''
   let instance = ''
   let generation = 0
+  let pauseAfterCapture: number | null = null
   let disposed = false
   let activeTab: Window | null = null
 
@@ -124,24 +125,39 @@ export function createPhonePreview(
     close,
     capture: async (signal: PreviewCaptureSignal): Promise<PhonePreviewCapture> => {
       signal.throwIfAborted()
-      if (state.mode === 'minimized') throw new Error('Restore the mobile preview before taking a picture.')
       if (state.mode === 'closed' || !state.ready) throw new Error('Open the mobile preview and wait for it to load before taking a picture.')
+      if (state.mode === 'minimized') {
+        pauseAfterCapture = generation
+        publish({ ...state, mode: 'embedded' })
+        channel.send({ type: 'visibility', session, instance, visible: true })
+      }
       const requestId = crypto.randomUUID()
-      return new Promise<PhonePreviewCapture>((resolve, reject) => {
-        const finish = (): void => {
-          clearTimeout(timeout)
-          signal.removeEventListener('abort', abort)
-          captures.delete(requestId)
-        }
-        const abort = (): void => { finish(); reject(signal.reason) }
-        const timeout = setTimeout(() => { finish(); reject(new Error('The mobile preview did not answer. Bring its tab to the foreground and retry.')) }, 10_000)
-        captures.set(requestId, {
-          resolve: (value) => { finish(); resolve(value) },
-          reject: (error) => { finish(); reject(error) }
+      try {
+        return await new Promise<PhonePreviewCapture>((resolve, reject) => {
+          const finish = (): void => {
+            clearTimeout(timeout)
+            signal.removeEventListener('abort', abort)
+            captures.delete(requestId)
+          }
+          const abort = (): void => { finish(); reject(signal.reason) }
+          const timeout = setTimeout(() => { finish(); reject(new Error('The mobile preview did not answer. Bring its tab to the foreground and retry.')) }, 10_000)
+          captures.set(requestId, {
+            resolve: (value) => { finish(); resolve(value) },
+            reject: (error) => { finish(); reject(error) }
+          })
+          signal.addEventListener('abort', abort, { once: true })
+          channel.send({ type: 'capture', session, instance, requestId })
         })
-        signal.addEventListener('abort', abort, { once: true })
-        channel.send({ type: 'capture', session, instance, requestId })
-      })
+      } finally {
+        if (captures.size === 0) {
+          // A creator action during capture takes precedence over restoring the previous mode.
+          if (pauseAfterCapture === generation && state.mode === 'embedded') {
+            publish({ ...state, mode: 'minimized' })
+            channel.send({ type: 'visibility', session, instance, visible: false })
+          }
+          pauseAfterCapture = null
+        }
+      }
     },
     built: async (projectId: string): Promise<void> => {
       if (realmOpened === null) return

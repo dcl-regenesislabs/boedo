@@ -151,7 +151,8 @@ up as you make them:
 The assistant can photograph the mobile preview with `view({ target: 'mobile' })`.
 An unframed `view` captures it automatically while embedded; `target: 'editor'` keeps the
 editor camera. Mobile captures include scene UI and touch controls.
-A minimized preview must be restored before taking a new picture.
+A minimized preview briefly resumes for the picture, then pauses again automatically.
+When you ask to see the mobile UI, the assistant can open a closed preview and wait for it to load.
 
 ## Sign in with Decentraland
 

@@ -177,11 +177,13 @@ components; see the [service README](../packages/service/README.md).
   The turn context and build result include the current mobile preview mode and readiness.
   After HUD/menu/layout changes, the assistant is instructed to capture an open preview automatically
   after a successful build, check readability, clipping and overlap with touch controls, and recheck fixes.
-  A closed preview prompts an offer to open **Preview → As a phone**; it never starts an extra engine
-  automatically. Loading/failed captures are reported as incomplete. These are assistant instructions,
+  For automatic validation, a closed preview prompts an offer to check mobile. When the creator asks
+  to see mobile UI, `view({ target: 'mobile', openIfClosed: true })` opens the preview if needed and waits
+  up to 60 seconds for readiness. Failed captures are reported as incomplete. These are assistant instructions,
   not a deterministic visual test or a substitute for interaction testing.
-  A minimized preview reports that mode and rejects captures; the assistant asks the creator to
-  **Restore preview** before checking it, rather than automatically resuming it.
+  Asking how mobile controls or UI look also uses this capture, without requiring a build.
+  A minimized preview briefly resumes for a fresh picture, then pauses again even if capture fails.
+  It keeps the same instance and camera; a creator's mode change during capture takes precedence.
 - `make_thumbnail` (runs on the service): paints the scene's key art with an image model. It takes
   2 `view` shots as references (the hero subject close, then the whole scene wide), with `avatars` adds a bundled
   line-up of Decentraland avatars (`src/ai/avatar-lineup.jpg`, so people look like avatars) and the
