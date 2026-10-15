@@ -109,11 +109,27 @@ You need Node 24, git, and both repos side by side:
    under `packages/scene` (the in-engine editor scene) also needs
    `npm run export-static -w @dcl-editor/scene`; the web build leaves `dist/scene` alone.
 
-5. **Preview ▸ As a phone** opens the scene in the Decentraland mobile explorer's web build, in a
-   1600×720 window that reloads after each build. The explorer serves that build at `/godot/` only
-   when `GODOT_WEB_DIR` names its export (`GODOT_WEB_DIR=/path/to/build/web npm run dev:web …`);
-   without it the menu says the phone preview couldn't open. It needs the explorer to answer `HEAD`
-   on the preview realm, or the mobile explorer reports "Connection lost".
+5. **Preview ▸ As a phone** embeds the Decentraland mobile explorer in the editor's center at a
+   1600×720 aspect ratio. The red, yellow and green window controls close, minimize/pause,
+   and open in a tab or restore it to the editor. Hover or focus reveals the action labels.
+   In another tab, the preview leaves the editor viewport and gizmos available at their normal
+   frame rate; only the embedded preview caps the covered viewport at 5 FPS.
+   **Minimize** pauses mobile rendering and scene processing, leaving a compact **Restore preview**
+   bar while you edit. Restore keeps the same instance and player camera. Minimizing retains its
+   memory; **Close preview** releases it. Captures require restoring a minimized preview first.
+   Moving restarts the preview; closing it or leaving the project releases its engine.
+   Builds hot-reload the scene in either view. The runtime is a separate editor-owned npm package,
+   `@dcl-regenesislabs/mobile-preview-runtime`; bevy-explorer does not serve or depend on it.
+   For a local build, set `MOBILE_PREVIEW_EXPORT=/path/to/build/web` before `npm run dev:web`.
+   This prepares the package and starts its server on **127.0.0.1:8788**, separate from the editor's
+   localhost origin so runtime startup cannot block the editor's JavaScript thread.
+   Production uses the editor service's `/mobile-preview/` endpoint with a pinned runtime package.
+   See [runtime packaging](../packages/mobile-preview/README.md). A fetch bridge relays the active
+   scene's HTTP requests through the editor, including requests from scene workers; lifecycle, hot reload and captures use scoped postMessage.
+   The local launch skips lobby/account background work and surrounding terrain.
+   The assistant's `view` tool accepts `target: 'mobile'` to photograph this preview.
+   Scene JavaScript runs in a web worker. Its system API bridge is still incomplete, including
+   renderer RPC calls, so verify final gameplay in the native mobile app.
 
 So one local page runs your editor, your explorer and your engine together: change any of the
 three, rebuild that one (editor: `npm run build -w @dcl-editor/web`; engine: step 1b; explorer:

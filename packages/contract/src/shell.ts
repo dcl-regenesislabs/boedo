@@ -233,10 +233,27 @@ export type MobilePreview =
   | { ok: true; deepLink: string; qr: string }
   | { ok: false; reason: 'no-network' | 'no-scene' }
 
-// Result of launching an external preview client (web explorer tab or the
-// Decentraland desktop app). `no-client` = no app registered for the
-// decentraland:// protocol — the UI points at the download page.
-// `unavailable` = this page doesn't serve the mobile explorer's web build.
+export interface PhonePreviewState {
+  mode: 'embedded' | 'minimized' | 'tab' | 'closed'
+  url: string | null
+  ready: boolean
+}
+
+export interface PhonePreviewCapture {
+  mimeType: 'image/jpeg'
+  image: string
+  width: number
+  height: number
+}
+
+export interface PreviewCaptureSignal {
+  reason: unknown
+  throwIfAborted(): void
+  addEventListener(type: 'abort', listener: () => void, options?: { once: boolean }): void
+  removeEventListener(type: 'abort', listener: () => void): void
+}
+
+// `no-client`: no app registered for decentraland://; `unavailable`: no mobile web export.
 export type OpenPreview =
   | { ok: true }
   | { ok: false; reason: 'no-scene' | 'no-client' | 'unavailable' }
@@ -461,8 +478,11 @@ export interface EditorShell {
   webPreview?: () => Promise<OpenPreview>
   // open the scene in the Decentraland desktop client via its deep link
   unityPreview?: () => Promise<OpenPreview>
-  // open the scene in the mobile explorer's web build, in a phone-sized window, reloaded on each build
-  phonePreview?: () => Promise<OpenPreview>
+  phonePreview?: (mode?: 'embedded' | 'minimized' | 'tab') => Promise<OpenPreview>
+  phonePreviewState?: () => PhonePreviewState
+  onPhonePreviewState?: (listener: () => void) => () => void
+  closePhonePreview?: () => void
+  capturePhonePreview?: (signal: PreviewCaptureSignal) => Promise<PhonePreviewCapture>
   // ---- App auto-update ----
   // installed app version ("0.2.0") for the Account section
   appVersion?: () => Promise<string>

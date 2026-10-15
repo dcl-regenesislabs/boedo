@@ -1,0 +1,33 @@
+{
+  "name": "@dcl-regenesislabs/mobile-preview-runtime",
+  "version": "0.1.0",
+  "description": "Mobile scene preview runtime and asset server for the web editor",
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": [
+    "dist",
+    "src/server.ts",
+    "README.md",
+    "LICENSE",
+    "scripts/check-dist.mjs",
+    "GODOT-LICENSE.txt",
+    "GODOT-COPYRIGHT.txt"
+  ],
+  "exports": {
+    "./server": "./src/server.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "serve": "node scripts/serve.ts",
+    "prepack": "node scripts/check-dist.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "^20.19.0"
+  }
+}

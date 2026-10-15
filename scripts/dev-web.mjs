@@ -34,6 +34,7 @@ const { values } = parseArgs({
 const PAGE = 'http://localhost:5173'
 const SERVICE_PORT = 8787
 const WORLDS_PORT = 8799
+const MOBILE_PORT = 8788
 
 const reactWeb = path.join(path.resolve(values.bevy), 'react-web')
 if (!fs.existsSync(path.join(reactWeb, 'package.json'))) {
@@ -66,6 +67,7 @@ if (!values['no-build']) {
   }
   run('npm', ['run', 'build', '-w', '@dcl-editor/web'])
 }
+if (process.env.MOBILE_PREVIEW_EXPORT) run('npm', ['run', 'build', '-w', '@dcl-regenesislabs/mobile-preview-runtime'])
 
 const children = []
 function start(name, command, args, options = {}) {
@@ -90,6 +92,9 @@ process.on('SIGTERM', stop)
 
 const dataDir = path.join(root, '.data', 'service')
 fs.mkdirSync(dataDir, { recursive: true })
+if (fs.existsSync(path.join(root, 'packages/mobile-preview/dist/manifest.json'))) {
+  start('mobile', process.execPath, ['packages/mobile-preview/scripts/serve.ts', String(MOBILE_PORT)])
+}
 start('service', process.execPath, [
   'packages/service/dev-server.ts',
   '--port',

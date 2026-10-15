@@ -46,6 +46,7 @@ export interface Point {
 }
 
 export interface ViewRequest {
+  target?: 'editor' | 'mobile'
   entity: string | null
   // the free camera moved here, in world metres, looking at lookAt (or keeping its aim)
   from: Point | null
@@ -54,6 +55,14 @@ export interface ViewRequest {
 
 // The creator's camera comes back where it was once the picture is taken.
 export async function captureView(request: ViewRequest, signal: AbortSignal): Promise<ViewCapture> {
+  const phone = window.editorShell?.phonePreviewState?.()
+  const mobile = request.target === 'mobile' || (request.target === undefined && phone?.mode === 'embedded' && request.from === null && request.entity === null && request.lookAt === null)
+  if (mobile) {
+    if (request.from !== null || request.entity !== null || request.lookAt !== null) throw new Error('Mobile captures use the current player camera. Use target: editor for entity framing or camera positioning.')
+    const capture = window.editorShell?.capturePhonePreview
+    if (capture === undefined) throw new Error('This editor does not support mobile preview captures.')
+    return { ...await capture(signal), framed: 'mobile preview' }
+  }
   const moving = request.from !== null || request.entity !== null
   if (moving) await sendToScene({ type: 'camera-hold' })
   try {

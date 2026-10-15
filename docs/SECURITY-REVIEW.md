@@ -64,3 +64,47 @@ Before public release, resolve or isolate the desktop runtime failure, run a liv
 assistant turn against the deployed HTTPS endpoint, and enable private vulnerability
 reporting in the repository settings. See [SECURITY.md](../SECURITY.md) for release checks
 and the trust boundaries. This review is not an independent penetration test.
+
+## Mobile preview review — 2026-10-14
+
+The mobile runtime source and graphics fixtures now live in the `test-godot-web`
+parent workspace and its pinned engine/explorer submodules. The editor retains its
+npm runtime package, hosting, transport and UI. No package, branch or deployment
+was published during this review.
+
+Fixed the resource relay's access to privileged realm routes: mobile scene workers
+could borrow the editor window's service-worker identity to read environment or
+server storage. It now permits only scene metadata, content and active-entity
+lookups, with timeouts and bounded response buffering. Regression tests reject
+environment/storage requests before fetch, along with traversal and wrong methods;
+ten cases failed before the restriction. Tests use synthetic data, not secrets.
+
+Also fixed preview launch cancellation, deferred runtime pausing until startup,
+checked the complete npm artifact inventory before packing, and removed local
+machine paths from the export. The migrated local static server now rejects path
+and symlink escapes and streams assets. Exports import resources first and fail
+on script/resource errors, including when Godot exits successfully.
+
+Validation: editor `npm run validate` passed all six checks and 2,642 tests.
+Explorer typechecking and 757 tests passed under UTC; its unchanged badge-date
+test fails in the local timezone. Eight migrated export, lifecycle and server tests
+passed. Both browser graphics fixtures passed. A fresh mobile export from the new
+workspace loaded one scene worker and produced an inspected 1024×461 screenshot.
+Minimized preview: zero mobile GPU submissions over three seconds, while the editor
+ran at 60 FPS. The mobile Wasm heap was 494.75 MiB; this is not total browser RSS.
+
+Limits: the migrated export reused compiled engine/library artifacts after checking
+the changed runtime source matched; a clean toolchain rebuild and native phone tests
+were not run. Local credential-pattern scans found no matches in changed source.
+The public explorer production dependency audit reported zero vulnerabilities.
+The private editor dependency audit remains pending authorization to send dependency
+metadata to npm; automatic approval review rejected that network request. Rust
+advisory auditing was unavailable (`cargo audit` is not installed).
+
+Before integration, update the editor/explorer branches to current main and review
+the engine buffer mirror's invalidation on GPU writes. The new CPU copy is updated
+by buffer copies/clears, but writable shader bindings and direct mapped writes do
+not invalidate/update it; GPU-modified vertex/index readback can return stale data.
+The graphics fixtures above cover uploaded texture/mesh serialization and frame
+pacing, not that write/readback case. Submodule changes must be committed separately
+before the parent can record their new revisions.

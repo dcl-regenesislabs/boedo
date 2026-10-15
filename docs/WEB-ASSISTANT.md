@@ -170,6 +170,18 @@ components; see the [service README](../packages/service/README.md).
 - `build`: compile the current browser project, run the bundle once and return compiler
   diagnostics plus scene/client/server errors. This does not simulate a full playthrough.
 - `view`: capture the viewport, optionally framing an entity or setting the camera pose.
+  `target: 'mobile'` captures the open Godot mobile preview, including touch controls and scene UI,
+  in the editor or a separate tab. Mobile capture uses the player's current camera. With no
+  target or framing arguments, an embedded mobile preview is selected automatically;
+  `target: 'editor'` always selects the editor camera.
+  The turn context and build result include the current mobile preview mode and readiness.
+  After HUD/menu/layout changes, the assistant is instructed to capture an open preview automatically
+  after a successful build, check readability, clipping and overlap with touch controls, and recheck fixes.
+  A closed preview prompts an offer to open **Preview → As a phone**; it never starts an extra engine
+  automatically. Loading/failed captures are reported as incomplete. These are assistant instructions,
+  not a deterministic visual test or a substitute for interaction testing.
+  A minimized preview reports that mode and rejects captures; the assistant asks the creator to
+  **Restore preview** before checking it, rather than automatically resuming it.
 - `make_thumbnail` (runs on the service): paints the scene's key art with an image model. It takes
   2 `view` shots as references (the hero subject close, then the whole scene wide), with `avatars` adds a bundled
   line-up of Decentraland avatars (`src/ai/avatar-lineup.jpg`, so people look like avatars) and the

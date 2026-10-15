@@ -24,6 +24,7 @@ import { assetsReview } from './panels/assets-review'
 import { storedValue, usePersistentEnum, usePersistentFlag, usePersistentNum } from './core/persist'
 import { autoSaveStatus } from './core/autosave'
 import { Splitter, Toast as DsToast } from './ds'
+import { PhonePreviewPane } from './features/preview/PhonePreviewPane'
 
 // Draggable right edge of the left dock.
 function LeftResize(props: { width: number; onResize: (w: number) => void }): JSX.Element {
@@ -197,6 +198,7 @@ export function App(props: { playing?: boolean }): JSX.Element {
   return (
     <>
       {rightCol}
+      <PhonePreviewPane left={leftOpen && ready ? leftWidth + 24 : 12} right={rightOpen ? rightWidth + 24 : 12} />
       {!ready ? (
         <div className="eui-boot">
           {phase === 'waiting-engine'
