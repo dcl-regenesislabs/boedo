@@ -140,6 +140,7 @@ up as you make them:
   [`@dcl-regenesislabs/mobile-preview-runtime`](packages/mobile-preview/README.md) npm package, pinned to an exact release and served by
   the editor on its own origin (see [local setup](docs/WEB-EDITOR.md)). Startup stays separate from the editor UI.
   The mobile preview includes the default grass floor under the scene's parcels.
+  Its header has sidebar icons to show or hide the hierarchy and inspector/assistant while the preview stays open.
   Its web runtime still has gaps in system APIs; verify final gameplay in the native phone app.
 - **On your phone** — shows a QR code; scan it with your phone's camera to
   open the scene in the Decentraland mobile app. Phone and computer must be

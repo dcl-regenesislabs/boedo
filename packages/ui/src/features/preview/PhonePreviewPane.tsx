@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { ArrowUpRight, Maximize2, Minus, X } from 'lucide-react'
 import type { PhonePreviewState } from '@dcl-editor/contract'
 import { Spinner } from '../../ds'
@@ -12,7 +12,7 @@ const CLOSED: PhonePreviewState = { mode: 'closed', url: null, ready: false }
 const snapshot = (): PhonePreviewState => window.editorShell?.phonePreviewState?.() ?? CLOSED
 const subscribe = (listener: () => void): (() => void) => window.editorShell?.onPhonePreviewState?.(listener) ?? (() => {})
 
-export function PhonePreviewPane({ left, right }: { left: number; right: number }): JSX.Element | null {
+export function PhonePreviewPane({ left, right, panelControls }: { left: number; right: number; panelControls?: ReactNode }): JSX.Element | null {
   const preview = useSyncExternalStore(subscribe, snapshot)
   const [error, setError] = useState<string | null>(null)
   const screen = useRef<HTMLDivElement>(null)
@@ -59,6 +59,7 @@ export function PhonePreviewPane({ left, right }: { left: number; right: number 
           <span>{preview.mode === 'minimized' ? 'Paused' : preview.mode === 'tab' ? 'Open in another tab' : '1600 × 720'}</span>
         </div>
         {!preview.ready && preview.mode !== 'minimized' && <Spinner size="xs" />}
+        {panelControls !== undefined && <div className="eui-phone-preview-panels" role="group" aria-label="Editor panels">{panelControls}</div>}
       </header>
       {error !== null && <p className="eui-phone-preview-error" role="alert">{error}</p>}
       {embedded && preview.url !== null && (
