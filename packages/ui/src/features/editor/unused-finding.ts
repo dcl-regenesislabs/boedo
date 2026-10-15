@@ -1,11 +1,9 @@
 // Files nothing uses, as a finding in the scene-checks card rather than a second pill of its own.
 import { reviewAssets } from '../../panels/assets-review'
-import { toggleInsights } from './SceneInsightsDock'
 import type { SceneFinding } from './scene-checks'
 
 export const REVIEW_UNUSED_ACTION = 'review-unused'
 
-const MODEL = /\.(glb|gltf)$/i
 const plural = (n: number, one: string): string => `${n} ${one}${n === 1 ? '' : 's'}`
 
 export function unusedFilesFinding(unused: string[] | null, older: string[] | null): SceneFinding | null {
@@ -21,7 +19,6 @@ export function unusedFilesFinding(unused: string[] | null, older: string[] | nu
   }
 }
 
-export function reviewUnusedFiles(unused: string[], older: string[]): void {
-  if (older.length > 0 || unused.some((f) => MODEL.test(f))) reviewAssets(older.length > 0)
-  else toggleInsights()
+export function reviewUnusedFiles(older: string[]): void {
+  reviewAssets(older.length > 0)
 }

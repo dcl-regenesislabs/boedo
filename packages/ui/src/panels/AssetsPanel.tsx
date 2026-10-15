@@ -18,7 +18,7 @@ import { IconCamera, IconChevron, IconEye, IconFileTree, IconPlay, IconRefresh, 
 import { AssetsFileTree } from './AssetsFileTree'
 import { FilePreviewModal } from '../features/ai/FilePreview'
 import { fileKind } from '../script/project-files'
-import { AssetThumb } from './AssetThumb'
+import { AssetThumb, ModelGlyph } from './AssetThumb'
 
 const PAGE_SIZE = 60
 const LISTED = ['model', 'audio', 'image', 'video']
@@ -30,17 +30,6 @@ const LOCAL_PREVIEW = 7
 
 let treeView = false
 
-const ModelGlyph = (): JSX.Element => (
-  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path
-      d="M12 2.5 21 7v10l-9 4.5L3 17V7l9-4.5Z"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinejoin="round"
-    />
-    <path d="M3 7l9 4.5L21 7M12 11.5V21.5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-  </svg>
-)
 
 function CatalogGrid(props: { entries: typeof state.assetCatalog; resetKey: string }): JSX.Element {
   const [visible, setVisible] = useState(PAGE_SIZE)
@@ -388,6 +377,7 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   const [models, setModels] = useState<string[] | null>(null)
   const [allFiles, setAllFiles] = useState(false)
   const [tree, setTree] = useState(treeView)
+  const unusedOnly = useStore(() => assetsReview.unusedOnly)
   const [reloads, setReloads] = useState(0)
   const files = useUnusedFiles()
   const older = files.older ?? []
@@ -424,13 +414,14 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   const f = filter.toLowerCase()
   // the files to clean up lead, so the preview cap never hides them
   const flagged = (p: string): number => (older.includes(p) || unused.includes(p) ? 0 : 1)
-  const local = (models ?? []).filter((p) => f === '' || p.toLowerCase().includes(f)).sort((a, b) => flagged(a) - flagged(b))
+  const listed = unusedOnly ? [...older, ...unused.filter((p) => !older.includes(p))] : models ?? []
+  const local = listed.filter((p) => f === '' || p.toLowerCase().includes(f)).sort((a, b) => flagged(a) - flagged(b))
   const entries = catalog.filter(
     (a) => (category === '' || a.category === category) && catalogMatches(a, f)
   )
   const categories = [...new Set(catalog.map((a) => a.category))].sort()
   const nothing = f !== '' && local.length === 0 && entries.length === 0 && !busy
-  const capped = !allFiles && f === '' && local.length > LOCAL_PREVIEW
+  const capped = !allFiles && !unusedOnly && f === '' && local.length > LOCAL_PREVIEW
   const shownLocal = capped ? local.slice(0, LOCAL_PREVIEW) : local
 
   return (
@@ -466,8 +457,15 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
         <div className="eui-asset-count">{busy ? 'Working…' : 'Loading…'}</div>
       )}
       <div className="eui-panel-body">
-        <Shelf title="My files" count={models === null || tree ? undefined : local.length}>
-          {tree ? <AssetsFileTree query={filter} reloadKey={reloads} /> : <LocalGrid list={shownLocal} older={older} olderScanned={files.older !== null} unused={unused} onUploaded={refresh} />}
+        <Shelf title={unusedOnly ? 'Unused files' : 'My files'} count={models === null || (tree && !unusedOnly) ? undefined : local.length}>
+          {unusedOnly && (
+            <div className="eui-asset-more">
+              <LinkButton tone="inline" onClick={() => (assetsReview.unusedOnly = false)}>
+                Show all my files
+              </LinkButton>
+            </div>
+          )}
+          {tree && !unusedOnly ? <AssetsFileTree query={filter} reloadKey={reloads} /> : <LocalGrid list={shownLocal} older={older} olderScanned={files.older !== null} unused={unused} onUploaded={refresh} />}
           {!tree && capped && (
             <div className="eui-asset-more">
               <LinkButton tone="inline" onClick={() => setAllFiles(true)}>
