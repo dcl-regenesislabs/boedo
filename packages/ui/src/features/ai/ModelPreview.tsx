@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Modal, Spinner } from '../../ds'
+import { Button, GroupLabel, Modal, PropRow, Spinner } from '../../ds'
 import { startThreeWorker, type ThreeWorker } from '../../three/client'
 import { catalogUrl } from '../../assets'
 import { dataLayerReadFileBytes } from '../../engine/datalayer'
@@ -25,19 +25,33 @@ function Details(props: { info: ModelInfo; playing: string | null; onPlay: (name
   const size = info.bounds?.size
   const own = info.textures - info.sharedImages.length
   return (
-    <dl className="eui-ai-model-info">
-      <dt>Triangles</dt><dd>{info.triangles.toLocaleString()}</dd>
-      <dt>Size</dt><dd>{size === undefined ? '—' : `${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} m`}</dd>
-      <dt>File</dt><dd>{Math.round(info.bytes / 1024).toLocaleString()} KB</dd>
-      <dt>Materials</dt><dd>{info.materials.length}{info.materials.length > 0 ? <small>{info.materials.join(', ')}</small> : null}</dd>
-      <dt>Textures</dt><dd>{own}{info.sharedImages.length > 0 ? ` + ${info.sharedImages.length} shared` : ''}{info.largestImage > 0 ? <small>largest {info.largestImage} px</small> : null}</dd>
-      <dt>Animations</dt>
-      <dd>
-        {info.animations.length === 0 ? '—' : info.animations.map((name) => (
-          <button key={name} type="button" className={`clip${props.playing === name ? ' on' : ''}`} aria-pressed={props.playing === name} onClick={() => props.onPlay(name)}>{name}</button>
-        ))}
-      </dd>
-    </dl>
+    <div className="eui-ai-model-info">
+      <GroupLabel>Model</GroupLabel>
+      <PropRow label="Size">{size === undefined ? '—' : `${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} m`}</PropRow>
+      <PropRow label="Triangles">{info.triangles.toLocaleString()}</PropRow>
+      <PropRow label="File">{Math.round(info.bytes / 1024).toLocaleString()} KB</PropRow>
+      <PropRow label="Materials">
+        {info.materials.length}
+        {info.materials.length > 0 && <small>{info.materials.join(', ')}</small>}
+      </PropRow>
+      <PropRow label="Textures">
+        {own}
+        {info.sharedImages.length > 0 ? ` + ${info.sharedImages.length} shared` : ''}
+        {info.largestImage > 0 && <small>largest {info.largestImage} px</small>}
+      </PropRow>
+      {info.animations.length > 0 && (
+        <>
+          <GroupLabel>Animations</GroupLabel>
+          <div className="clips">
+            {info.animations.map((name) => (
+              <Button key={name} size="xs" active={props.playing === name} aria-pressed={props.playing === name} onClick={() => props.onPlay(name)}>
+                {name}
+              </Button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -107,6 +121,7 @@ export function ModelView(props: { source: PreviewSource }): JSX.Element {
       <div ref={host} className="eui-ai-model-view">
         {status === 'loading' && <Spinner size="md" />}
         {status === 'failed' && <p>The model could not be loaded.</p>}
+        {status === 'ready' && <span className="hint">Drag to turn · scroll to zoom</span>}
       </div>
       {info !== null && (
         <Details info={info} playing={playing} onPlay={(name) => {
