@@ -4,7 +4,6 @@ import { resetSceneChecksForTest, revealSceneChecks, setSceneFindings, type Scen
 import { clearPrefabReveal, prefabStore } from '../../panels/prefab-store'
 import { mount, run } from '../../test/render'
 import { state } from '@scene/state'
-import { clearLaunchParams, patchLaunchParams } from '../../boot/launch-params'
 import { unusedFiles } from '../../unused-files'
 import { THUMBNAIL_FIX_ACTION } from './scene-check-thumbnail'
 
@@ -55,8 +54,6 @@ const noThumbnail: SceneFinding = {
 
 afterEach(() => {
   resetSceneChecksForTest()
-  clearLaunchParams()
-  Reflect.deleteProperty(window, 'editorShell')
   run(() => {
     clearPrefabReveal()
     state.frozen = false
@@ -135,14 +132,11 @@ describe('SceneChecksCard render', () => {
   })
 
 
-  it('offers to choose an image for the thumbnail when no assistant is signed in', () => {
-    patchLaunchParams({ project: '/projects/demo' })
-    Object.defineProperty(window, 'editorShell', { configurable: true, value: { sceneSettings: () => {}, onStackLog: () => {}, getState: async () => ({ logs: [] }) } })
+  it('offers the assistant for the thumbnail even before one is signed in', () => {
     setSceneFindings([noThumbnail])
     const view = mount(<SceneChecksCard />)
     view.click(view.find('.eui-checks-head .bar'))
-    expect(view.byText('Make one with the assistant', 'button')).toBeNull()
-    expect(view.byText('Choose an image', 'button')).not.toBeNull()
+    expect(view.byText('Make one with the assistant', 'button')).not.toBeNull()
     view.unmount()
   })
 

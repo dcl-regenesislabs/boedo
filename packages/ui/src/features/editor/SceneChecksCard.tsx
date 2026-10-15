@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { state } from '@scene/state'
 import { Button, Chip } from '../../ds'
-import { IconBot, IconFolder, IconFrame, IconImport, IconPrefab } from '../../icons'
-import { launchParam } from '../../boot/launch-params'
+import { IconBot, IconFolder, IconFrame, IconPrefab } from '../../icons'
 import { useUnusedFiles } from '../../unused-files'
-import { SceneSettingsModal } from '../scene-settings/SceneSettingsModal'
 import { REVIEW_UNUSED_ACTION, reviewUnusedFiles, unusedFilesFinding } from './unused-finding'
 import { useStore } from '../../core/store'
 import { revealPrefab } from '../../panels/prefab-store'
-import { canAskAssistant, prefillAssistant } from '../../panels/ai-store'
+import { prefillAssistant } from '../../panels/ai-store'
 import { THUMBNAIL_FIX_ACTION } from './scene-check-thumbnail'
 import { uiFocusEntity, uiSelectEntity } from '../../actions/selection'
 import { uiPlay } from '../../actions/playback'
@@ -67,9 +65,6 @@ export function SceneChecksCard(): JSX.Element | null {
   const files = useUnusedFiles(frozen)
   const unusedFinding = frozen ? unusedFilesFinding(files.unused, files.older) : null
   const findings = unusedFinding === null ? checked : [...checked, unusedFinding]
-  const projectDir = launchParam('project')
-  const canChooseImage = projectDir !== null && window.editorShell?.sceneSettings !== undefined
-  const [settings, setSettings] = useState(false)
   const [open, setOpen] = useState(false)
   const [dismissed, setDismissed] = useState('')
   const seenBlocking = useRef<Set<string> | null>(null)
@@ -108,11 +103,8 @@ export function SceneChecksCard(): JSX.Element | null {
   const runFix = (finding: SceneFinding): void => {
     const action = finding.fix?.action
     if (action === 'reveal-prefab' && finding.folder !== undefined) revealPrefab(finding.folder)
-    if (action === THUMBNAIL_FIX_ACTION) {
-      if (canAskAssistant()) prefillAssistant('Make a thumbnail for this scene in a … style')
-      else setSettings(true)
-    }
-    if (action === REVIEW_UNUSED_ACTION) reviewUnusedFiles(files.unused ?? [], files.older ?? [])
+    if (action === THUMBNAIL_FIX_ACTION) prefillAssistant('Make a thumbnail for this scene in a … style')
+    if (action === REVIEW_UNUSED_ACTION) reviewUnusedFiles(files.older ?? [])
     if (action === 'select-entity' && finding.entityId !== undefined) {
       uiSelectEntity(finding.entityId, false, false)
       uiFocusEntity(finding.entityId)
@@ -161,11 +153,11 @@ export function SceneChecksCard(): JSX.Element | null {
                   {LEVEL_LABEL[finding.level]}
                 </Chip>
                 <b>{finding.title}</b>
-                {finding.fix !== undefined && (finding.fix.action !== THUMBNAIL_FIX_ACTION || canAskAssistant() || canChooseImage) && (
+                {finding.fix !== undefined && (
                   <span className="act">
                     <Button variant="primary" size="xs" onClick={() => runFix(finding)}>
-                      {finding.fix.action === THUMBNAIL_FIX_ACTION && !canAskAssistant() ? <IconImport /> : FIX_ICON[finding.fix.action]}
-                      {finding.fix.action === THUMBNAIL_FIX_ACTION && !canAskAssistant() ? 'Choose an image' : finding.fix.label}
+                      {FIX_ICON[finding.fix.action]}
+                      {finding.fix.label}
                     </Button>
                   </span>
                 )}
@@ -174,15 +166,6 @@ export function SceneChecksCard(): JSX.Element | null {
             </li>
           ))}
         </ul>
-      )}
-      {settings && projectDir !== null && (
-        <SceneSettingsModal
-          dir={projectDir}
-          onClose={() => setSettings(false)}
-          onSaved={(layoutChanged) => {
-            if (layoutChanged) void window.editorShell?.openProject(projectDir)
-          }}
-        />
       )}
     </div>
   )
