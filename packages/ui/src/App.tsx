@@ -62,7 +62,6 @@ const DOCK_MIN_H = 200
 // The inspector keeps its header plus a few rows however tall the assistant gets.
 const INSPECTOR_MIN_H = 180
 const COL_GAPS = 20
-// eui-rise on .eui-left lasts 0.28s
 const LEFT_RISE_MS = 300
 
 function maxDockHeight(colHeight: number): number {
@@ -96,7 +95,6 @@ export function App(props: { playing?: boolean }): JSX.Element {
   const [leftView, setLeftView] = usePersistentEnum<LeftView>('left-view', 'scene', isLeftView)
   const [leftWidth, setLeftWidth] = usePersistentNum('left-w', 300)
   const [leftOpen, setLeftOpen] = usePersistentFlag('left', true)
-  // the sidebar rises in when it opens, not again on every tab switch (each tab is its own panel)
   const [leftSettled, setLeftSettled] = useState(false)
   useEffect(() => {
     if (!leftOpen) return setLeftSettled(false)

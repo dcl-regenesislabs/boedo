@@ -14,7 +14,6 @@ export interface WindowControlsProps {
   expandIcon?: JSX.Element
 }
 
-// The three macOS window dots. A control without a handler shows as a grey, inert dot.
 export function WindowControls(props: WindowControlsProps): JSX.Element {
   const dot = (kind: 'close' | 'minimize' | 'expand', onClick: (() => void) | undefined, label: string, icon: JSX.Element): JSX.Element => (
     <button type="button" className={`eui-ds-winctl ${kind}`} aria-label={label} data-tip={label} disabled={onClick === undefined} onClick={onClick}>

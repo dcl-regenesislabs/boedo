@@ -8,7 +8,6 @@ export function FileRail(props: {
   active: string | null
   onOpen: (path: string) => void
   reloadKey: number
-  /** a filter owned by the surrounding panel, which then shows no search field of its own */
   query?: string
   fill?: boolean
 }): JSX.Element {
