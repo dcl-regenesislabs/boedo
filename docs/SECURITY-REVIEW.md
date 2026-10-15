@@ -97,11 +97,14 @@ The initial migrated browser export loaded one scene worker and produced an insp
 while the editor ran at 60 FPS. The mobile Wasm heap was 494.75 MiB; this is not total
 browser RSS. Both original graphics fixtures passed with the migrated binaries.
 
-A new buffer-coherence fixture reproduced stale data after CPU updates and GPU writes.
-The driver now updates mirrors for mapped/direct writes and invalidates them before
-writable shader use, including read-only uniform sets rebound to writable shaders.
-A clean engine/library rebuild and rerun of all graphics fixtures are in progress.
-Native phone tests have not run.
+A buffer-coherence fixture reproduced five stale-data failures on the old engine after
+CPU updates, clears, copies, read-only shader use and a GPU write. The driver now submits
+queued changes before readback, updates CPU mirrors and invalidates them before writable
+shader use. Pending GPU reads return empty data instead of taking a synchronous fallback.
+The clean engine build and all three fixture exports pass. The native/browser library
+build is in progress; final graphics and editor lifecycle checks are still pending.
+Automatic approval review could not start the Linux browser check because account usage
+capacity was exhausted. This is not a passing browser result. Native phone tests have not run.
 
 Dependency review uses the downloaded public OSV npm database and an offline scanner;
 no private dependency list is uploaded. The service's 91 production packages have no
