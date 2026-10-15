@@ -11,7 +11,7 @@ registerCss('ds/Chip', 'primitives', css)
 // 'server' (green) and 'client' (blue) are the global client/server colour
 // language (docs/MULTIPLAYER-PLAN.md §8), not free-form decoration: a green chip
 // means the value is server-owned, a blue one means the client decides it.
-export const CHIP_TONES = ['default', 'live', 'soon', 'primary', 'danger', 'info', 'server', 'client'] as const
+export const CHIP_TONES = ['default', 'live', 'soon', 'primary', 'warning', 'danger', 'info', 'server', 'client'] as const
 export const CHIP_SIZES = ['md', 'xs'] as const
 export type ChipTone = (typeof CHIP_TONES)[number]
 export type ChipSize = (typeof CHIP_SIZES)[number]

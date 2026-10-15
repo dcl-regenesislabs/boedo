@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { state } from '@scene/state'
 import { useStore } from '../core/store'
-import { uiCheckModelRefs, uiFetchCatalog, uiImportAsset, uiLoadLocalModels, uiPlaceLocalModel, uiImportFiles } from '../actions/assets'
-import { loadLocalSounds, opendclUrl, SOUND_EXT } from '../assets'
+import { uiCheckModelRefs, uiFetchCatalog, uiImportAsset, uiLoadLocalModels, uiPlaceLocalModel, uiPlaceLocalSound, uiImportFiles } from '../actions/assets'
+import { loadLocalMedia, loadLocalSounds, opendclUrl, SOUND_EXT } from '../assets'
 import { Button, ContextMenu, IconButton, LinkButton, MenuItem, Modal, SearchField, Select, Shelf } from '../ds'
 import { deleteProjectFile, fileUsers, filesDeletedWith } from '../project-file-use'
 import { refreshUnusedFiles, useUnusedFiles } from '../unused-files'
-import { assetsReview, takeSweepRequest } from './assets-review'
+import { assetsReview } from './assets-review'
 import { dataLayerReadFileBytes, onDataLayerWrite } from '../engine/datalayer'
 import { canAskAssistant, prefillAssistant } from './ai-store'
 import { threeAvailable } from '../three/client'
@@ -14,26 +14,25 @@ import { LeftTabs, type LeftView } from './left-view'
 import { ensurePrefabsLoaded } from './prefab-store'
 import { SearchEmpty } from './SearchEmpty'
 import { catalogMatches, countPrefabMatches, matchHint } from './search-hints'
-import { IconPlay, IconRefresh, IconSound, IconStop } from '../icons'
+import { IconCamera, IconChevron, IconDots, IconFileTree, IconPlay, IconRefresh, IconSound, IconStop, IconTiles } from '../icons'
+import { AssetsFileTree } from './AssetsFileTree'
+import { UnusedReview } from './UnusedReview'
+import { FilePreviewModal } from '../features/ai/FilePreview'
+import { fileKind } from '../script/project-files'
+import { AssetThumb, ModelGlyph } from './AssetThumb'
 
 const PAGE_SIZE = 60
+const LISTED = ['model', 'audio', 'image', 'video']
+const placer = (p: string): ((rel: string) => Promise<void>) | undefined =>
+  fileKind(p) === 'model' ? uiPlaceLocalModel : SOUND_EXT.test(p) ? uiPlaceLocalSound : undefined
 
 // Enough of your own files to recognise the section, few enough that the Catalog
 // header below it stays on the first screen. A search is the one time the long
 // list IS the answer, so it lifts the cap.
 const LOCAL_PREVIEW = 7
 
-const ModelGlyph = (): JSX.Element => (
-  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path
-      d="M12 2.5 21 7v10l-9 4.5L3 17V7l9-4.5Z"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinejoin="round"
-    />
-    <path d="M3 7l9 4.5L21 7M12 11.5V21.5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-  </svg>
-)
+let treeView = false
+
 
 function CatalogGrid(props: { entries: typeof state.assetCatalog; resetKey: string }): JSX.Element {
   const [visible, setVisible] = useState(PAGE_SIZE)
@@ -71,15 +70,11 @@ function CatalogGrid(props: { entries: typeof state.assetCatalog; resetKey: stri
   )
 }
 
-function LocalGrid(props: { list: string[]; older: string[]; olderScanned: boolean; unused: string[]; onUploaded: () => void }): JSX.Element {
+function LocalGrid(props: { list: string[]; older: string[]; unused: string[]; onUploaded: () => void }): JSX.Element {
   const [pending, setPending] = useState<{ files: File[]; missing: string[] } | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null)
   const [doomed, setDoomed] = useState<{ path: string; also: string[]; users: string[] | null; unchecked?: boolean; busy?: boolean; error?: string } | null>(null)
   const [sweep, setSweep] = useState<{ busy?: boolean; error?: string } | null>(null)
-  const sweepAsked = useStore(() => assetsReview.sweep)
-  useEffect(() => {
-    if (sweepAsked && props.olderScanned && takeSweepRequest() && props.older.length > 0) setSweep({})
-  }, [sweepAsked, props.older, props.olderScanned])
   const confirmSweep = async (): Promise<void> => {
     setSweep({ busy: true })
     try {
@@ -112,6 +107,8 @@ function LocalGrid(props: { list: string[]; older: string[]; olderScanned: boole
   const fileRef = useRef<HTMLInputElement>(null)
   const carryRef = useRef<File[]>([])
   const [playing, setPlaying] = useState<string | null>(null)
+  const [viewing, setViewing] = useState<string | null>(null)
+  const canView = (p: string): boolean => fileKind(p) !== 'model' || threeAvailable()
   // token bumps on every stop and on unmount, so a read still in flight knows it was superseded
   const preview = useRef<{ token: number; path: string | null; audio: HTMLAudioElement | null }>({ token: 0, path: null, audio: null })
   const stopPreview = (): void => {
@@ -212,19 +209,32 @@ function LocalGrid(props: { list: string[]; older: string[]; olderScanned: boole
           const older = props.older.includes(p)
           const unused = props.unused.includes(p)
           const sound = SOUND_EXT.test(p)
+          const kind = fileKind(p)
+          const media = kind === 'image' || kind === 'video'
           return (
             <div
               key={p}
               className="eui-asset"
-              data-tip={older ? `An earlier build of a model in the scene, kept for undo · right-click to delete` : unused ? `Not placed in the scene or named by a script · right-click to delete` : sound ? `${p} · right-click for more` : `Place ${p} · right-click for more`}
-              onClick={() => void (sound ? togglePreview(p) : uiPlaceLocalModel(p))}
+              data-tip={older ? `An earlier build of a model in the scene, kept for undo · right-click to delete` : unused ? `Not placed in the scene or named by a script · right-click to delete` : sound ? `Play ${p} · ⋯ to add it to the scene` : media ? `View ${p} · right-click for more` : `Preview ${p} · ⋯ to add it to the scene`}
+              onClick={() => void (sound ? togglePreview(p) : canView(p) ? setViewing(p) : uiPlaceLocalModel(p))}
               onContextMenu={(e) => {
                 e.preventDefault()
                 setMenu({ x: e.clientX, y: e.clientY, path: p })
               }}
             >
               <div className="glyph">
-                {sound ? <IconSound /> : <ModelGlyph />}
+                {sound ? <IconSound /> : kind === 'image' ? <AssetThumb path={p} fallback={<ModelGlyph />} /> : kind === 'video' ? <IconCamera /> : <ModelGlyph />}
+                <IconButton
+                  className="eui-asset-menu"
+                  tip="More"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const r = e.currentTarget.getBoundingClientRect()
+                    setMenu({ x: r.left, y: r.bottom + 4, path: p })
+                  }}
+                >
+                  <IconDots />
+                </IconButton>
                 {sound && (
                   <IconButton
                     className="eui-asset-preview"
@@ -239,14 +249,23 @@ function LocalGrid(props: { list: string[]; older: string[]; olderScanned: boole
                   </IconButton>
                 )}
               </div>
-              <span className="name">{name.replace(/\.(glb|gltf|mp3|ogg|wav)$/i, '')}</span>
-              <span className="pack">{older ? 'older build' : unused ? 'unused' : folder.replace(/^assets\//, '') || 'model'}</span>
+              <span className="name">{name.replace(/\.[^.]+$/, '')}</span>
+              <span className="pack">{older ? 'older build' : unused ? 'unused' : folder.replace(/^assets\//, '') || kind}</span>
             </div>
           )
         })}
       </div>
+      {viewing !== null && (
+        <FilePreviewModal
+          path={viewing}
+          onClose={() => setViewing(null)}
+          action={placer(viewing) === undefined ? undefined : { label: 'Add to scene', run: () => void placer(viewing)?.(viewing) }}
+        />
+      )}
       {menu !== null && (
         <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
+          {placer(menu.path) !== undefined && <MenuItem onClick={() => { void placer(menu.path)?.(menu.path); setMenu(null) }}>Add to scene</MenuItem>}
+          {canView(menu.path) && <MenuItem onClick={() => { setViewing(menu.path); setMenu(null) }}>Preview</MenuItem>}
           <MenuItem danger onClick={() => askDelete(menu.path)}>Delete file…</MenuItem>
           {props.older.includes(menu.path) && props.older.length > 1 && (
             <MenuItem danger onClick={() => { setMenu(null); setSweep({}) }}>Delete all {props.older.length} older builds…</MenuItem>
@@ -362,6 +381,10 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   const [category, setCategory] = useState('')
   const [models, setModels] = useState<string[] | null>(null)
   const [allFiles, setAllFiles] = useState(false)
+  const [tree, setTree] = useState(treeView)
+  const unusedOnly = useStore(() => assetsReview.unusedOnly)
+  const reviewAsks = useStore(() => assetsReview.asks)
+  const [reloads, setReloads] = useState(0)
   const files = useUnusedFiles()
   const older = files.older ?? []
   const unused = files.unused ?? []
@@ -370,16 +393,17 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   const catalogFailed = useStore(() => state.assetCatalogFailed)
 
   const refresh = (): void => {
+    setReloads((n) => n + 1)
     setModels(null)
     // models first: the capped preview of My files should still show them
-    void Promise.all([uiLoadLocalModels(), loadLocalSounds()]).then(([m, sounds]) => setModels([...m, ...sounds]))
+    void Promise.all([uiLoadLocalModels(), loadLocalSounds(), loadLocalMedia()]).then(([m, sounds, media]) => setModels([...m, ...sounds, ...media]))
   }
   useEffect(refresh, [])
   // a model built, imported or deleted from anywhere shows up here without a manual reload
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
     const off = onDataLayerWrite((paths) => {
-      if (!paths.some((p) => /\.(glb|gltf)$/i.test(p) || SOUND_EXT.test(p))) return
+      if (!paths.some((p) => LISTED.includes(fileKind(p)))) return
       clearTimeout(timer)
       timer = setTimeout(refresh, 300)
     })
@@ -396,13 +420,14 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   const f = filter.toLowerCase()
   // the files to clean up lead, so the preview cap never hides them
   const flagged = (p: string): number => (older.includes(p) || unused.includes(p) ? 0 : 1)
-  const local = (models ?? []).filter((p) => f === '' || p.toLowerCase().includes(f)).sort((a, b) => flagged(a) - flagged(b))
+  const listed = unusedOnly ? [...older, ...unused.filter((p) => !older.includes(p))] : models ?? []
+  const local = listed.filter((p) => f === '' || p.toLowerCase().includes(f)).sort((a, b) => flagged(a) - flagged(b))
   const entries = catalog.filter(
     (a) => (category === '' || a.category === category) && catalogMatches(a, f)
   )
   const categories = [...new Set(catalog.map((a) => a.category))].sort()
   const nothing = f !== '' && local.length === 0 && entries.length === 0 && !busy
-  const capped = !allFiles && f === '' && local.length > LOCAL_PREVIEW
+  const capped = !allFiles && !unusedOnly && f === '' && local.length > LOCAL_PREVIEW
   const shownLocal = capped ? local.slice(0, LOCAL_PREVIEW) : local
 
   return (
@@ -420,6 +445,16 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
             options={[{ value: '', label: 'All' }, ...categories.map((c) => ({ value: c, label: c }))]}
           />
         )}
+        <IconButton
+          tip={tree ? 'Show your files as tiles' : 'Show every project file as a tree'}
+          style={{ flex: 'none' }}
+          onClick={() => {
+            treeView = !tree
+            setTree(treeView)
+          }}
+        >
+          {tree ? <IconTiles /> : <IconFileTree />}
+        </IconButton>
         <IconButton tip="Reload your files" style={{ flex: 'none' }} onClick={() => { refresh(); void refreshUnusedFiles(true) }}>
           <IconRefresh />
         </IconButton>
@@ -428,12 +463,16 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
         <div className="eui-asset-count">{busy ? 'Working…' : 'Loading…'}</div>
       )}
       <div className="eui-panel-body">
-        <Shelf title="My files" count={models === null ? undefined : local.length}>
-          <LocalGrid list={shownLocal} older={older} olderScanned={files.older !== null} unused={unused} onUploaded={refresh} />
-          {capped && (
+        <Shelf title={unusedOnly ? 'Unused files' : 'My files'} count={models === null || (tree && !unusedOnly) ? undefined : local.length}>
+          <div key={reviewAsks} className={unusedOnly ? 'eui-asset-review' : undefined}>
+            {unusedOnly && <UnusedReview files={listed} onDeleted={refresh} />}
+            {tree && !unusedOnly ? <AssetsFileTree query={filter} reloadKey={reloads} /> : <LocalGrid list={shownLocal} older={older} unused={unused} onUploaded={refresh} />}
+          </div>
+          {!tree && capped && (
             <div className="eui-asset-more">
-              <LinkButton onClick={() => setAllFiles(true)}>
+              <LinkButton tone="inline" onClick={() => setAllFiles(true)}>
                 Show all {local.length} files
+                <IconChevron />
               </LinkButton>
             </div>
           )}

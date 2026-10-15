@@ -3,6 +3,9 @@ import { SceneChecksCard } from './SceneChecksCard'
 import { resetSceneChecksForTest, revealSceneChecks, setSceneFindings, type SceneFinding } from './scene-checks'
 import { clearPrefabReveal, prefabStore } from '../../panels/prefab-store'
 import { mount, run } from '../../test/render'
+import { state } from '@scene/state'
+import { unusedFiles } from '../../unused-files'
+import { THUMBNAIL_FIX_ACTION } from './scene-check-thumbnail'
 
 const blocker: SceneFinding = {
   id: 'server-pool-multi-entity',
@@ -41,10 +44,21 @@ const spawning: SceneFinding = {
   fix: { label: 'Select entity', action: 'select-entity' }
 }
 
+const noThumbnail: SceneFinding = {
+  id: 'no-thumbnail',
+  level: 'warning',
+  title: 'No thumbnail yet',
+  detail: 'The map shows a 16:9 picture of the scene.',
+  fix: { label: 'Make one with the assistant', action: THUMBNAIL_FIX_ACTION }
+}
+
 afterEach(() => {
   resetSceneChecksForTest()
   run(() => {
     clearPrefabReveal()
+    state.frozen = false
+    unusedFiles.unused = null
+    unusedFiles.older = null
   })
 })
 
@@ -117,6 +131,29 @@ describe('SceneChecksCard render', () => {
     view.unmount()
   })
 
+
+  it('offers the assistant for the thumbnail even before one is signed in', () => {
+    setSceneFindings([noThumbnail])
+    const view = mount(<SceneChecksCard />)
+    view.click(view.find('.eui-checks-head .bar'))
+    expect(view.byText('Make one with the assistant', 'button')).not.toBeNull()
+    view.unmount()
+  })
+
+  it('lists unused files as one more finding while editing', () => {
+    run(() => {
+      state.frozen = true
+    })
+    const view = mount(<SceneChecksCard />)
+    run(() => {
+      unusedFiles.unused = ['models/tree.glb', 'assets/audio/old.mp3']
+      unusedFiles.older = []
+    })
+    view.click(view.find('.eui-checks-head .bar'))
+    expect(view.byText('Unused files')).not.toBeNull()
+    expect(view.byText('Review', 'button')).not.toBeNull()
+    view.unmount()
+  })
 
   it('dismisses until the findings change, and comes back when they do', () => {
     setSceneFindings([warning])

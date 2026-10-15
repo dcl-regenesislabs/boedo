@@ -62,6 +62,8 @@ const DOCK_MIN_H = 200
 // The inspector keeps its header plus a few rows however tall the assistant gets.
 const INSPECTOR_MIN_H = 180
 const COL_GAPS = 20
+const LEFT_RISE_MS = 300
+
 function maxDockHeight(colHeight: number): number {
   return Math.max(DOCK_MIN_H, colHeight - INSPECTOR_MIN_H - COL_GAPS)
 }
@@ -93,6 +95,12 @@ export function App(props: { playing?: boolean }): JSX.Element {
   const [leftView, setLeftView] = usePersistentEnum<LeftView>('left-view', 'scene', isLeftView)
   const [leftWidth, setLeftWidth] = usePersistentNum('left-w', 300)
   const [leftOpen, setLeftOpen] = usePersistentFlag('left', true)
+  const [leftSettled, setLeftSettled] = useState(false)
+  useEffect(() => {
+    if (!leftOpen) return setLeftSettled(false)
+    const timer = setTimeout(() => setLeftSettled(true), LEFT_RISE_MS)
+    return () => clearTimeout(timer)
+  }, [leftOpen])
   const [rightWidth, setRightWidth] = usePersistentNum('right-w', 340)
   const [aiHeight, setAiHeight] = usePersistentNum('ai-h', 520)
   const [inspectorMin, setInspectorMin] = usePersistentFlag('right-min', false)
@@ -200,7 +208,7 @@ export function App(props: { playing?: boolean }): JSX.Element {
       ) : (
         <>
           <PrefabDropLayer />
-          <div className="eui-play-hide" hidden={playing}>
+          <div className={leftSettled ? 'eui-play-hide eui-left-settled' : 'eui-play-hide'} hidden={playing}>
             <Toolbar
               leftOpen={leftOpen}
               rightOpen={rightOpen}

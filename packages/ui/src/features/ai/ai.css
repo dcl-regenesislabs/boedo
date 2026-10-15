@@ -212,11 +212,6 @@
 }
 .eui-studio-brand { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13px; }
 .eui-studio-brand svg { color: var(--primary); }
-.eui-studio-hbtn {
-  width: 28px; height: 28px; border-radius: var(--r-control); border: 1px solid var(--divider); background: var(--paper);
-  color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px;
-}
-.eui-studio-hbtn:hover { color: var(--text); background: var(--paper-hi); }
 
 /* ---- studio columns: chrome on --paper, documents on --input ---- */
 .eui-studio-split { flex: 1; min-height: 0; display: flex; }
@@ -304,6 +299,8 @@
 
 /* ---- project file tree (Studio's left column) ---- */
 .eui-studio-rail-head { padding: 8px; border-bottom: 1px solid var(--divider-soft); }
+.eui-studio-rail.fill { width: auto; border-right: 0; background: transparent; }
+.eui-studio-rail.fill .eui-studio-rail-body { overflow: visible; }
 .eui-studio-rail-body { flex: 1; min-height: 0; overflow: auto; padding: 6px 6px 14px; }
 
 .eui-file-row {
@@ -333,6 +330,8 @@
 .eui-file-row .ki.k-text { color: var(--ink-6); }
 .eui-file-row .ki.k-image { color: var(--gold); }
 .eui-file-row .ki.k-model { color: var(--green); }
+.eui-file-row .ki.k-audio { color: var(--lavender); }
+.eui-file-row .ki.k-video { color: var(--client-blue); }
 .eui-file-row .ki.k-binary { color: var(--text-3); }
 
 .eui-file-row.dir { color: var(--text-2); font: 600 11.5px/1 var(--font-family); letter-spacing: 0.01em; }
@@ -430,6 +429,11 @@
   background-size: 16px 16px;
   background-position: 0 0, 0 8px, 8px -8px, -8px 0;
 }
+.eui-preview.model { padding: var(--space-3); }
+.eui-preview.media { display: flex; align-items: center; justify-content: center; padding: 24px; }
+.eui-preview.media audio { width: min(100%, 480px); }
+.eui-preview.media video { max-width: 100%; max-height: 100%; border-radius: var(--r-control); background: #000; }
+.eui-preview-modal { display: flex; flex-direction: column; height: min(70vh, 560px); }
 .eui-preview-text {
   margin: 0; padding: 14px 16px; white-space: pre-wrap; word-break: break-word;
   font: 12.5px/1.7 var(--font-mono); color: var(--text-2);
@@ -497,7 +501,16 @@
 }
 .eui-qopen-row.on { background: var(--primary-selected, rgba(152, 45, 226, 0.22)); }
 .eui-qopen-none { color: var(--text-3); font-size: 12.5px; padding: 14px; text-align: center; }
-.eui-ai-model-view { position: relative; display: flex; align-items: center; justify-content: center; height: min(60vh, 480px); color: var(--text-2); background: var(--input); border-radius: var(--r-control); overflow: hidden; }
+.eui-ai-model-body { display: flex; gap: var(--space-3); height: min(60vh, 480px); min-height: 0; }
+.eui-ai-model-view { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; color: var(--text-2); background: var(--input); border-radius: var(--r-control); overflow: hidden; }
+.eui-ai-model-view .hint { position: absolute; left: var(--space-2); bottom: var(--space-2); padding: 3px 8px; border-radius: var(--r-pill); background: var(--panel); color: var(--text-3); font-size: var(--fs-xs); pointer-events: none; }
+.eui-ai-model-info { flex: none; width: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.eui-ai-model-info .pvalue { flex-direction: column; align-items: flex-start; gap: 1px; font-variant-numeric: tabular-nums; }
+.eui-ai-model-info small { color: var(--text-3); font-size: var(--fs-xs); overflow-wrap: anywhere; }
+.eui-ai-model-info .clips { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 0 var(--space-2); }
+.eui-preview.model { container-type: size; }
+.eui-preview.model .eui-ai-model-body { height: 100%; }
+@container (max-width: 560px) { .eui-ai-model-body { flex-direction: column; } .eui-ai-model-info { width: auto; } }
 .eui-ai-model-view > canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
 .eui-ai-built { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-2) 0; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); background: var(--input); border: 1px solid var(--divider-soft); border-radius: var(--r-control); }
 .eui-ai-built .what { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: var(--fs-sm); }

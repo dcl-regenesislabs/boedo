@@ -1,15 +1,10 @@
-// Asks, from outside the Assets panel, to show it — and the older builds' delete confirmation with it.
+// Asks, from outside the Assets panel, to show it narrowed to the files nothing uses.
 import { reactive } from '../core/store'
 
-export const assetsReview = reactive({ asks: 0, sweep: false })
+// unusedOnly narrows My files to what the review is about, until the creator asks for everything again
+export const assetsReview = reactive({ asks: 0, unusedOnly: false })
 
-export function reviewAssets(sweepOlder: boolean): void {
-  assetsReview.sweep = sweepOlder
+export function reviewAssets(): void {
+  assetsReview.unusedOnly = true
   assetsReview.asks++
-}
-
-export function takeSweepRequest(): boolean {
-  const asked = assetsReview.sweep
-  if (asked) assetsReview.sweep = false
-  return asked
 }

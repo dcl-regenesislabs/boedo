@@ -34,6 +34,8 @@ import {
   Eye,
   EyeOff,
   Grid3x3,
+  LayoutGrid,
+  ListTree,
   Volume2,
   VolumeOff,
   Box,
@@ -102,6 +104,8 @@ export const IconUnlock = wrap(Unlock)
 export const IconEye = wrap(Eye)
 export const IconEyeOff = wrap(EyeOff)
 export const IconGrid = wrap(Grid3x3)
+export const IconTiles = wrap(LayoutGrid)
+export const IconFileTree = wrap(ListTree)
 export const IconTable = wrap(Table2)
 export const IconRefresh = wrap(RefreshCw)
 export const IconFolder = wrap(FolderOpen)

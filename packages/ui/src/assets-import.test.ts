@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createEntities } from '@scene/inspector'
-import { importFiles } from './assets'
+import { importFiles, placeLocalSound } from './assets'
 
 const saved = vi.hoisted((): string[] => [])
 vi.mock('./engine/datalayer', () => ({
@@ -11,7 +11,7 @@ vi.mock('./engine/datalayer', () => ({
 vi.mock('./engine/cmd', () => ({ cmd: {} }))
 vi.mock('./engine/bus', () => ({ sceneRpc: async () => null }))
 vi.mock('@scene/inspector', () => ({ createEntities: vi.fn(async () => []) }))
-vi.mock('@scene/state', () => ({ state: {}, setSelected: () => {} }))
+vi.mock('@scene/state', () => ({ state: { snapshot: {} }, setSelected: () => {} }))
 vi.mock('./panels/reveal', () => ({ revealInTree: () => {} }))
 vi.mock('@scene/custom-components', () => ({ NAME_COMPONENT: 'core-schema::Name' }))
 
@@ -30,5 +30,18 @@ describe('importing files', () => {
     expect(saved).toEqual(added)
     expect(result.skipped).toEqual(['huge.png (over 50 MB, which Worlds refuse)', 'song.flac (not a model, image, sound, video or data file)'])
     expect(createEntities).not.toHaveBeenCalled()
+  })
+})
+
+describe('placing a sound', () => {
+  it('adds an entity whose AudioSource plays the file, looping, so it counts as used', async () => {
+    vi.mocked(createEntities).mockClear()
+    await placeLocalSound('assets/audio/lobby-drift.mp3', 'lobby-drift', { x: 8, y: 1, z: 8 })
+    const [entity] = vi.mocked(createEntities).mock.calls[0][0]
+    expect(entity).toMatchObject({
+      Transform: { position: { x: 8, y: 1, z: 8 } },
+      AudioSource: { audioClipUrl: 'assets/audio/lobby-drift.mp3', playing: true, loop: true }
+    })
+    expect(entity).not.toHaveProperty('GltfContainer')
   })
 })

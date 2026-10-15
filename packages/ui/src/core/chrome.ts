@@ -11,7 +11,7 @@ import { setStoredFlag, storedFlag, whenPersisted } from './persist'
 // component's usePersistentFlag because module code has to be able to raise the
 // dock: an "ask the assistant" chip or a jump to an error line has to reach a
 // panel the creator may have hidden.
-export const chrome = reactive({ uiHidden: false, rightOpen: storedFlag('right', true), rightDock: 0 })
+export const chrome = reactive({ uiHidden: false, rightOpen: storedFlag('right', true), rightDock: 0, rightDockBottom: 0 })
 whenPersisted(() => (chrome.rightOpen = storedFlag('right', true)))
 
 export function toggleUiHidden(): void {
@@ -29,17 +29,28 @@ export function toggleRightPanel(): void {
 
 // The logs drawer ends where the right-hand column begins, so the assistant's composer stays usable.
 export function trackRightDock(el: HTMLElement): () => void {
+  const observer = new ResizeObserver(() => measure())
   const measure = (): void => {
     const left = el.getBoundingClientRect().left
     chrome.rightDock = el.hidden || left <= 0 ? 0 : Math.max(0, Math.round(window.innerWidth - left))
+    // a minimized inspector or assistant is a title bar at the top: below it the column is empty
+    chrome.rightDockBottom = Math.round(Math.max(0, ...[...el.children].map((child) => child.getBoundingClientRect().bottom)))
   }
-  const observer = new ResizeObserver(measure)
-  observer.observe(el)
+  const watchChildren = (): void => {
+    observer.disconnect()
+    observer.observe(el)
+    for (const child of el.children) observer.observe(child)
+    measure()
+  }
+  const children = new MutationObserver(watchChildren)
+  children.observe(el, { childList: true })
+  watchChildren()
   window.addEventListener('resize', measure)
-  measure()
   return () => {
     observer.disconnect()
+    children.disconnect()
     window.removeEventListener('resize', measure)
     chrome.rightDock = 0
+    chrome.rightDockBottom = 0
   }
 }

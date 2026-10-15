@@ -253,12 +253,34 @@ export async function loadLocalSounds(): Promise<string[]> {
   }
 }
 
+// imported images and videos; textures that ship with a model live under models/ and stay out
+export async function loadLocalMedia(): Promise<string[]> {
+  try {
+    return (await projectFiles()).filter((p) => p.startsWith('assets/') && (IMAGE_EXT.test(p) || VIDEO_EXT.test(p))).sort()
+  } catch {
+    return []
+  }
+}
+
 // Place a model that's already in the project content at `position`.
 export async function placeLocalModel(
   rel: string,
   name: string,
   position: { x: number; y: number; z: number }
 ): Promise<void> {
+  await placeLocal(name, position, { GltfContainer: { src: rel, visibleMeshesCollisionMask: 3 } })
+}
+
+// a sound in the scene is ambience, so it starts playing and loops; the inspector turns either off
+export async function placeLocalSound(
+  rel: string,
+  name: string,
+  position: { x: number; y: number; z: number }
+): Promise<void> {
+  await placeLocal(name, position, { AudioSource: { audioClipUrl: rel, playing: true, loop: true, volume: 1 } })
+}
+
+async function placeLocal(name: string, position: { x: number; y: number; z: number }, components: Record<string, unknown>): Promise<void> {
   const ids = await createEntities([
     {
       Transform: {
@@ -267,7 +289,7 @@ export async function placeLocalModel(
         scale: { x: 1, y: 1, z: 1 },
         parent: 0
       },
-      GltfContainer: { src: rel, visibleMeshesCollisionMask: 3 },
+      ...components,
       [NAME_COMPONENT]: { value: uniqueEntityName(name) }
     }
   ])

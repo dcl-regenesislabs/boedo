@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { state } from '@scene/state'
-import { Chip } from '../../ds'
+import { Button, Chip } from '../../ds'
+import { IconBot, IconFolder, IconFrame, IconPrefab } from '../../icons'
+import { useUnusedFiles } from '../../unused-files'
+import { REVIEW_UNUSED_ACTION, reviewUnusedFiles, unusedFilesFinding } from './unused-finding'
 import { useStore } from '../../core/store'
 import { revealPrefab } from '../../panels/prefab-store'
-import { canAskAssistant, prefillAssistant } from '../../panels/ai-store'
+import { prefillAssistant } from '../../panels/ai-store'
 import { THUMBNAIL_FIX_ACTION } from './scene-check-thumbnail'
 import { uiFocusEntity, uiSelectEntity } from '../../actions/selection'
 import { uiPlay } from '../../actions/playback'
@@ -24,6 +27,13 @@ import {
 registerCss('features/editor/scene-checks', 'features', css)
 
 const IDLE_REFRESH_MS = 15_000
+
+const FIX_ICON: Record<string, JSX.Element> = {
+  [THUMBNAIL_FIX_ACTION]: <IconBot />,
+  'select-entity': <IconFrame />,
+  'reveal-prefab': <IconPrefab />,
+  [REVIEW_UNUSED_ACTION]: <IconFolder />
+}
 
 const LEVEL_LABEL: Record<SceneCheckLevel, string> = {
   blocker: 'Blocks Play',
@@ -47,11 +57,14 @@ function signatureOf(findings: SceneFinding[]): string {
 }
 
 export function SceneChecksCard(): JSX.Element | null {
-  const findings = useSceneFindings()
+  const checked = useSceneFindings()
   const flash = useSceneChecksFlash()
   const frozen = useStore(() => state.frozen)
   const saveStatus = useStore(() => state.saveStatus)
   const health = useSceneHealth()
+  const files = useUnusedFiles(frozen)
+  const unusedFinding = frozen ? unusedFilesFinding(files.unused, files.older) : null
+  const findings = unusedFinding === null ? checked : [...checked, unusedFinding]
   const [open, setOpen] = useState(false)
   const [dismissed, setDismissed] = useState('')
   const seenBlocking = useRef<Set<string> | null>(null)
@@ -91,6 +104,7 @@ export function SceneChecksCard(): JSX.Element | null {
     const action = finding.fix?.action
     if (action === 'reveal-prefab' && finding.folder !== undefined) revealPrefab(finding.folder)
     if (action === THUMBNAIL_FIX_ACTION) prefillAssistant('Make a thumbnail for this scene in a … style')
+    if (action === REVIEW_UNUSED_ACTION) reviewUnusedFiles()
     if (action === 'select-entity' && finding.entityId !== undefined) {
       uiSelectEntity(finding.entityId, false, false)
       uiFocusEntity(finding.entityId)
@@ -135,19 +149,20 @@ export function SceneChecksCard(): JSX.Element | null {
           {findings.map((finding, index) => (
             <li key={findingKey(finding, index)} className={finding.level}>
               <div className="top">
-                <Chip size="xs" tone={finding.level === 'warning' ? 'default' : 'danger'}>
+                <Chip size="xs" tone={finding.level === 'warning' ? 'warning' : 'danger'}>
                   {LEVEL_LABEL[finding.level]}
                 </Chip>
                 <b>{finding.title}</b>
+                {finding.fix !== undefined && (
+                  <span className="act">
+                    <Button variant="primary" size="xs" onClick={() => runFix(finding)}>
+                      {FIX_ICON[finding.fix.action]}
+                      {finding.fix.label}
+                    </Button>
+                  </span>
+                )}
               </div>
               <p>{finding.detail}</p>
-              {finding.fix !== undefined && (finding.fix.action !== THUMBNAIL_FIX_ACTION || canAskAssistant()) && (
-                <div className="act">
-                  <button className="eui-link" onClick={() => runFix(finding)}>
-                    {finding.fix.label}
-                  </button>
-                </div>
-              )}
             </li>
           ))}
         </ul>

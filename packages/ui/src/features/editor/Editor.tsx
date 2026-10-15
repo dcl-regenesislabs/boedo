@@ -28,7 +28,6 @@ import { LogsDrawer, type LogsTab } from './LogsDrawer'
 import { stripAnsi, useSceneHealth, errorLocation, type SceneHealth } from './scene-health'
 import { SceneChecksCard } from './SceneChecksCard'
 import { SceneInsightsDock } from './SceneInsightsDock'
-import { UnusedFilesChip } from './UnusedFilesChip'
 import { openCodeAt } from '../../panels/ai-store'
 import { baseName } from '../../script/project-files'
 import { chrome, toggleUiHidden } from '../../core/chrome'
@@ -295,7 +294,6 @@ export function Editor(props: { params: URLSearchParams; preview?: number }): JS
       {revealed && health !== null && <SceneHealthBanner health={health} onLogs={() => openLogs()} />}
       {revealed && !uiHidden && !fullScreen && <SceneChecksCard />}
       {revealed && !uiHidden && !fullScreen && <SceneInsightsDock />}
-      {revealed && !uiHidden && !fullScreen && <UnusedFilesChip />}
       {props.params.get('project') !== null && <SyncConflictGate project={props.params.get('project') as string} />}
       {/* Play is the game as a player sees it: the chrome stays mounted (the
           chat keeps its turn, the panels their scroll) but takes no room. */}

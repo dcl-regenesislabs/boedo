@@ -107,6 +107,20 @@ export function LogsDrawer(props: {
     if (pre.current !== null) pre.current.scrollTop = pre.current.scrollHeight
   }, [serverLogs, sceneLogs, open, tab])
   const dock = useStore(() => chrome.rightDock)
+  const dockBottom = useStore(() => chrome.rightDockBottom)
+  const [drawer, setDrawer] = useState<HTMLDivElement | null>(null)
+  const [drawerTop, setDrawerTop] = useState(Infinity)
+  useEffect(() => {
+    if (drawer === null) return
+    const measure = (): void => setDrawerTop(drawer.getBoundingClientRect().top)
+    const observer = new ResizeObserver(measure)
+    observer.observe(drawer)
+    window.addEventListener('resize', measure)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [drawer])
   if (!open) return null
   // hosted, the preview realm serves the scene's storage itself
   const host = getHost()
@@ -140,7 +154,7 @@ export function LogsDrawer(props: {
     return BUILD_TAB_EMPTY
   }
   return (
-    <div className="eui-logs-drawer" style={{ right: dock }}>
+    <div ref={setDrawer} className="eui-logs-drawer" style={{ right: dockBottom > drawerTop ? dock : 0 }}>
       <div className="eui-logs-tabs">
         {shell !== undefined && (
           <button className={tab === 'server' ? 'on' : ''} onClick={() => setTab('server')}>

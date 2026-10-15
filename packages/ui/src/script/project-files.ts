@@ -17,6 +17,8 @@ export const ENTRY_FILE = 'src/index.ts'
 const EDITABLE = ['.ts', '.tsx']
 const IMAGE = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.avif']
 const MODEL = ['.glb', '.gltf']
+const AUDIO = ['.mp3', '.ogg', '.wav', '.m4a', '.flac']
+const VIDEO = ['.mp4', '.webm', '.mov']
 // Formats that are definitely not text. Everything NOT listed here falls through
 // to a text preview — a project is full of one-off config files (.config,
 // .toml, .lock, Dockerfile, extensionless) and listing every readable extension
@@ -24,14 +26,13 @@ const MODEL = ['.glb', '.gltf']
 // guess here shows "binary file", never a screen of mojibake.
 const BINARY = [
   '.wasm', '.zip', '.gz', '.tar', '.7z', '.rar',
-  '.mp3', '.ogg', '.wav', '.m4a', '.flac',
-  '.mp4', '.webm', '.mov', '.avi',
+  '.avi',
   '.ttf', '.otf', '.woff', '.woff2', '.eot',
   '.pdf', '.bin', '.dat', '.exe', '.dll', '.dylib', '.so',
   '.ico', '.icns', '.psd', '.blend', '.fbx', '.obj'
 ]
 
-export type FileKind = 'code' | 'text' | 'image' | 'model' | 'binary'
+export type FileKind = 'code' | 'text' | 'image' | 'model' | 'audio' | 'video' | 'binary'
 
 function has(path: string, exts: string[]): boolean {
   const lower = path.toLowerCase()
@@ -42,6 +43,8 @@ export function fileKind(path: string): FileKind {
   if (has(path, EDITABLE)) return 'code'
   if (has(path, IMAGE)) return 'image'
   if (has(path, MODEL)) return 'model'
+  if (has(path, AUDIO)) return 'audio'
+  if (has(path, VIDEO)) return 'video'
   if (has(path, BINARY)) return 'binary'
   return 'text'
 }
@@ -68,16 +71,19 @@ export function isEditable(path: string): boolean {
 // read-only, which sidesteps the reason they were excluded before: saving a
 // .json would restart the scene and race the Scene Settings dialog that owns it.
 export function isViewable(path: string): boolean {
-  const kind = fileKind(path)
-  return kind === 'code' || kind === 'text' || kind === 'image'
+  return fileKind(path) !== 'binary'
 }
 
 export function mimeFor(path: string): string {
   const lower = path.toLowerCase()
-  if (lower.endsWith('.svg')) return 'image/svg+xml'
-  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg'
   const ext = lower.slice(lower.lastIndexOf('.') + 1)
-  return `image/${ext}`
+  if (ext === 'svg') return 'image/svg+xml'
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg'
+  if (ext === 'mp3') return 'audio/mpeg'
+  if (ext === 'm4a') return 'audio/mp4'
+  if (ext === 'mov') return 'video/quicktime'
+  const kind = fileKind(path)
+  return `${kind === 'audio' || kind === 'video' ? kind : 'image'}/${ext}`
 }
 
 export function baseName(path: string): string {
