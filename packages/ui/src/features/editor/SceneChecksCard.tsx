@@ -104,7 +104,7 @@ export function SceneChecksCard(): JSX.Element | null {
     const action = finding.fix?.action
     if (action === 'reveal-prefab' && finding.folder !== undefined) revealPrefab(finding.folder)
     if (action === THUMBNAIL_FIX_ACTION) prefillAssistant('Make a thumbnail for this scene in a … style')
-    if (action === REVIEW_UNUSED_ACTION) reviewUnusedFiles(files.older ?? [])
+    if (action === REVIEW_UNUSED_ACTION) reviewUnusedFiles()
     if (action === 'select-entity' && finding.entityId !== undefined) {
       uiSelectEntity(finding.entityId, false, false)
       uiFocusEntity(finding.entityId)

@@ -19,6 +19,6 @@ export function unusedFilesFinding(unused: string[] | null, older: string[] | nu
   }
 }
 
-export function reviewUnusedFiles(older: string[]): void {
-  reviewAssets(older.length > 0)
+export function reviewUnusedFiles(): void {
+  reviewAssets()
 }

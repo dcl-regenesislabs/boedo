@@ -610,6 +610,14 @@
 .eui-asset-more { display: flex; justify-content: center; padding: var(--space-1) var(--space-3) var(--space-3); }
 .eui-asset-more > button { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs); }
 .eui-asset-more > button svg { width: 14px; height: 14px; }
+.eui-asset-review { display: flex; flex-direction: column; gap: var(--space-2); padding-top: var(--space-2); animation: eui-review-in 0.9s ease-out; border-radius: var(--r-control); }
+.eui-asset-review .eui-asset { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warning) 55%, transparent); }
+.eui-unused-review-act { display: flex; justify-content: flex-end; margin-top: var(--space-2); }
+@keyframes eui-review-in {
+  0% { opacity: 0; transform: translateY(6px); box-shadow: 0 0 0 0 color-mix(in srgb, var(--warning) 60%, transparent); }
+  35% { opacity: 1; transform: none; box-shadow: 0 0 0 4px color-mix(in srgb, var(--warning) 35%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--warning) 0%, transparent); }
+}
 .eui-asset {
   border: 1px solid var(--divider-soft); border-radius: 10px; padding: 6px; cursor: pointer;
   display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center;

@@ -6,7 +6,7 @@ import { loadLocalMedia, loadLocalSounds, opendclUrl, SOUND_EXT } from '../asset
 import { Button, ContextMenu, IconButton, LinkButton, MenuItem, Modal, SearchField, Select, Shelf } from '../ds'
 import { deleteProjectFile, fileUsers, filesDeletedWith } from '../project-file-use'
 import { refreshUnusedFiles, useUnusedFiles } from '../unused-files'
-import { assetsReview, takeSweepRequest } from './assets-review'
+import { assetsReview } from './assets-review'
 import { dataLayerReadFileBytes, onDataLayerWrite } from '../engine/datalayer'
 import { canAskAssistant, prefillAssistant } from './ai-store'
 import { threeAvailable } from '../three/client'
@@ -16,6 +16,7 @@ import { SearchEmpty } from './SearchEmpty'
 import { catalogMatches, countPrefabMatches, matchHint } from './search-hints'
 import { IconCamera, IconChevron, IconEye, IconFileTree, IconPlay, IconRefresh, IconSound, IconStop, IconTiles } from '../icons'
 import { AssetsFileTree } from './AssetsFileTree'
+import { UnusedReview } from './UnusedReview'
 import { FilePreviewModal } from '../features/ai/FilePreview'
 import { fileKind } from '../script/project-files'
 import { AssetThumb, ModelGlyph } from './AssetThumb'
@@ -67,15 +68,11 @@ function CatalogGrid(props: { entries: typeof state.assetCatalog; resetKey: stri
   )
 }
 
-function LocalGrid(props: { list: string[]; older: string[]; olderScanned: boolean; unused: string[]; onUploaded: () => void }): JSX.Element {
+function LocalGrid(props: { list: string[]; older: string[]; unused: string[]; onUploaded: () => void }): JSX.Element {
   const [pending, setPending] = useState<{ files: File[]; missing: string[] } | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null)
   const [doomed, setDoomed] = useState<{ path: string; also: string[]; users: string[] | null; unchecked?: boolean; busy?: boolean; error?: string } | null>(null)
   const [sweep, setSweep] = useState<{ busy?: boolean; error?: string } | null>(null)
-  const sweepAsked = useStore(() => assetsReview.sweep)
-  useEffect(() => {
-    if (sweepAsked && props.olderScanned && takeSweepRequest() && props.older.length > 0) setSweep({})
-  }, [sweepAsked, props.older, props.olderScanned])
   const confirmSweep = async (): Promise<void> => {
     setSweep({ busy: true })
     try {
@@ -378,6 +375,7 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   const [allFiles, setAllFiles] = useState(false)
   const [tree, setTree] = useState(treeView)
   const unusedOnly = useStore(() => assetsReview.unusedOnly)
+  const reviewAsks = useStore(() => assetsReview.asks)
   const [reloads, setReloads] = useState(0)
   const files = useUnusedFiles()
   const older = files.older ?? []
@@ -458,14 +456,10 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
       )}
       <div className="eui-panel-body">
         <Shelf title={unusedOnly ? 'Unused files' : 'My files'} count={models === null || (tree && !unusedOnly) ? undefined : local.length}>
-          {unusedOnly && (
-            <div className="eui-asset-more">
-              <LinkButton tone="inline" onClick={() => (assetsReview.unusedOnly = false)}>
-                Show all my files
-              </LinkButton>
-            </div>
-          )}
-          {tree && !unusedOnly ? <AssetsFileTree query={filter} reloadKey={reloads} /> : <LocalGrid list={shownLocal} older={older} olderScanned={files.older !== null} unused={unused} onUploaded={refresh} />}
+          <div key={reviewAsks} className={unusedOnly ? 'eui-asset-review' : undefined}>
+            {unusedOnly && <UnusedReview files={listed} onDeleted={refresh} />}
+            {tree && !unusedOnly ? <AssetsFileTree query={filter} reloadKey={reloads} /> : <LocalGrid list={shownLocal} older={older} unused={unused} onUploaded={refresh} />}
+          </div>
           {!tree && capped && (
             <div className="eui-asset-more">
               <LinkButton tone="inline" onClick={() => setAllFiles(true)}>
