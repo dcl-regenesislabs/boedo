@@ -92,23 +92,30 @@ The service container builds with a verified mobile runtime and passes its restr
 container, signed-storage, restart and shutdown smoke test. That test also verifies
 mobile Wasm delivery and denial of non-artifact files. Workflow syntax passes actionlint.
 
-The initial migrated browser export loaded one scene worker and produced an inspected
-1024×461 screenshot. Minimized preview: zero mobile GPU submissions over three seconds,
-while the editor ran at 60 FPS. The mobile Wasm heap was 494.75 MiB; this is not total
-browser RSS. Both original graphics fixtures passed with the migrated binaries.
+The final export loaded one scene worker and produced an inspected 1024×461 screenshot
+with grass under the scene's parcels and mobile controls. Two open/close cycles kept
+the Wasm heap at 494.75 MiB, with one scene worker each; this is not total browser RSS
+or a long-duration memory test. Minimized preview: zero mobile GPU submissions over
+three seconds. The editor returned to its closed-preview baseline: 71 engine frames
+in three seconds, versus 15 while covered. Restore retained the instance and resumed
+rendering. Detached-tab screenshots, gizmo movement, scene reload and undo also passed;
+the scene's original transform was restored. A cold launch took 17.2 seconds, with
+1,907 editor UI frames and a maximum frame gap of 59 ms during that sample.
 
 A buffer-coherence fixture reproduced five stale-data failures on the old engine after
 CPU updates, clears, copies, read-only shader use and a GPU write. The driver now submits
 queued changes before readback, updates CPU mirrors and invalidates them before writable
 shader use. Pending GPU reads return empty data instead of taking a synchronous fallback.
-The clean engine build, native importer build and all three fixture exports pass. The
-fresh browser library build cannot proceed until `nightly-2026-09-15` with `rust-src` is
-installed. The default native check stopped in LiveKit's WebRTC dependency build script
-when its HTTP client panicked in the sandbox; this is not a successful native check.
-Final graphics and editor lifecycle checks are still pending. Automatic approval review
-could not start the Linux browser check because account usage capacity was exhausted.
-The prepared npm runtime and service smoke result above still use the earlier migrated
-export, not the final engine fixes. Native phone tests have not run.
+The clean engine build, native importer, browser library and all three fixture exports
+pass. Linux Chromium passes buffer coherence, texture roundtrip and frame pacing against
+the rebuilt engine; the pacing fixture measured 59 browser FPS while limiting the engine
+to 4.98 FPS. Default native `cargo check --locked` and `cargo clippy --locked -- -D warnings`
+pass. GDScript format/lint checks pass across 414 files. A headless regression verifies
+content-loading guards on both main and worker threads. The final prepared npm runtime
+passes artifact verification, and its rebuilt service image passes the restricted-container
+smoke test. Native phone tests have not run. The embedded runtime still reports browser
+permission rejections for service-worker registration and automatic pointer lock; neither
+blocked these checks. Cold startup and the retained heap remain performance limitations.
 
 Dependency review uses the downloaded public OSV npm database and an offline scanner;
 no private dependency list is uploaded. The service's 91 production packages have no
@@ -137,6 +144,7 @@ GitHub requires a read-only
 `GODOT_SOURCE_TOKEN` for the private source repositories; no credential was added and
 the secret is currently absent from both the source parent and editor repositories.
 No remote workflow was dispatched. Submodule commits and the parent pin are prepared
-locally. Before merging, complete the fresh browser export, all three graphics assertions,
-runtime packaging and editor lifecycle checks, then pass CI with the source secret
-configured. Nothing has been pushed, published or deployed.
+locally, with the fresh browser export, graphics assertions, runtime packaging and editor
+lifecycle checks complete. Secret setup is deferred to the maintainer's handoff. Before
+merging, make the source commits available, configure the secret in both repositories
+and pass remote CI. Nothing has been pushed, published or deployed.
