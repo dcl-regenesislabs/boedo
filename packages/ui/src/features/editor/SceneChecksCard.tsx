@@ -165,7 +165,7 @@ export function SceneChecksCard(): JSX.Element | null {
               <p>{finding.detail}</p>
               {finding.fix !== undefined && (finding.fix.action !== THUMBNAIL_FIX_ACTION || canAskAssistant() || canChooseImage) && (
                 <div className="act">
-                  <Button variant="primary" size="sm" onClick={() => runFix(finding)}>
+                  <Button variant="primary" size="xs" onClick={() => runFix(finding)}>
                     {finding.fix.action === THUMBNAIL_FIX_ACTION && !canAskAssistant() ? <IconImport /> : FIX_ICON[finding.fix.action]}
                     {finding.fix.action === THUMBNAIL_FIX_ACTION && !canAskAssistant() ? 'Choose an image' : finding.fix.label}
                   </Button>
