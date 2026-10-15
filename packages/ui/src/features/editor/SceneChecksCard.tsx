@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { state } from '@scene/state'
 import { Button, Chip } from '../../ds'
-import { IconBot, IconFrame, IconPrefab } from '../../icons'
+import { IconBot, IconFolder, IconFrame, IconImport, IconPrefab } from '../../icons'
+import { launchParam } from '../../boot/launch-params'
+import { useUnusedFiles } from '../../unused-files'
+import { SceneSettingsModal } from '../scene-settings/SceneSettingsModal'
+import { REVIEW_UNUSED_ACTION, reviewUnusedFiles, unusedFilesFinding } from './unused-finding'
 import { useStore } from '../../core/store'
 import { revealPrefab } from '../../panels/prefab-store'
 import { canAskAssistant, prefillAssistant } from '../../panels/ai-store'
@@ -29,7 +33,8 @@ const IDLE_REFRESH_MS = 15_000
 const FIX_ICON: Record<string, JSX.Element> = {
   [THUMBNAIL_FIX_ACTION]: <IconBot />,
   'select-entity': <IconFrame />,
-  'reveal-prefab': <IconPrefab />
+  'reveal-prefab': <IconPrefab />,
+  [REVIEW_UNUSED_ACTION]: <IconFolder />
 }
 
 const LEVEL_LABEL: Record<SceneCheckLevel, string> = {
@@ -54,11 +59,17 @@ function signatureOf(findings: SceneFinding[]): string {
 }
 
 export function SceneChecksCard(): JSX.Element | null {
-  const findings = useSceneFindings()
+  const checked = useSceneFindings()
   const flash = useSceneChecksFlash()
   const frozen = useStore(() => state.frozen)
   const saveStatus = useStore(() => state.saveStatus)
   const health = useSceneHealth()
+  const files = useUnusedFiles(frozen)
+  const unusedFinding = frozen ? unusedFilesFinding(files.unused, files.older) : null
+  const findings = unusedFinding === null ? checked : [...checked, unusedFinding]
+  const projectDir = launchParam('project')
+  const canChooseImage = projectDir !== null && window.editorShell?.sceneSettings !== undefined
+  const [settings, setSettings] = useState(false)
   const [open, setOpen] = useState(false)
   const [dismissed, setDismissed] = useState('')
   const seenBlocking = useRef<Set<string> | null>(null)
@@ -97,7 +108,11 @@ export function SceneChecksCard(): JSX.Element | null {
   const runFix = (finding: SceneFinding): void => {
     const action = finding.fix?.action
     if (action === 'reveal-prefab' && finding.folder !== undefined) revealPrefab(finding.folder)
-    if (action === THUMBNAIL_FIX_ACTION) prefillAssistant('Make a thumbnail for this scene in a … style')
+    if (action === THUMBNAIL_FIX_ACTION) {
+      if (canAskAssistant()) prefillAssistant('Make a thumbnail for this scene in a … style')
+      else setSettings(true)
+    }
+    if (action === REVIEW_UNUSED_ACTION) reviewUnusedFiles(files.unused ?? [], files.older ?? [])
     if (action === 'select-entity' && finding.entityId !== undefined) {
       uiSelectEntity(finding.entityId, false, false)
       uiFocusEntity(finding.entityId)
@@ -148,17 +163,26 @@ export function SceneChecksCard(): JSX.Element | null {
                 <b>{finding.title}</b>
               </div>
               <p>{finding.detail}</p>
-              {finding.fix !== undefined && (finding.fix.action !== THUMBNAIL_FIX_ACTION || canAskAssistant()) && (
+              {finding.fix !== undefined && (finding.fix.action !== THUMBNAIL_FIX_ACTION || canAskAssistant() || canChooseImage) && (
                 <div className="act">
                   <Button variant="primary" size="sm" onClick={() => runFix(finding)}>
-                    {FIX_ICON[finding.fix.action]}
-                    {finding.fix.label}
+                    {finding.fix.action === THUMBNAIL_FIX_ACTION && !canAskAssistant() ? <IconImport /> : FIX_ICON[finding.fix.action]}
+                    {finding.fix.action === THUMBNAIL_FIX_ACTION && !canAskAssistant() ? 'Choose an image' : finding.fix.label}
                   </Button>
                 </div>
               )}
             </li>
           ))}
         </ul>
+      )}
+      {settings && projectDir !== null && (
+        <SceneSettingsModal
+          dir={projectDir}
+          onClose={() => setSettings(false)}
+          onSaved={(layoutChanged) => {
+            if (layoutChanged) void window.editorShell?.openProject(projectDir)
+          }}
+        />
       )}
     </div>
   )
