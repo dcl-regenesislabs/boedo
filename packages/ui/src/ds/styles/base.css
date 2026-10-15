@@ -10,6 +10,7 @@
 /* react-web Panel's frosted variant (in-world overlays) */
 .eui-panel.blur { background: rgba(22, 21, 24, 0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .eui-left  { position: absolute; top: 12px; left: 12px; bottom: 12px; width: 264px; animation: eui-rise 0.28s cubic-bezier(0.2, 0.9, 0.3, 1) backwards; }
+.eui-left-settled .eui-left { animation: none; }
 /* The right edge is a COLUMN (inspector above, docked assistant below): the
    column owns position + width so both panels share one resize handle; the
    panels just flex inside it. pointer-events:none keeps any gap click-through
