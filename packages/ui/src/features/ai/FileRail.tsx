@@ -8,8 +8,12 @@ export function FileRail(props: {
   active: string | null
   onOpen: (path: string) => void
   reloadKey: number
+  /** a filter owned by the surrounding panel, which then shows no search field of its own */
+  query?: string
+  fill?: boolean
 }): JSX.Element {
-  const [query, setQuery] = useState('')
+  const [ownQuery, setQuery] = useState('')
+  const query = props.query ?? ownQuery
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const { data, err, reload } = useLoad(() => dataLayerListFiles(IGNORED_DIRS), [props.reloadKey])
 
@@ -28,10 +32,12 @@ export function FileRail(props: {
     })
 
   return (
-    <div className="eui-studio-rail">
-      <div className="eui-studio-rail-head">
-        <SearchField value={query} onChange={setQuery} placeholder="Filter files" />
-      </div>
+    <div className={props.fill === true ? 'eui-studio-rail fill' : 'eui-studio-rail'}>
+      {props.query === undefined && (
+        <div className="eui-studio-rail-head">
+          <SearchField value={query} onChange={setQuery} placeholder="Filter files" />
+        </div>
+      )}
       <div className="eui-studio-rail-body">
         <PanelState err={err} onRetry={reload} loading={false} />
         {data === undefined && err === null && <RailSkeleton />}

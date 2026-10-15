@@ -14,7 +14,8 @@ import { LeftTabs, type LeftView } from './left-view'
 import { ensurePrefabsLoaded } from './prefab-store'
 import { SearchEmpty } from './SearchEmpty'
 import { catalogMatches, countPrefabMatches, matchHint } from './search-hints'
-import { IconCamera, IconEye, IconPlay, IconRefresh, IconSound, IconStop } from '../icons'
+import { IconCamera, IconEye, IconFileTree, IconPlay, IconRefresh, IconSound, IconStop, IconTiles } from '../icons'
+import { AssetsFileTree } from './AssetsFileTree'
 import { FilePreviewModal } from '../features/ai/FilePreview'
 import { fileKind } from '../script/project-files'
 import { AssetThumb } from './AssetThumb'
@@ -26,6 +27,8 @@ const LISTED = ['model', 'audio', 'image', 'video']
 // header below it stays on the first screen. A search is the one time the long
 // list IS the answer, so it lifts the cap.
 const LOCAL_PREVIEW = 7
+
+let treeView = false
 
 const ModelGlyph = (): JSX.Element => (
   <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -384,6 +387,8 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   const [category, setCategory] = useState('')
   const [models, setModels] = useState<string[] | null>(null)
   const [allFiles, setAllFiles] = useState(false)
+  const [tree, setTree] = useState(treeView)
+  const [reloads, setReloads] = useState(0)
   const files = useUnusedFiles()
   const older = files.older ?? []
   const unused = files.unused ?? []
@@ -392,6 +397,7 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
   const catalogFailed = useStore(() => state.assetCatalogFailed)
 
   const refresh = (): void => {
+    setReloads((n) => n + 1)
     setModels(null)
     // models first: the capped preview of My files should still show them
     void Promise.all([uiLoadLocalModels(), loadLocalSounds(), loadLocalMedia()]).then(([m, sounds, media]) => setModels([...m, ...sounds, ...media]))
@@ -442,6 +448,16 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
             options={[{ value: '', label: 'All' }, ...categories.map((c) => ({ value: c, label: c }))]}
           />
         )}
+        <IconButton
+          tip={tree ? 'Show your files as tiles' : 'Show every project file as a tree'}
+          style={{ flex: 'none' }}
+          onClick={() => {
+            treeView = !tree
+            setTree(treeView)
+          }}
+        >
+          {tree ? <IconTiles /> : <IconFileTree />}
+        </IconButton>
         <IconButton tip="Reload your files" style={{ flex: 'none' }} onClick={() => { refresh(); void refreshUnusedFiles(true) }}>
           <IconRefresh />
         </IconButton>
@@ -450,9 +466,9 @@ export function AssetsPanel(props: { width?: number; onView: (v: LeftView) => vo
         <div className="eui-asset-count">{busy ? 'Working…' : 'Loading…'}</div>
       )}
       <div className="eui-panel-body">
-        <Shelf title="My files" count={models === null ? undefined : local.length}>
-          <LocalGrid list={shownLocal} older={older} olderScanned={files.older !== null} unused={unused} onUploaded={refresh} />
-          {capped && (
+        <Shelf title="My files" count={models === null || tree ? undefined : local.length}>
+          {tree ? <AssetsFileTree query={filter} reloadKey={reloads} /> : <LocalGrid list={shownLocal} older={older} olderScanned={files.older !== null} unused={unused} onUploaded={refresh} />}
+          {!tree && capped && (
             <div className="eui-asset-more">
               <LinkButton onClick={() => setAllFiles(true)}>
                 Show all {local.length} files
