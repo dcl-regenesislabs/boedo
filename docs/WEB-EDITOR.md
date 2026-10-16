@@ -127,7 +127,8 @@ You need Node 24, git, and both repos side by side:
    Production uses the editor service's `/mobile-preview/` endpoint. The service image installs
    the pinned npm package and verifies its artifacts; editor CI never clones or builds Godot.
    For runtime development, `MOBILE_PREVIEW_EXPORT=/path/to/build/web` overrides the installed
-   runtime. Releases use npm OIDC in `test-godot-web`; the editor requires no source token.
+   runtime. Releases use npm OIDC in `dcl-regenesislabs/godot-web-preview`, which publishes a
+   `next` snapshot on every push to its `main`; the editor requires no source token.
    See [runtime packaging](../packages/mobile-preview/README.md). A fetch bridge relays the active
    scene's HTTP requests through the editor, including requests from scene workers; lifecycle, hot reload and captures use scoped postMessage.
    The local launch skips lobby/account background work and surrounding terrain.

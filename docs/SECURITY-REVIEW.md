@@ -67,8 +67,8 @@ and the trust boundaries. This review is not an independent penetration test.
 
 ## Mobile preview review — 2026-10-15
 
-The mobile runtime source and graphics fixtures now live in the `test-godot-web`
-parent workspace and its pinned engine/explorer submodules. The editor retains its
+The mobile runtime source and graphics fixtures now live in the public
+`dcl-regenesislabs/godot-web-preview` repository with its engine/explorer subtrees. The editor retains its
 npm runtime package, hosting, transport and UI. No package, branch or deployment
 was published during this review.
 
@@ -134,9 +134,9 @@ vulnerability-free. Bevy's lockfile is unchanged, including findings in its brow
 (crossbeam-epoch, quick-xml, ringbuf, ruint and ruzstd) that require separate dependency
 upgrades. Browser isolation does not replace those upgrades.
 
-Runtime releases now belong to `test-godot-web`: its CI builds and audits the pinned
-source, runs graphics assertions, verifies the npm artifact inventory and publishes stable
-tags through npm OIDC. The editor's private hosting adapter depends on an exact runtime
+Runtime releases now belong to `godot-web-preview`: its CI builds and audits the source,
+runs graphics assertions, verifies the npm artifact inventory and publishes `next`
+snapshots (every `main` push) and stable tags through npm OIDC. The editor's private hosting adapter depends on an exact runtime
 npm version; its service image installs that package and verifies its manifest before
 adding the editor transport. The editor has no source checkout, Rust/Godot build, source
 credential or publishing workflow. Production dependency checks still use offline OSV;
@@ -144,12 +144,10 @@ the scanner binary is version-pinned and checksum-verified. Source-fork release 
 remain disabled, and inherited distribution branch names are passed through environment
 variables rather than interpolated into shell code.
 
-The package name currently returns 404 from npm. Local integration uses a packed runtime;
-it does not establish that a registry install or OIDC publish succeeds. Before merging the
-editor, publish the first runtime, refresh its lockfile entry with the registry integrity,
-and pass remote CI. The current `0.1.0` lock entry intentionally has no invented integrity
-value. npm trusted-publisher setup and private source access belong only in the source
-repository. No package, branch, workflow or deployment was published or dispatched.
+The runtime repository publishes a `next` snapshot from every `main` push through npm
+OIDC; the editor pins one exact snapshot version, and its lock entry carries the registry
+integrity npm recorded at install time. Before merging a runtime bump, pass remote CI with
+that lock entry. npm trusted-publisher setup belongs only in the source repository.
 
 The distribution change passed editor validation (2,642 tests in 265 files and all
 six gates), source packaging/release checks and workflow lint. A locally packed runtime

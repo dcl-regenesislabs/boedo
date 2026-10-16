@@ -2,7 +2,9 @@
 
 `@dcl-editor/mobile-preview` is the editor's private hosting and transport adapter.
 It depends on an exact npm version of `@dcl-regenesislabs/mobile-preview-runtime`,
-published by [test-godot-web](https://github.com/kuruk-mm/test-godot-web) using npm OIDC.
+published by [godot-web-preview](https://github.com/dcl-regenesislabs/godot-web-preview)
+using npm OIDC: every push to its `main` publishes a `next` snapshot versioned
+`0.1.0-<run id>.commit-<sha>`.
 The editor never clones or builds Godot source and needs no source-access token.
 bevy-explorer has no mobile runtime dependency or configuration.
 
@@ -23,17 +25,18 @@ For local runtime development, pass an exported directory to the build command o
 set `MOBILE_PREVIEW_EXPORT=/path/to/mobile/build/web` before `npm run dev:web`.
 This explicit development override bypasses npm; normal installs and CI use npm.
 
-To adopt the newest release while retaining an exact version and lockfile integrity:
+To adopt the newest snapshot while retaining an exact version and lockfile integrity:
 
 ```sh
-npm install --save-exact @dcl-regenesislabs/mobile-preview-runtime@latest -w @dcl-editor/mobile-preview --ignore-scripts --no-audit
+v=$(npm view @dcl-regenesislabs/mobile-preview-runtime dist-tags.next)
+npm install --save-exact @dcl-regenesislabs/mobile-preview-runtime@$v -w @dcl-editor/mobile-preview --ignore-scripts --no-audit
 ```
 
-Review and commit the package/lockfile changes together. Runtime releases and npm
-trusted-publisher setup live in the source repository. For the initial release,
-`0.1.0` must exist in npm before clean editor installs can succeed. Refresh the
-lockfile from that release before merging; the prepared entry has no fabricated
-checksum. Local validation can use the source repository's packed tarball.
+Review and commit the package/lockfile changes together; the lock entry must carry
+npm's integrity for the registry tarball. Do not use `latest`: it still points at the
+bootstrap placeholder until the runtime ships a stable tag. Runtime releases and npm
+trusted-publisher setup live in the source repository. Local validation can use the
+source repository's packed tarball.
 
 The runtime requires HTTPS or loopback, WebGPU and the isolation headers provided
 by this server. Its fetch bridge relays only active-scene metadata, content and
