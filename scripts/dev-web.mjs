@@ -66,8 +66,12 @@ if (!values['no-build']) {
     run('npm', ['run', 'export-static', '-w', '@dcl-editor/scene'])
   }
   run('npm', ['run', 'build', '-w', '@dcl-editor/web'])
+  // the phone preview is optional: without its runtime the stack starts with the menu entry hidden
+  console.log('▶ npm run build -w @dcl-editor/mobile-preview')
+  if (spawnSync('npm', ['run', 'build', '-w', '@dcl-editor/mobile-preview'], { cwd: root, stdio: 'inherit' }).status !== 0) {
+    console.warn('[mobile] runtime build failed; starting without the phone preview')
+  }
 }
-run('npm', ['run', 'build', '-w', '@dcl-editor/mobile-preview'])
 
 const children = []
 function start(name, command, args, options = {}) {

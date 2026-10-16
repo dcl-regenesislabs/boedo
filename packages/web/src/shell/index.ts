@@ -118,7 +118,7 @@ export const createWebShell: CreateWebShell = ({ host, sceneCompiler }) => {
   const phone = createPhonePreview(mobilePreviewEntry(host.pageDir, services?.services.projects ?? null), previewIdOf, async (realmId) => previewMachineId(await secret, wallet() ?? 'guest', realmId))
   const emit = (event: SceneBuildEvent): void => {
     for (const listener of buildListeners) listener(event)
-    if (event.type === 'bundleSaved' && current !== null) void phone.built(current.id)
+    if (event.type === 'bundleSaved' && current !== null) phone.built(current.id).catch((error: unknown) => console.error('[editor] mobile preview reload failed', error))
   }
   // where each project's npm packages stand, for as long as the page lives
   const packages = new Map<string, ProjectPackages>()

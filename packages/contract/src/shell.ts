@@ -253,7 +253,8 @@ export interface PreviewCaptureSignal {
   removeEventListener(type: 'abort', listener: () => void): void
 }
 
-// `no-client`: no app registered for decentraland://; `unavailable`: no mobile web export.
+// `no-scene`: the scene servers are still starting; `no-client`: no app registered for decentraland://;
+// `unavailable`: the runtime is missing or unreachable, the launch was cancelled, or a pop-up was blocked.
 export type OpenPreview =
   | { ok: true }
   | { ok: false; reason: 'no-scene' | 'no-client' | 'unavailable' }

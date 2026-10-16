@@ -10,8 +10,11 @@ createServer(async (request, response) => {
     for (const [key, value] of Object.entries(request.headers)) if (value !== undefined) headers.set(key, String(value))
     const result = await handle(new Request(`http://127.0.0.1:${port}${request.url}`, { method: request.method, headers }))
     response.writeHead(result.status, Object.fromEntries(result.headers))
-    if (result.body) Readable.from(result.body).pipe(response)
-    else response.end()
+    if (result.body) {
+      const body = Readable.from(result.body)
+      body.on('error', (error) => { console.error(error); response.destroy(error) })
+      body.pipe(response)
+    } else response.end()
   } catch (error) {
     console.error(error)
     response.writeHead(500).end()

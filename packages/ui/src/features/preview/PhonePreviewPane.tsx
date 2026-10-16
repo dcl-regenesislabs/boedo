@@ -36,7 +36,10 @@ export function PhonePreviewPane({ left, right, panelControls }: { left: number;
   const move = (mode: 'embedded' | 'minimized' | 'tab'): void => {
     setError(null)
     void window.editorShell?.phonePreview?.(mode).then((result) => {
-      if (!result.ok) setError('The preview could not open. Allow pop-ups for this page and try again.')
+      if (result.ok) return
+      if (result.reason === 'no-scene') setError('The scene is still starting. Try again in a moment.')
+      else if (mode === 'tab') setError('The preview could not open in a tab. Allow pop-ups for this page and try again.')
+      else setError('The mobile preview is not available right now.')
     }).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)))
   }
   const expandLabel = preview.mode === 'minimized' ? 'Restore preview' : preview.mode === 'tab' ? 'Move preview here' : 'Open preview in tab'

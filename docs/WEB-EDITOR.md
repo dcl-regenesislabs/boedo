@@ -170,12 +170,12 @@ behind Cloudflare. It stores projects and runs the assistant on the team's Claud
   `TICKET_SECRET`, `WKC_METRICS_BEARER_TOKEN`, `STORAGE_WALLETS` and, with a model credential,
   `ASSISTANT_WALLETS` (both `*` here). The credential is `ANTHROPIC_OAUTH_SETUP_TOKEN` from
   `claude setup-token` (`sk-ant-oat…`); an empty `ANTHROPIC_OAUTH_SETUP_TOKEN=` line crashes startup.
-- **Redeploy:** prepare `packages/mobile-preview/dist` first (or use the release
-  workflow, which builds it from the pinned source); the image rejects missing runtime artifacts.
+- **Redeploy:** the image installs the pinned mobile runtime from npm and builds
+  `packages/mobile-preview/dist` itself; it rejects missing runtime artifacts.
 
   ```bash
   rsync -a --delete package.json package-lock.json root@162.243.43.60:/opt/dcl-editor/
-  rsync -a --delete --exclude .env --exclude compose.override.yaml --exclude node_modules packages/contract packages/service root@162.243.43.60:/opt/dcl-editor/packages/
+  rsync -a --delete --exclude .env --exclude compose.override.yaml --exclude node_modules --exclude dist packages/contract packages/service packages/mobile-preview root@162.243.43.60:/opt/dcl-editor/packages/
   ssh root@162.243.43.60 'cd /opt/dcl-editor && docker build -f packages/service/Dockerfile -t dcl-editor-service:local . \
     && cd packages/service && docker compose up -d && sleep 5 && curl -fsS http://127.0.0.1:8787/health/ready'
   ```
