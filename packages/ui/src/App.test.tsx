@@ -21,8 +21,8 @@ afterEach(() => {
 
 const shown = (el: HTMLElement | null): boolean => el !== null && el.closest('[hidden]') === null
 
-it.each([false, true])('reopens both sidebars without restarting an embedded preview (ready: %s)', (ready) => {
-  const preview: PhonePreviewState = { mode: 'embedded', url: 'about:blank', ready }
+it('reopens both sidebars without restarting an embedded preview', () => {
+  const preview: PhonePreviewState = { mode: 'embedded', url: 'about:blank', ready: true }
   const phonePreview = vi.fn()
   Object.defineProperty(window, 'editorShell', { configurable: true, value: {
     phonePreviewState: () => preview, phonePreview

@@ -39,8 +39,9 @@ it('forwards POST bytes and handles HEAD without a response body', async () => {
   expect(new TextDecoder().decode(request.body)).toBe('{"pointers":["0,0"]}')
   receive({ requestId: request.requestId, status: 200, body: new ArrayBuffer(0) })
   expect((await post).status).toBe(200)
+  // the transport buffers every reply, so a HEAD or 304 arrives with an empty body the Response constructor would reject
   const head = scope.fetch(realm + '/about', { method: 'HEAD' })
-  receive({ requestId: send.mock.calls[1][0].requestId as string, status: 200 })
+  receive({ requestId: send.mock.calls[1][0].requestId as string, status: 304, body: new ArrayBuffer(0) })
   expect(await (await head).text()).toBe('')
 })
 

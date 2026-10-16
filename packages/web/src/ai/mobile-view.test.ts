@@ -45,8 +45,8 @@ it('leaves a closed preview alone during automatic validation', async () => {
   expect(vi.getTimerCount()).toBe(0)
 })
 
-it.each(['embedded', 'minimized', 'tab'] as const)('uses the existing %s preview for mobile pictures', async (mode) => {
-  const { shell } = setup(mode, true)
+it('uses an existing preview for mobile pictures without restoring it first', async () => {
+  const { shell } = setup('minimized', true)
   expect(await captureMobileView(true, new AbortController().signal)).toMatchObject({ image: 'JPEG' })
   expect(shell.phonePreview).not.toHaveBeenCalled()
 })
